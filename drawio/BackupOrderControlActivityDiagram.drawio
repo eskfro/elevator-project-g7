@@ -1,0 +1,206 @@
+<mxfile host="app.diagrams.net" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:147.0) Gecko/20100101 Firefox/147.0" version="29.3.6">
+  <diagram name="Page-1" id="D5cvEIdI8sMUkoWkvEyq">
+    <mxGraphModel dx="2068" dy="578" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1200" pageHeight="1920" background="#ffffff" math="0" shadow="0" adaptiveColors="none">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="0Uz3LKo-crwQmXWdohBY-1" parent="1" style="text;html=1;whiteSpace=wrap;overflow=hidden;rounded=0;" value="&lt;h1 style=&quot;margin-top: 0px;&quot;&gt;Primary order control (a)&lt;/h1&gt;&lt;p&gt;&lt;br&gt;&lt;/p&gt;" vertex="1">
+          <mxGeometry height="50" width="313.5" x="435.5" y="25" as="geometry" />
+        </mxCell>
+        <mxCell id="hm_ofVD60qdnigaYp8bY-6" parent="1" style="rhombus;whiteSpace=wrap;html=1;fontSize=10;" value="" vertex="1">
+          <mxGeometry height="90" width="90" x="402" y="887" as="geometry" />
+        </mxCell>
+        <mxCell id="hm_ofVD60qdnigaYp8bY-7" parent="1" style="rhombus;whiteSpace=wrap;html=1;fontSize=10;" value="" vertex="1">
+          <mxGeometry height="90" width="90" x="151" y="893" as="geometry" />
+        </mxCell>
+        <mxCell id="hm_ofVD60qdnigaYp8bY-10" parent="1" style="rhombus;whiteSpace=wrap;html=1;fontSize=10;" value="" vertex="1">
+          <mxGeometry height="90" width="90" x="136" y="696" as="geometry" />
+        </mxCell>
+        <mxCell id="hm_ofVD60qdnigaYp8bY-11" parent="1" style="rhombus;whiteSpace=wrap;html=1;fontSize=10;" value="" vertex="1">
+          <mxGeometry height="90" width="90" x="209" y="889" as="geometry" />
+        </mxCell>
+        <mxCell id="hm_ofVD60qdnigaYp8bY-88" edge="1" parent="1" source="hm_ofVD60qdnigaYp8bY-21" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="hm_ofVD60qdnigaYp8bY-87">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="hm_ofVD60qdnigaYp8bY-21" parent="1" style="strokeWidth=2;html=1;shape=mxgraph.flowchart.start_2;whiteSpace=wrap;" value="" vertex="1">
+          <mxGeometry height="30" width="30" x="543" y="82" as="geometry" />
+        </mxCell>
+        <mxCell id="hm_ofVD60qdnigaYp8bY-113" edge="1" parent="1" source="hm_ofVD60qdnigaYp8bY-37" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="hm_ofVD60qdnigaYp8bY-105">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="hm_ofVD60qdnigaYp8bY-37" parent="1" style="rounded=1;whiteSpace=wrap;html=1;" value="&lt;font&gt;&lt;span style=&quot;background-color: rgb(255, 255, 255); color: rgb(102, 102, 102); font-family: &amp;quot;Google Sans&amp;quot;, Arial, sans-serif;&quot;&gt;–&lt;/span&gt;&lt;span style=&quot;color: light-dark(rgb(102, 102, 102), rgb(149, 149, 149)); background-color: transparent;&quot;&gt;&amp;nbsp;Compute (if hall order) which elevator to take order&lt;/span&gt;&lt;/font&gt;&lt;div&gt;&lt;font style=&quot;color: rgb(102, 102, 102);&quot;&gt;&lt;span style=&quot;background-color: rgb(255, 255, 255); font-family: &amp;quot;Google Sans&amp;quot;, Arial, sans-serif;&quot;&gt;–&lt;/span&gt;&amp;nbsp;Update potential order table&lt;/font&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="63" width="156" x="712" y="171.73000000000002" as="geometry" />
+        </mxCell>
+        <mxCell id="hm_ofVD60qdnigaYp8bY-49" parent="1" style="rounded=1;whiteSpace=wrap;html=1;" value="" vertex="1">
+          <mxGeometry height="50" width="162.5" x="518.75" y="875" as="geometry" />
+        </mxCell>
+        <mxCell id="wWMnfEIcIBLoxX74VPgO-13" edge="1" parent="1" source="hm_ofVD60qdnigaYp8bY-69" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="wWMnfEIcIBLoxX74VPgO-1" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="hm_ofVD60qdnigaYp8bY-69" parent="1" style="strokeWidth=2;html=1;shape=mxgraph.flowchart.start_2;whiteSpace=wrap;" value="" vertex="1">
+          <mxGeometry height="30" width="30" x="-637.5" y="117" as="geometry" />
+        </mxCell>
+        <mxCell id="hm_ofVD60qdnigaYp8bY-84" parent="1" style="text;html=1;whiteSpace=wrap;overflow=hidden;rounded=0;" value="&lt;h1 style=&quot;margin-top: 0px;&quot;&gt;Primary order control (b)&lt;/h1&gt;&lt;p&gt;&lt;br&gt;&lt;/p&gt;" vertex="1">
+          <mxGeometry height="50" width="325" x="-769" y="62" as="geometry" />
+        </mxCell>
+        <mxCell id="hm_ofVD60qdnigaYp8bY-109" edge="1" parent="1" source="hm_ofVD60qdnigaYp8bY-87" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="hm_ofVD60qdnigaYp8bY-37">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="hm_ofVD60qdnigaYp8bY-123" edge="1" parent="1" source="hm_ofVD60qdnigaYp8bY-87" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="hm_ofVD60qdnigaYp8bY-103">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="hm_ofVD60qdnigaYp8bY-87" parent="1" style="rhombus;whiteSpace=wrap;html=1;fontSize=10;" value="select" vertex="1">
+          <mxGeometry height="68.45" width="74" x="521" y="169" as="geometry" />
+        </mxCell>
+        <mxCell id="hm_ofVD60qdnigaYp8bY-99" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" value="&lt;font style=&quot;font-size: 11px;&quot;&gt;&lt;span style=&quot;background-color: light-dark(#ffffff, var(--ge-dark-color, #121212));&quot;&gt;case: Unassigned order list empty&lt;/span&gt;&lt;/font&gt;" vertex="1">
+          <mxGeometry height="30" width="125" x="583" y="171.73000000000002" as="geometry" />
+        </mxCell>
+        <mxCell id="hm_ofVD60qdnigaYp8bY-137" edge="1" parent="1" source="hm_ofVD60qdnigaYp8bY-103" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="hm_ofVD60qdnigaYp8bY-127">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="hm_ofVD60qdnigaYp8bY-103" parent="1" style="rounded=1;whiteSpace=wrap;html=1;" value="&lt;font&gt;&lt;span style=&quot;background-color: rgb(255, 255, 255); color: rgb(102, 102, 102); font-family: &amp;quot;Google Sans&amp;quot;, Arial, sans-serif;&quot;&gt;–&lt;/span&gt;&lt;span style=&quot;color: light-dark(rgb(102, 102, 102), rgb(149, 149, 149)); background-color: transparent;&quot;&gt;&amp;nbsp;Update active- and potential order table&lt;/span&gt;&lt;/font&gt;&lt;div&gt;&lt;font style=&quot;color: rgb(102, 102, 102);&quot;&gt;&lt;span style=&quot;font-family: &amp;quot;Google Sans&amp;quot;, Arial, sans-serif; background-color: rgb(255, 255, 255);&quot;&gt;– Empty clear list&lt;/span&gt;&lt;/font&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="50.45" width="156" x="480" y="370" as="geometry" />
+        </mxCell>
+        <mxCell id="hm_ofVD60qdnigaYp8bY-126" edge="1" parent="1" source="hm_ofVD60qdnigaYp8bY-104" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="hm_ofVD60qdnigaYp8bY-110">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="972" y="530" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="hm_ofVD60qdnigaYp8bY-104" parent="1" style="rounded=1;whiteSpace=wrap;html=1;" value="&lt;div&gt;&lt;span style=&quot;color: rgb(102, 102, 102);&quot;&gt;- Remove the order from potential order table&lt;/span&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="44" width="156" x="894" y="370" as="geometry" />
+        </mxCell>
+        <mxCell id="hm_ofVD60qdnigaYp8bY-111" edge="1" parent="1" source="hm_ofVD60qdnigaYp8bY-105" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="hm_ofVD60qdnigaYp8bY-104">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="hm_ofVD60qdnigaYp8bY-112" edge="1" parent="1" source="hm_ofVD60qdnigaYp8bY-105" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="hm_ofVD60qdnigaYp8bY-106">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="hm_ofVD60qdnigaYp8bY-105" parent="1" style="rhombus;whiteSpace=wrap;html=1;fontSize=10;" value="&lt;span style=&quot;background-color: light-dark(#ffffff, var(--ge-dark-color, #121212));&quot;&gt;Acknowledgement succeeded&lt;/span&gt;" vertex="1">
+          <mxGeometry height="57.17" width="63.25" x="758.37" y="267.88" as="geometry" />
+        </mxCell>
+        <mxCell id="hm_ofVD60qdnigaYp8bY-125" edge="1" parent="1" source="hm_ofVD60qdnigaYp8bY-106" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="hm_ofVD60qdnigaYp8bY-110">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="hm_ofVD60qdnigaYp8bY-106" parent="1" style="rounded=1;whiteSpace=wrap;html=1;" value="&lt;div&gt;&lt;font&gt;&lt;span style=&quot;background-color: rgb(255, 255, 255); color: rgb(102, 102, 102); font-family: &amp;quot;Google Sans&amp;quot;, Arial, sans-serif;&quot;&gt;–&lt;/span&gt;&lt;span style=&quot;color: light-dark(rgb(102, 102, 102), rgb(149, 149, 149)); background-color: transparent;&quot;&gt;&amp;nbsp;Remove order from&amp;nbsp; &amp;nbsp; &amp;nbsp;unassigned order list&lt;/span&gt;&lt;/font&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;color: rgb(102, 102, 102);&quot;&gt;&lt;font&gt;&lt;span style=&quot;background-color: rgb(255, 255, 255); font-family: &amp;quot;Google Sans&amp;quot;, Arial, sans-serif;&quot;&gt;–&lt;/span&gt;&amp;nbsp;Update active order table&lt;/font&gt;&lt;/span&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;color: rgb(102, 102, 102);&quot;&gt;&lt;font&gt;&lt;span style=&quot;font-family: &amp;quot;Google Sans&amp;quot;, Arial, sans-serif; background-color: rgb(255, 255, 255);&quot;&gt;– Remove wait mark from corresponding clear request if relevant&lt;/span&gt;&lt;/font&gt;&lt;/span&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="100" width="156" x="711.99" y="370" as="geometry" />
+        </mxCell>
+        <mxCell id="hm_ofVD60qdnigaYp8bY-136" edge="1" parent="1" source="hm_ofVD60qdnigaYp8bY-110" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="hm_ofVD60qdnigaYp8bY-127">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="790" y="591" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="hm_ofVD60qdnigaYp8bY-110" parent="1" style="rhombus;whiteSpace=wrap;html=1;fontSize=10;" value="" vertex="1">
+          <mxGeometry height="57.17" width="58.64" x="760.6800000000001" y="501" as="geometry" />
+        </mxCell>
+        <mxCell id="hm_ofVD60qdnigaYp8bY-117" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" value="yes" vertex="1">
+          <mxGeometry height="30" width="60" x="774" y="326" as="geometry" />
+        </mxCell>
+        <mxCell id="hm_ofVD60qdnigaYp8bY-118" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" value="no (timeout, etc...)" vertex="1">
+          <mxGeometry height="30" width="112" x="849" y="271.5" as="geometry" />
+        </mxCell>
+        <mxCell id="hm_ofVD60qdnigaYp8bY-124" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" value="&lt;span style=&quot;background-color: light-dark(#ffffff, var(--ge-dark-color, #121212));&quot;&gt;case: Clear list not empty&amp;nbsp;&lt;/span&gt;" vertex="1">
+          <mxGeometry height="30" width="167" x="487" y="277" as="geometry" />
+        </mxCell>
+        <mxCell id="hm_ofVD60qdnigaYp8bY-135" edge="1" parent="1" source="hm_ofVD60qdnigaYp8bY-127" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="558" y="636" />
+              <mxPoint x="444" y="636" />
+              <mxPoint x="444" y="134" />
+            </Array>
+            <mxPoint x="558.0000000000005" y="134.1999969482422" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="hm_ofVD60qdnigaYp8bY-127" parent="1" style="rhombus;whiteSpace=wrap;html=1;fontSize=10;" value="" vertex="1">
+          <mxGeometry height="57.17" width="58.64" x="528.6800000000001" y="562" as="geometry" />
+        </mxCell>
+        <mxCell id="wWMnfEIcIBLoxX74VPgO-7" edge="1" parent="1" source="wWMnfEIcIBLoxX74VPgO-1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="wWMnfEIcIBLoxX74VPgO-4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="wWMnfEIcIBLoxX74VPgO-12" edge="1" parent="1" source="wWMnfEIcIBLoxX74VPgO-1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="wWMnfEIcIBLoxX74VPgO-3">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="-719" y="225" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="wWMnfEIcIBLoxX74VPgO-28" edge="1" parent="1" source="wWMnfEIcIBLoxX74VPgO-1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="-504.99999321831604" y="320.33333333333337" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="wWMnfEIcIBLoxX74VPgO-1" parent="1" style="rhombus;whiteSpace=wrap;html=1;" value="select" vertex="1">
+          <mxGeometry height="74" width="73" x="-659" y="188" as="geometry" />
+        </mxCell>
+        <mxCell id="wWMnfEIcIBLoxX74VPgO-26" edge="1" parent="1" source="wWMnfEIcIBLoxX74VPgO-3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="wWMnfEIcIBLoxX74VPgO-22">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="-719" y="485.9999898274741" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="wWMnfEIcIBLoxX74VPgO-3" parent="1" style="rounded=1;whiteSpace=wrap;html=1;" value="&lt;div&gt;&lt;font&gt;&lt;span style=&quot;background-color: rgb(255, 255, 255); color: rgb(102, 102, 102); font-family: &amp;quot;Google Sans&amp;quot;, Arial, sans-serif;&quot;&gt;–&lt;/span&gt;&lt;span style=&quot;color: light-dark(rgb(102, 102, 102), rgb(149, 149, 149)); background-color: transparent;&quot;&gt;&amp;nbsp;Add new clear request to clear list&lt;/span&gt;&lt;/font&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="46" width="120" x="-779" y="321" as="geometry" />
+        </mxCell>
+        <mxCell id="wWMnfEIcIBLoxX74VPgO-24" edge="1" parent="1" source="wWMnfEIcIBLoxX74VPgO-4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="wWMnfEIcIBLoxX74VPgO-22">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="-335" y="486" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="wWMnfEIcIBLoxX74VPgO-4" parent="1" style="rounded=1;whiteSpace=wrap;html=1;" value="&lt;font&gt;&lt;span style=&quot;background-color: rgb(255, 255, 255); color: rgb(102, 102, 102); font-family: &amp;quot;Google Sans&amp;quot;, Arial, sans-serif;&quot;&gt;–&lt;/span&gt;&lt;span style=&quot;color: light-dark(rgb(102, 102, 102), rgb(149, 149, 149)); background-color: transparent;&quot;&gt;&amp;nbsp;Remove relevant elevator from unfeasible list&lt;/span&gt;&lt;/font&gt;" vertex="1">
+          <mxGeometry height="60" width="120" x="-395" y="319" as="geometry" />
+        </mxCell>
+        <mxCell id="wWMnfEIcIBLoxX74VPgO-25" edge="1" parent="1" source="wWMnfEIcIBLoxX74VPgO-5" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="wWMnfEIcIBLoxX74VPgO-22">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="-524.5" y="486.66664632161473" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="wWMnfEIcIBLoxX74VPgO-5" parent="1" style="rounded=1;whiteSpace=wrap;html=1;align=left;" value="&lt;div align=&quot;left&quot;&gt;&lt;font&gt;&lt;span style=&quot;background-color: rgb(255, 255, 255); color: rgb(102, 102, 102); font-family: &amp;quot;Google Sans&amp;quot;, Arial, sans-serif;&quot;&gt;–&lt;/span&gt;&lt;span style=&quot;color: light-dark(rgb(102, 102, 102), rgb(149, 149, 149)); background-color: transparent;&quot;&gt;&amp;nbsp;Add relevant hall orders back to unassigned orders list&lt;/span&gt;&lt;/font&gt;&lt;/div&gt;&lt;div align=&quot;left&quot;&gt;&lt;font&gt;&lt;span style=&quot;color: rgb(102, 102, 102); font-family: &amp;quot;Google Sans&amp;quot;, Arial, sans-serif; background-color: rgb(255, 255, 255);&quot;&gt;– Add old hall orders to clear list but mark them with wait&lt;/span&gt;&lt;span style=&quot;color: light-dark(rgb(102, 102, 102), rgb(149, 149, 149)); background-color: transparent;&quot;&gt;&lt;/span&gt;&lt;/font&gt;&lt;/div&gt;&lt;div align=&quot;left&quot;&gt;&lt;font&gt;&lt;span style=&quot;color: rgb(102, 102, 102); font-family: &amp;quot;Google Sans&amp;quot;, Arial, sans-serif; background-color: rgb(255, 255, 255);&quot;&gt;– Add relevant elevator to unfeasible list.&amp;nbsp;&lt;/span&gt;&lt;/font&gt;&lt;/div&gt;&lt;div align=&quot;left&quot;&gt;&lt;font&gt;&lt;span style=&quot;color: rgb(102, 102, 102); font-family: &amp;quot;Google Sans&amp;quot;, Arial, sans-serif; background-color: rgb(255, 255, 255);&quot;&gt;–&lt;/span&gt;&lt;/font&gt;&lt;font&gt;&lt;span style=&quot;color: rgb(102, 102, 102); font-family: &amp;quot;Google Sans&amp;quot;, Arial, sans-serif; background-color: rgb(255, 255, 255);&quot;&gt;&amp;nbsp;Start feasible timer if connection not lost&lt;/span&gt;&lt;/font&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="109" width="231" x="-644" y="321" as="geometry" />
+        </mxCell>
+        <mxCell id="wWMnfEIcIBLoxX74VPgO-23" edge="1" parent="1" source="wWMnfEIcIBLoxX74VPgO-6" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="wWMnfEIcIBLoxX74VPgO-22">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="-921" y="486" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="wWMnfEIcIBLoxX74VPgO-6" parent="1" style="rounded=1;whiteSpace=wrap;html=1;" value="&lt;div&gt;&lt;font&gt;&lt;font style=&quot;color: rgb(102, 102, 102);&quot;&gt;&amp;nbsp;&lt;/font&gt;&lt;span style=&quot;background-color: rgb(255, 255, 255); color: rgb(102, 102, 102); font-family: &amp;quot;Google Sans&amp;quot;, Arial, sans-serif;&quot;&gt;–&lt;/span&gt;&lt;span style=&quot;color: light-dark(rgb(102, 102, 102), rgb(149, 149, 149)); background-color: transparent;&quot;&gt;&amp;nbsp;Add new order to unassigned order list&lt;/span&gt;&lt;/font&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="42" width="144" x="-993" y="321" as="geometry" />
+        </mxCell>
+        <mxCell id="wWMnfEIcIBLoxX74VPgO-11" edge="1" parent="1" source="wWMnfEIcIBLoxX74VPgO-1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.459;entryY=0.017;entryDx=0;entryDy=0;entryPerimeter=0;" target="wWMnfEIcIBLoxX74VPgO-6">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="wWMnfEIcIBLoxX74VPgO-14" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" value="&lt;span style=&quot;background-color: light-dark(#ffffff, var(--ge-dark-color, #121212));&quot;&gt;case: New order request&lt;/span&gt;" vertex="1">
+          <mxGeometry height="30" width="138" x="-981" y="249" as="geometry" />
+        </mxCell>
+        <mxCell id="wWMnfEIcIBLoxX74VPgO-17" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" value="&lt;span style=&quot;background-color: light-dark(#ffffff, var(--ge-dark-color, #121212));&quot;&gt;case: New clear request&lt;/span&gt;" vertex="1">
+          <mxGeometry height="30" width="137" x="-776" y="251" as="geometry" />
+        </mxCell>
+        <mxCell id="wWMnfEIcIBLoxX74VPgO-18" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" value="&lt;span style=&quot;background-color: light-dark(#ffffff, var(--ge-dark-color, #121212));&quot;&gt;case: Backup connection lost or order times out&lt;/span&gt;" vertex="1">
+          <mxGeometry height="30" width="147" x="-581" y="253" as="geometry" />
+        </mxCell>
+        <mxCell id="wWMnfEIcIBLoxX74VPgO-20" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" value="&lt;span style=&quot;background-color: light-dark(#ffffff, var(--ge-dark-color, #121212));&quot;&gt;case: Backup connection restored or feasible timeout&lt;/span&gt;" vertex="1">
+          <mxGeometry height="30" width="157" x="-397" y="253" as="geometry" />
+        </mxCell>
+        <mxCell id="wWMnfEIcIBLoxX74VPgO-27" edge="1" parent="1" source="wWMnfEIcIBLoxX74VPgO-22" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="-622" y="549" />
+              <mxPoint x="-1026" y="549" />
+              <mxPoint x="-1026" y="167" />
+            </Array>
+            <mxPoint x="-622.4999999999998" y="166.64705164292286" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="wWMnfEIcIBLoxX74VPgO-22" parent="1" style="rhombus;whiteSpace=wrap;html=1;" value="" vertex="1">
+          <mxGeometry height="74" width="73" x="-659" y="449" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
