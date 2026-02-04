@@ -1,7 +1,7 @@
 package main
 
 import (
-	"elevator-project-g7/internal/elevator"
+	"elevator-project-g7/internal/movement"
 	"elevator-project-g7/internal/parser"
 	"fmt"
 	"os"
@@ -13,16 +13,16 @@ import (
 // Packages need to start with lowecase
 
 func main() {
-	// Extract os args
+	// Parse args
 	id, port, err := parser.ParseOsArgs(os.Args)
 	if err != nil {
 		fmt.Println("Failed to parse os args")
 		return
 	}
 
-	// Things
-	elevator.InitPhysicalElevator("localhost", port, 2)
-	elevator.CreateElevator(id, port)
+	// init things
+	movement.MovePhysicalElevatorToFloor("localhost", port, 0)
+	movement.CreateElevator(id, port)
 	fmt.Printf("elevator starting | id = %d | port = %d\n", id, port)
 
 }
