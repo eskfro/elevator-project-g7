@@ -40,13 +40,13 @@ func CreateElevator(_Id int, _Port int) ElevatorPhysicalInfo {
 	return Elev
 }
 
-func MovePhysicalElevatorToFloor(ip string, port int, _initFloor int) {
+func InitPhysicalElevatorToFloor(ip string, port int, _initFloor int) {
 
 	initFloor := _initFloor
 
 	elevio.Init(fmt.Sprintf("localhost:%d", port), N_FLOORS)
 
-	elevio.SetMotorDirection(elevio.MD_Up)
+	elevio.SetMotorDirection(elevio.MD_Down)
 	for elevio.GetFloor() == -1 {
 	}
 	elevio.SetMotorDirection(elevio.MD_Stop)
