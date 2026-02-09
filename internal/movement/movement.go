@@ -95,13 +95,13 @@ func CreateElevator(_Id int, _Port int) ElevatorPhysicalInfo {
 	Elev.Floor = elevio.GetFloor()
 	Elev.MotorDir = elevio.MD_Stop
 	Elev.State = EM_Idle
-	
+	Elev.DoorTimer = timer.New(DOOR_OPEN_TIME)
+
 	for f := 0; f < N_FLOORS; f++ {
 		for b := 0; b < N_BUTTONS; b++ {
 			Elev.LocalOrderTable[f][b] = false
 		}
 	}
-	Elev.DoorTimer = timer.New(DOOR_OPEN_TIME)
 
 	return Elev
 }
@@ -140,12 +140,8 @@ func FSM_OnFloorArrival(elev *ElevatorPhysicalInfo, floor int) {
 
 			//Open door
 			elevio.SetDoorOpenLamp(true)
-			if !DoorTimer.Stop() {
-				select {case <- DoorTimer.C: default:}
-			}
-			DoorTimer.Reset(DOOR_OPEN_TIME)
+			timer.Start(elev.DoorTimer)
 			elev.State = EM_DoorOpen
-
 
 			//TODO: requests.clearShit //Implement clearShit in requests
 			//TODO: C koden kaller setAllLights her? Skal vi??
@@ -153,14 +149,12 @@ func FSM_OnFloorArrival(elev *ElevatorPhysicalInfo, floor int) {
 	}
 }
 
-func FSM_OnDoorTimeout(elev *ElevatorPhysicalInfo){
-	if elev.Obstructed{
-		if !DoorTimer.Stop() {
-				select {case <- DoorTimer.C: default:}
-		}
-		DoorTimer.Reset(DOOR_OPEN_TIME)	
+func FSM_OnDoorTimeout(elev *ElevatorPhysicalInfo) {
+	if elev.Obstructed {
+		timer.Start(elev.DoorTimer)
 		return
 	}
 	elevio.SetDoorOpenLamp(false)
 	elev.State = EM_Idle
+	timer.Stop(elev.DoorTimer)
 }

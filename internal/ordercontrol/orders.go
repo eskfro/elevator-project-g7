@@ -31,10 +31,11 @@ func orderControl(buttonPressCh chan elevio.ButtonEvent) {
 		select {
 		case btnPress := <-buttonPressCh:
 			oc_onButtonPress(btnPress)
+		//case Får beskjed fra master om å ta en ordre
 		}
 	}
 }
 
 func oc_onButtonPress(buttonPress elevio.ButtonEvent) {
-	//TODO: Skriv noke tull her
+	//TODO: Skriv noke tull her, blant anna send til master
 }
