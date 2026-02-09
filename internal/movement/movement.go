@@ -76,11 +76,11 @@ func HandleEvents(elev *ElevatorPhysicalInfo,
 		case floor := <-floorArrivalCh:
 			FSM_OnFloorArrival(elev, floor)
 
-		case v := <-obstructionCh:
-			elev.Obstructed = v
+		case obst := <-obstructionCh:
+			elev.Obstructed = obst
 
-		case <-buttonPressCh:
-			FSM_OnButtonPress()
+		case btnEvent:= <-buttonPressCh:
+			FSM_OnButtonPress(elev, btnEvent)
 		}
 	}
 }
@@ -138,7 +138,7 @@ func InitPhysicalElevator(ip string, port int, _initFloor int) {
 
 }
 
-func FSM_OnButtonPress() {
+func FSM_OnButtonPress(elev *ElevatorPhysicalInfo, buttonEvent elevio.ButtonEvent) {
 
 }
 
