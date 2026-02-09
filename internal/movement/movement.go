@@ -33,7 +33,8 @@ type ElevatorPhysicalInfo struct {
 	NumFloors int
 }
 
-var DoorTimeoutChan = make(chan bool)
+var DoorTimer = time.NewTimer(0)
+
 
 func SetAllLights(localOrderTable [N_FLOORS][N_BUTTONS]bool) {
 	for f := 0; f < N_FLOORS; f++ {
@@ -51,6 +52,7 @@ func CreateElevator(_Id int, _Port int) ElevatorPhysicalInfo {
 	Elev.Floor = elevio.GetFloor()
 	Elev.MotorDir = elevio.MD_Stop
 	Elev.State = EM_Idle
+	DoorTimer.Stop()
 
 	for f := 0; f < N_FLOORS; f++ {
 		for b := 0; b < N_BUTTONS; b++ {
@@ -101,13 +103,17 @@ func FSM_OnFloorArrival(MovementState ElevatorMovement, floor int){
 	case EM_Moving:
 		if requests.ShouldStop() { //TODO:Implement ShouldStop in requests
 			elevio.SetMotorDirection(elevio.MD_Stop)
+
+			//Open door
 			elevio.SetDoorOpenLamp(true)
+			if !DoorTimer.Stop() {
+				select {case <- DoorTimer.C: default:}
+			}
+			DoorTimer.Reset(DOOR_OPEN_TIME)
+
+
 			//TODO: requests.clearShit //Implement clearShit in requests
 			//TODO: C koden kaller setAllLights her? Skal vi??
-			go func() {
-				time.Sleep(DOOR_OPEN_TIME)
-				DoorTimeoutChan <- true
-			}()
 		}
 	}
 }
@@ -119,7 +125,7 @@ func FSM_OnDoorTimeout(...){
 func HandleEvents() { //Her er forslag til struktur på FSM
 	for {
 		select{
-		case <- DoorTimeoutChan:
+		case <- DoorTimer.C:
 			FSM_OnDoorTimeout(...)
 		
 		case <- FloorArrivalChannel:
