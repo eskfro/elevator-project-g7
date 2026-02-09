@@ -23,7 +23,7 @@ func main() {
 
 	// init things
 	movement.InitPhysicalElevatorToFloor("localhost", port, 0) //Move to floor 0
-	movement.CreateElevator(id, port)
+	e := movement.CreateElevator(id, port)
 	fmt.Printf("elevator starting | id = %d | port = %d\n", id, port)
 
 	// channels

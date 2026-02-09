@@ -24,16 +24,20 @@ type ElevatorPhysicalInfo struct {
 	Id        int
 	Port      int
 	Floor     int
-	LocalOrderTable [N_FLOORS][N_BUTTONS]int
 	MotorDir  elevio.MotorDirection
 	State     ElevatorMovement
 	NumFloors int
 }
 
-func setAllLights() {
+type DirnMovementPair struct {
+	direction elevio.MotorDirection
+	movement  ElevatorMovement
+}
+
+func setAllLights(e ElevatorPhysicalInfo) {
 	for f := 0; f < N_FLOORS; f++ {
 		for b := 0; b < N_BUTTONS; b++ {
-			elevio.SetButtonLamp(b, f, LocalOrderTable[f][b])
+			elevio.SetButtonLamp(b, f, e.LocalOrderTable[f][b])
 		}
 	}
 }
