@@ -30,6 +30,14 @@ type ElevatorPhysicalInfo struct {
 	NumFloors int
 }
 
+func setAllLights() {
+	for f := 0; f < N_FLOORS; f++ {
+		for b := 0; b < N_BUTTONS; b++ {
+			elevio.SetButtonLamp(b, f, LocalOrderTable[f][b])
+		}
+	}
+}
+
 func CreateElevator(_Id int, _Port int) ElevatorPhysicalInfo {
 	Elev := ElevatorPhysicalInfo{}
 	Elev.Id = _Id
