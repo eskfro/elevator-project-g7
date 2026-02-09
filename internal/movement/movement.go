@@ -3,6 +3,7 @@ package movement
 import (
 	"elevator-project-g7/internal/elevio"
 	"elevator-project-g7/internal/requests"
+	"elevator-project-g7/internal/timer"
 	"fmt"
 	"time"
 )
@@ -13,7 +14,7 @@ import (
 
 const N_FLOORS = 4
 const N_BUTTONS = 3
-const DOOR_OPEN_TIME = time.Second*3
+const DOOR_OPEN_TIME = time.Second * 3
 
 type ElevatorMovement int
 
@@ -24,13 +25,14 @@ const (
 )
 
 type ElevatorPhysicalInfo struct {
-	Id        int
-	Port      int
-	Floor     int
-	MotorDir  elevio.MotorDirection
-	State     ElevatorMovement
-	NumFloors int
+	Id         int
+	Port       int
+	Floor      int
+	MotorDir   elevio.MotorDirection
+	State      ElevatorMovement
+	NumFloors  int
 	Obstructed bool
+	DoorTimer  *timer.Timer
 }
 
 type DirnMovementPair struct {
@@ -38,47 +40,44 @@ type DirnMovementPair struct {
 	Movement  ElevatorMovement
 }
 
-var DoorTimer = time.NewTimer(0)
+func setAllLights(e ElevatorPhysicalInfo, LocalOrderTable [N_FLOORS][N_BUTTONS]bool) {
+	for f := 0; f < N_FLOORS; f++ {
+		for b := 0; b < N_BUTTONS; b++ {
+			elevio.SetButtonLamp(elevio.ButtonType(b), f, LocalOrderTable[f][b])
+		}
+	}
+}
 
-func Start(_id int, _port int){
-	elev = CreateElevator(_id, _port)
+func Start(_id int, _port int) {
+	elev := CreateElevator(_id, _port)
 
-
+	//Input channels
 	obstructionCh := make(chan bool)
 	floorArrivalCh := make(chan int)
-	buttonPressCh := make(chan elevio.ButtonEvent)
-
-	DoorTimer.Stop()
 
 	go elevio.PollObstructionSwitch(obstructionCh)
 	go elevio.PollFloorSensor(floorArrivalCh)
-	go elevio.PollButtons(buttonPressCh)
 
-	HandleEvents(&elev, floorArrivalCh, obstructionCh, buttonPressCh)
+	go HandleEvents(&elev, floorArrivalCh, obstructionCh)
 }
 
-func HandleEvents(elev *ElevatorPhysicalInfo, 
+func HandleEvents(elev *ElevatorPhysicalInfo,
 	floorArrivalCh chan int,
-	obstructionCh chan bool,
-	buttonPressCh chan elevio.ButtonEvent) { //Her er forslag til struktur på FSM
-		
-		for {
-			select{
-			case <- DoorTimer.C:
-				FSM_OnDoorTimeout(...)
-				
-			case floor := <- floorArrivalCh:
-				FSM_OnFloorArrival(elev, floor)
-				
-			case <- obstructionCh:
-				elev.obstructed = true
-				
-			case <- buttbuttonPressCh:
-				//TODO: implement
-			}
-			
+	obstructionCh chan bool) { //Her er forslag til struktur på FSM
+
+	for {
+		select {
+		case <-elev.DoorTimer.C:
+			FSM_OnDoorTimeout(elev)
+
+		case floor := <-floorArrivalCh:
+			FSM_OnFloorArrival(elev, floor)
+
+		case obst := <-obstructionCh:
+			elev.Obstructed = obst
 		}
 	}
+}
 
 func SetAllLights(localOrderTable [N_FLOORS][N_BUTTONS]bool) {
 	for f := 0; f < N_FLOORS; f++ {
@@ -102,15 +101,17 @@ func CreateElevator(_Id int, _Port int) ElevatorPhysicalInfo {
 			Elev.LocalOrderTable[f][b] = false
 		}
 	}
+	Elev.DoorTimer = timer.New(DOOR_OPEN_TIME)
 
 	return Elev
 }
 
-func InitPhysicalElevatorToFloor(ip string, port int) {
+func InitPhysicalElevator(ip string, port int, _initFloor int) {
+
+	initFloor := _initFloor
 
 	elevio.Init(fmt.Sprintf("localhost:%d", port), N_FLOORS)
 
-	// Move elevator to first floor below
 	elevio.SetMotorDirection(elevio.MD_Down)
 	for elevio.GetFloor() == -1 {
 	}
@@ -123,11 +124,12 @@ func InitPhysicalElevatorToFloor(ip string, port int) {
 	elevio.SetFloorIndicator(elevio.GetFloor())
 }
 
+func FSM_OnButtonPress(elev *ElevatorPhysicalInfo, buttonEvent elevio.ButtonEvent) {
 
+}
 
-	
-func FSM_OnFloorArrival(elev *ElevatorPhysicalInfo, floor int){
-	
+func FSM_OnFloorArrival(elev *ElevatorPhysicalInfo, floor int) {
+
 	elevio.SetFloorIndicator(floor)
 	elev.Floor = floor
 
