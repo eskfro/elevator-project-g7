@@ -48,7 +48,6 @@ func setAllLights(e ElevatorPhysicalInfo, LocalOrderTable [N_FLOORS][N_BUTTONS]b
 	}
 }
 
-var DoorTimer = time.NewTimer(0)
 
 func Start(_id int, _port int) {
 	elev := CreateElevator(_id, _port)
