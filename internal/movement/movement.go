@@ -2,7 +2,9 @@ package movement
 
 import (
 	"elevator-project-g7/internal/elevio"
+	"elevator-project-g7/internal/requests"
 	"fmt"
+	"time"
 )
 
 /*
@@ -11,6 +13,7 @@ import (
 
 const N_FLOORS = 4
 const N_BUTTONS = 3
+const DOOR_OPEN_TIME = time.Second*3
 
 type ElevatorMovement int
 
@@ -30,10 +33,12 @@ type ElevatorPhysicalInfo struct {
 	NumFloors int
 }
 
-func setAllLights() {
+var DoorTimeoutChan = make(chan bool)
+
+func SetAllLights(localOrderTable [N_FLOORS][N_BUTTONS]bool) {
 	for f := 0; f < N_FLOORS; f++ {
 		for b := 0; b < N_BUTTONS; b++ {
-			elevio.SetButtonLamp(b, f, LocalOrderTable[f][b])
+			elevio.SetButtonLamp(elevio.ButtonType(b), f, localOrderTable[f][b])
 		}
 	}
 }
@@ -86,3 +91,40 @@ func InitPhysicalElevatorToFloor(ip string, port int, _initFloor int) {
 	elevio.SetDoorOpenLamp(false)
 	elevio.SetFloorIndicator(elevio.GetFloor())
 }
+
+func FSM_OnFloorArrival(MovementState ElevatorMovement, floor int){
+	
+	elevio.SetFloorIndicator(floor)
+
+
+	switch MovementState {
+	case EM_Moving:
+		if requests.ShouldStop() { //TODO:Implement ShouldStop in requests
+			elevio.SetMotorDirection(elevio.MD_Stop)
+			elevio.SetDoorOpenLamp(true)
+			//TODO: requests.clearShit //Implement clearShit in requests
+			//TODO: C koden kaller setAllLights her? Skal vi??
+			go func() {
+				time.Sleep(DOOR_OPEN_TIME)
+				DoorTimeoutChan <- true
+			}()
+		}
+	}
+}
+
+func FSM_OnDoorTimeout(...){
+	//TODO: Implement this shit
+}
+
+func HandleEvents() { //Her er forslag til struktur på FSM
+	for {
+		select{
+		case <- DoorTimeoutChan:
+			FSM_OnDoorTimeout(...)
+		
+		case <- FloorArrivalChannel:
+			FSM_OnFloorArrival(...)
+		}
+	}
+}
+
