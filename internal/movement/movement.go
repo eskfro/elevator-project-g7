@@ -48,25 +48,22 @@ func setAllLights(e ElevatorPhysicalInfo, LocalOrderTable [N_FLOORS][N_BUTTONS]b
 	}
 }
 
-
 func Start(_id int, _port int) {
 	elev := CreateElevator(_id, _port)
 
+	//Input channels
 	obstructionCh := make(chan bool)
 	floorArrivalCh := make(chan int)
-	buttonPressCh := make(chan elevio.ButtonEvent)
 
 	go elevio.PollObstructionSwitch(obstructionCh)
 	go elevio.PollFloorSensor(floorArrivalCh)
-	go elevio.PollButtons(buttonPressCh)
 
-	go HandleEvents(&elev, floorArrivalCh, obstructionCh, buttonPressCh)
+	go HandleEvents(&elev, floorArrivalCh, obstructionCh)
 }
 
 func HandleEvents(elev *ElevatorPhysicalInfo,
 	floorArrivalCh chan int,
-	obstructionCh chan bool,
-	buttonPressCh chan elevio.ButtonEvent) { //Her er forslag til struktur på FSM
+	obstructionCh chan bool) { //Her er forslag til struktur på FSM
 
 	for {
 		select {
@@ -78,9 +75,6 @@ func HandleEvents(elev *ElevatorPhysicalInfo,
 
 		case obst := <-obstructionCh:
 			elev.Obstructed = obst
-
-		case btnEvent:= <-buttonPressCh:
-			FSM_OnButtonPress(elev, btnEvent)
 		}
 	}
 }
