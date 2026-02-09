@@ -25,14 +25,15 @@ const (
 )
 
 type ElevatorPhysicalInfo struct {
-	Id         int
-	Port       int
-	Floor      int
-	MotorDir   elevio.MotorDirection
-	State      ElevatorMovement
-	NumFloors  int
-	Obstructed bool
-	DoorTimer  *timer.Timer
+	Id              int
+	Port            int
+	Floor           int
+	LocalOrderTable [][]bool
+	MotorDir        elevio.MotorDirection
+	State           ElevatorMovement
+	NumFloors       int
+	Obstructed      bool
+	DoorTimer       *timer.Timer
 }
 
 type DirnMovementPair struct {
@@ -95,6 +96,7 @@ func CreateElevator(_Id int, _Port int) ElevatorPhysicalInfo {
 	Elev.Floor = elevio.GetFloor()
 	Elev.MotorDir = elevio.MD_Stop
 	Elev.State = EM_Idle
+
 	Elev.DoorTimer = timer.New(DOOR_OPEN_TIME)
 
 	for f := 0; f < N_FLOORS; f++ {
@@ -102,13 +104,12 @@ func CreateElevator(_Id int, _Port int) ElevatorPhysicalInfo {
 			Elev.LocalOrderTable[f][b] = false
 		}
 	}
+	Elev.DoorTimer = timer.New(DOOR_OPEN_TIME)
 
 	return Elev
 }
 
-func InitPhysicalElevator(ip string, port int, _initFloor int) {
-
-	initFloor := _initFloor
+func InitPhysicalElevator(ip string, port int) {
 
 	elevio.Init(fmt.Sprintf("localhost:%d", port), N_FLOORS)
 
