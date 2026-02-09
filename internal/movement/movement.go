@@ -10,6 +10,7 @@ import (
 */
 
 const N_FLOORS = 4
+const N_BUTTONS = 3
 
 type ElevatorMovement int
 
@@ -26,6 +27,14 @@ type ElevatorPhysicalInfo struct {
 	MotorDir  elevio.MotorDirection
 	State     ElevatorMovement
 	NumFloors int
+}
+
+func setAllLights() {
+	for f := 0; f < N_FLOORS; f++ {
+		for b := 0; b < N_BUTTONS; b++ {
+			elevio.SetButtonLamp(b, f, LocalOrderTable[f][b])
+		}
+	}
 }
 
 func CreateElevator(_Id int, _Port int) ElevatorPhysicalInfo {
