@@ -6,6 +6,15 @@ import (
 )
 
 func ParseOsArgs(args []string) (int, int, error) {
+	/*
+		Parser for OS-args when running program from cmd line
+
+		Example:
+		./out 1 15657
+		id = 1
+		port = 15657
+
+	*/
 
 	if len(args) < 3 {
 		return 0, 0, errors.New("Missing arguments")
