@@ -38,10 +38,6 @@ type DirnMovementPair struct {
 	Movement  ElevatorMovement
 }
 
-func setAllLights(e ElevatorPhysicalInfo) {
-	for f := 0; f < N_FLOORS; f++ {
-		for b := 0; b < N_BUTTONS; b++ {
-			elevio.SetButtonLamp(b, f, e.LocalOrderTable[f][b])
 var DoorTimer = time.NewTimer(0)
 
 func Start(_id int, _port int){
@@ -103,7 +99,7 @@ func CreateElevator(_Id int, _Port int) ElevatorPhysicalInfo {
 	
 	for f := 0; f < N_FLOORS; f++ {
 		for b := 0; b < N_BUTTONS; b++ {
-			Elev.LocalOrderTable[f][b] = 0
+			Elev.LocalOrderTable[f][b] = false
 		}
 	}
 
@@ -120,65 +116,49 @@ func InitPhysicalElevatorToFloor(ip string, port int) {
 	}
 	elevio.SetMotorDirection(elevio.MD_Stop)
 
-	// Move elevator to initFloor
-	if elevio.GetFloor() != initFloor {
-		
-		if elevio.GetFloor() < initFloor {
-			elevio.SetMotorDirection(elevio.MD_Up)
-		} else {
-			elevio.SetMotorDirection(elevio.MD_Down)
-		}
-		for elevio.GetFloor() != initFloor {
-		}
-		elevio.SetMotorDirection(elevio.MD_Stop)
-	}
-
 	for elevio.GetObstruction() {
 		elevio.SetDoorOpenLamp(true)
 	}
 	elevio.SetDoorOpenLamp(false)
 	elevio.SetFloorIndicator(elevio.GetFloor())
-	
-	
-
 }
 
 
 
 	
-	func FSM_OnFloorArrival(elev *ElevatorPhysicalInfo, floor int){
-		
-		elevio.SetFloorIndicator(floor)
-		elev.Floor = floor
+func FSM_OnFloorArrival(elev *ElevatorPhysicalInfo, floor int){
 	
-		switch elev.State {
-		case EM_Moving:
-			if requests.ShouldStop() { //TODO:Implement ShouldStop in requests
-				elevio.SetMotorDirection(elevio.MD_Stop)
-	
-				//Open door
-				elevio.SetDoorOpenLamp(true)
-				if !DoorTimer.Stop() {
-					select {case <- DoorTimer.C: default:}
-				}
-				DoorTimer.Reset(DOOR_OPEN_TIME)
-				elev.State = EM_DoorOpen
-	
-	
-				//TODO: requests.clearShit //Implement clearShit in requests
-				//TODO: C koden kaller setAllLights her? Skal vi??
-			}
-		}
-	}
-	
-	func FSM_OnDoorTimeout(elev *ElevatorPhysicalInfo){
-		if elev.Obstructed{
+	elevio.SetFloorIndicator(floor)
+	elev.Floor = floor
+
+	switch elev.State {
+	case EM_Moving:
+		if requests.ShouldStop() { //TODO:Implement ShouldStop in requests
+			elevio.SetMotorDirection(elevio.MD_Stop)
+
+			//Open door
+			elevio.SetDoorOpenLamp(true)
 			if !DoorTimer.Stop() {
-					select {case <- DoorTimer.C: default:}
+				select {case <- DoorTimer.C: default:}
 			}
-			DoorTimer.Reset(DOOR_OPEN_TIME)	
-			return
+			DoorTimer.Reset(DOOR_OPEN_TIME)
+			elev.State = EM_DoorOpen
+
+
+			//TODO: requests.clearShit //Implement clearShit in requests
+			//TODO: C koden kaller setAllLights her? Skal vi??
 		}
-		elevio.SetDoorOpenLamp(false)
-		elev.State = EM_Idle
 	}
+}
+
+func FSM_OnDoorTimeout(elev *ElevatorPhysicalInfo){
+	if elev.Obstructed{
+		if !DoorTimer.Stop() {
+				select {case <- DoorTimer.C: default:}
+		}
+		DoorTimer.Reset(DOOR_OPEN_TIME)	
+		return
+	}
+	elevio.SetDoorOpenLamp(false)
+	elev.State = EM_Idle
+}
