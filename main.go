@@ -1,6 +1,7 @@
 package main
 
 import (
+	"elevator-project-g7/internal/elevio"
 	"elevator-project-g7/internal/movement"
 	"elevator-project-g7/internal/parser"
 	"fmt"
@@ -24,4 +25,14 @@ func main() {
 	movement.InitPhysicalElevatorToFloor("localhost", port, 0) //Move to floor 0
 	movement.CreateElevator(id, port)
 	fmt.Printf("elevator starting | id = %d | port = %d\n", id, port)
+
+	// channels
+	chanStopButton := make(chan bool)
+
+	go elevio.PollStopButton(chanStopButton)
+	go elevio.PrintStopButton(chanStopButton)
+
+	for {
+	}
+
 }

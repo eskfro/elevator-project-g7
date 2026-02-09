@@ -10,6 +10,7 @@ import (
 */
 
 const N_FLOORS = 4
+const N_BUTTONS = 3
 
 type ElevatorMovement int
 
@@ -23,6 +24,7 @@ type ElevatorPhysicalInfo struct {
 	Id        int
 	Port      int
 	Floor     int
+	LocalOrderTable [N_FLOORS][N_BUTTONS]int
 	MotorDir  elevio.MotorDirection
 	State     ElevatorMovement
 	NumFloors int
@@ -36,6 +38,12 @@ func CreateElevator(_Id int, _Port int) ElevatorPhysicalInfo {
 	Elev.Floor = elevio.GetFloor()
 	Elev.MotorDir = elevio.MD_Stop
 	Elev.State = EM_Idle
+
+	for f := 0; f < N_FLOORS; f++ {
+		for b := 0; b < N_BUTTONS; b++ {
+			Elev.LocalOrderTable[f][b] = 0
+		}
+	}
 
 	return Elev
 }
