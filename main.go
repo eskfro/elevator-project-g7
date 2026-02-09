@@ -22,8 +22,8 @@ func main() {
 	}
 
 	// init things
-	movement.InitPhysicalElevatorToFloor("localhost", port, 0) //Move to floor 0
-	e := movement.CreateElevator(id, port)
+	movement.InitPhysicalElevatorToFloor("localhost", port)
+	movement.CreateElevator(id, port)
 	fmt.Printf("elevator starting | id = %d | port = %d\n", id, port)
 
 	// channels

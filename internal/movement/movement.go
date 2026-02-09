@@ -30,8 +30,8 @@ type ElevatorPhysicalInfo struct {
 }
 
 type DirnMovementPair struct {
-	direction elevio.MotorDirection
-	movement  ElevatorMovement
+	Direction elevio.MotorDirection
+	Movement  ElevatorMovement
 }
 
 func setAllLights(e ElevatorPhysicalInfo) {
@@ -60,29 +60,15 @@ func CreateElevator(_Id int, _Port int) ElevatorPhysicalInfo {
 	return Elev
 }
 
-func InitPhysicalElevatorToFloor(ip string, port int, _initFloor int) {
-
-	initFloor := _initFloor
+func InitPhysicalElevatorToFloor(ip string, port int) {
 
 	elevio.Init(fmt.Sprintf("localhost:%d", port), N_FLOORS)
 
+	// Move elevator to first floor below
 	elevio.SetMotorDirection(elevio.MD_Down)
 	for elevio.GetFloor() == -1 {
 	}
 	elevio.SetMotorDirection(elevio.MD_Stop)
-
-	// Move elevator to initFloor
-	if elevio.GetFloor() != initFloor {
-
-		if elevio.GetFloor() < initFloor {
-			elevio.SetMotorDirection(elevio.MD_Up)
-		} else {
-			elevio.SetMotorDirection(elevio.MD_Down)
-		}
-		for elevio.GetFloor() != initFloor {
-		}
-		elevio.SetMotorDirection(elevio.MD_Stop)
-	}
 
 	for elevio.GetObstruction() {
 		elevio.SetDoorOpenLamp(true)
