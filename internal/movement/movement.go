@@ -25,16 +25,30 @@ const (
 )
 
 type ElevatorPhysicalInfo struct {
-	Id              int
-	Port            int
-	Floor           int
-	LocalOrderTable [N_FLOORS][N_BUTTONS]int
-	MotorDir        elevio.MotorDirection
-	State           ElevatorMovement
-	NumFloors       int
-	Obstructed      bool
-	DoorTimer       *timer.Timer
+	Id         int
+	Port       int
+	Floor      int
+	MotorDir   elevio.MotorDirection
+	State      ElevatorMovement
+	NumFloors  int
+	Obstructed bool
+	DoorTimer  *timer.Timer
 }
+
+type DirnMovementPair struct {
+	Direction elevio.MotorDirection
+	Movement  ElevatorMovement
+}
+
+func setAllLights(e ElevatorPhysicalInfo, LocalOrderTable [N_FLOORS][N_BUTTONS]bool) {
+	for f := 0; f < N_FLOORS; f++ {
+		for b := 0; b < N_BUTTONS; b++ {
+			elevio.SetButtonLamp(elevio.ButtonType(b), f, LocalOrderTable[f][b])
+		}
+	}
+}
+
+var DoorTimer = time.NewTimer(0)
 
 func Start(_id int, _port int) {
 	elev := CreateElevator(_id, _port)
@@ -89,12 +103,6 @@ func CreateElevator(_Id int, _Port int) ElevatorPhysicalInfo {
 	Elev.MotorDir = elevio.MD_Stop
 	Elev.State = EM_Idle
 	Elev.DoorTimer = timer.New(DOOR_OPEN_TIME)
-
-	for f := 0; f < N_FLOORS; f++ {
-		for b := 0; b < N_BUTTONS; b++ {
-			Elev.LocalOrderTable[f][b] = 0
-		}
-	}
 
 	return Elev
 }
