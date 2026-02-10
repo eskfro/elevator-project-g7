@@ -5,7 +5,23 @@ import (
 	"elevator-project-g7/internal/elevio"
 	"elevator-project-g7/internal/requests"
 	"elevator-project-g7/internal/timer"
+	"fmt"
 )
+
+func printElevatorState(e *elev.ElevatorPhysicalInfo) {
+
+	switch e.State {
+	case elev.EM_Idle:
+		fmt.Println("state = IDLE")
+	case elev.EM_Moving:
+		fmt.Println("state = MOVING")
+	case elev.EM_DoorOpen:
+		fmt.Println("state = DOOR OPEN")
+	default:
+		fmt.Println("state = ?")
+	}
+
+}
 
 func setAllLights(LocalOrderTable [elev.N_FLOORS][elev.N_BUTTONS]bool) {
 	for f := 0; f < elev.N_FLOORS; f++ {
@@ -40,8 +56,12 @@ func HandleEvents(e *elev.ElevatorPhysicalInfo,
 
 		// TODO: eskil la til denne
 		case btnEvent := <-buttonPressCh:
-			FSM_OnButtonPress(e, btnEvent)
-
+			btnFloor := btnEvent.Floor
+			btnType := btnEvent.Button
+			// Testing shit maybe unecesarry
+			if !e.LocalOrderTable[btnFloor][btnType] {
+				FSM_OnButtonPress(e, btnEvent)
+			}
 		case <-e.DoorTimer.C:
 			FSM_OnDoorTimeout(e)
 
@@ -70,7 +90,7 @@ func FSM_OnButtonPress(e *elev.ElevatorPhysicalInfo, buttonEvent elevio.ButtonEv
 	case elev.EM_DoorOpen:
 		if requests.ShouldClearImmediately(e.Floor, e.MotorDir, btnFloor, btnType) {
 			// TODO: Marius; sjekk om jeg skjønte timeren riktig
-			timer.Start(e.DoorTimer)
+			timer.Set(e.DoorTimer, elev.DOOR_OPEN_TIME)
 		} else {
 			// TODO: her må det komme master/backup logic før det settes i local order table
 			// Merker alle det gjelder med tag: "MB logikk"
@@ -94,7 +114,7 @@ func FSM_OnButtonPress(e *elev.ElevatorPhysicalInfo, buttonEvent elevio.ButtonEv
 		case elev.EM_DoorOpen:
 			elevio.SetDoorOpenLamp(true)
 			// TODO: sjekk timer
-			timer.Start(e.DoorTimer)
+			timer.Set(e.DoorTimer, elev.DOOR_OPEN_TIME)
 			updated_LOT := requests.ClearCurrentFloor(e.LocalOrderTable, e.Floor, e.MotorDir)
 			// TODO: MB logikk
 			// We change the data here
@@ -103,12 +123,15 @@ func FSM_OnButtonPress(e *elev.ElevatorPhysicalInfo, buttonEvent elevio.ButtonEv
 		case elev.EM_Moving:
 			elevio.SetMotorDirection(e.MotorDir)
 
+		default:
+			fmt.Println("OnButtonPress case default")
 		}
 
 	}
 
 	// TODO: MB logikk
 	setAllLights(e.LocalOrderTable)
+	printElevatorState(e)
 
 }
 
@@ -120,13 +143,18 @@ func FSM_OnFloorArrival(e *elev.ElevatorPhysicalInfo, floor int) {
 	switch e.State {
 	case elev.EM_Moving:
 		if requests.ShouldStop(e.LocalOrderTable, e.Floor, e.MotorDir) {
+
+			requests.PrintLOT(e.LocalOrderTable)
+
 			elevio.SetMotorDirection(elevio.MD_Stop)
 			elevio.SetDoorOpenLamp(true)
 			updated_LOT := requests.ClearCurrentFloor(e.LocalOrderTable, e.Floor, e.MotorDir)
 			// TODO: MB logikk
 			e.LocalOrderTable = updated_LOT
 
-			timer.Start(e.DoorTimer)
+			requests.PrintLOT(e.LocalOrderTable)
+
+			timer.Set(e.DoorTimer, elev.DOOR_OPEN_TIME)
 
 			//TODO: C koden kaller setAllLights her? Skal vi?? E: idk
 			SetAllLights(e.LocalOrderTable)
@@ -134,6 +162,8 @@ func FSM_OnFloorArrival(e *elev.ElevatorPhysicalInfo, floor int) {
 			e.State = elev.EM_DoorOpen
 		}
 	}
+
+	printElevatorState(e)
 }
 
 func FSM_OnDoorTimeout(e *elev.ElevatorPhysicalInfo) {
@@ -146,6 +176,7 @@ func FSM_OnDoorTimeout(e *elev.ElevatorPhysicalInfo) {
 	*/
 
 	switch e.State {
+
 	case elev.EM_DoorOpen:
 		pair := requests.ChooseDirection(e.LocalOrderTable, e.Floor, e.MotorDir)
 		e.MotorDir = pair.Direction
@@ -154,16 +185,23 @@ func FSM_OnDoorTimeout(e *elev.ElevatorPhysicalInfo) {
 		switch e.State {
 
 		case elev.EM_DoorOpen:
-			timer.Start(e.DoorTimer)
+			timer.Set(e.DoorTimer, elev.DOOR_OPEN_TIME)
 			updated_LOT := requests.ClearCurrentFloor(e.LocalOrderTable, e.Floor, e.MotorDir)
 			// TODO: MB logikk
 			e.LocalOrderTable = updated_LOT
 			setAllLights(e.LocalOrderTable)
+
 		case elev.EM_Idle:
 			elevio.SetDoorOpenLamp(false)
 			elevio.SetMotorDirection(e.MotorDir)
+			//elevio.SetMotorDirection(elevio.MD_Stop)
+
+		default:
+			fmt.Println("OnDoorTimeout case default")
 		}
 	}
+
+	printElevatorState(e)
 }
 
 /*

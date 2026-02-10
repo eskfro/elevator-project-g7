@@ -40,14 +40,13 @@ func CreateElevator(_Id int, _Port int) ElevatorPhysicalInfo {
 	Elev.MotorDir = elevio.MD_Stop
 	Elev.State = EM_Idle
 
-	Elev.DoorTimer = timer.New(DOOR_OPEN_TIME)
+	Elev.DoorTimer = timer.New(0 * time.Second)
 
 	for f := 0; f < N_FLOORS; f++ {
 		for b := 0; b < N_BUTTONS; b++ {
 			Elev.LocalOrderTable[f][b] = false
 		}
 	}
-	Elev.DoorTimer = timer.New(DOOR_OPEN_TIME)
 
 	return Elev
 }

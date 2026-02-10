@@ -5,42 +5,59 @@ import (
 )
 
 type Timer struct {
-	internalTimer *time.Timer
-	duration      time.Duration
-	C             chan bool
+	internal *time.Timer
+	duration time.Duration
+	C        chan bool
+	stop     chan struct{}
 }
 
 func New(duration time.Duration) *Timer {
 	t := &Timer{
-		internalTimer: time.NewTimer(0),
-		duration:      duration,
-		C:             make(chan bool, 1),
+		internal: time.NewTimer(0),
+		duration: duration,
+		C:        make(chan bool, 1),
+		stop:     make(chan struct{}),
 	}
-	t.internalTimer.Stop()
-	select {
-	case <-t.internalTimer.C:
-	default:
-	}
+	t.internal.Stop()
+
+	go func() {
+		for {
+			select {
+			case <-t.internal.C:
+				select {
+				case t.C <- true:
+				default:
+				}
+			case <-t.stop:
+				return //exit point
+			}
+		}
+	}()
+
 	return t
+
 }
 
 func Stop(t *Timer) {
-	if !t.internalTimer.Stop() {
+	if !t.internal.Stop() {
 		select {
-		case <-t.internalTimer.C:
+		case <-t.internal.C:
 		default:
 		}
 	}
 }
 
 func Start(t *Timer) {
-	Stop(t)
-	t.internalTimer.Reset(t.duration)
-
-	go func() {
+	if !t.internal.Stop() {
 		select {
-		case <-t.internalTimer.C:
-			t.C <- true
+		case <-t.internal.C:
+		default:
 		}
-	}()
+	}
+	t.internal.Reset(t.duration)
+}
+
+func Set(t *Timer, _duration time.Duration) {
+	t.duration = _duration
+	Start(t)
 }

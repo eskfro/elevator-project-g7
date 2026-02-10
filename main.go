@@ -32,7 +32,7 @@ func main() {
 
 	// init things
 	elev.InitPhysicalElevator("localhost", port)
-	elev.CreateElevator(id, port)
+	//elev.CreateElevator(id, port)
 	fmt.Printf("elevator starting | id = %d | port = %d\n", id, port)
 
 	// gg

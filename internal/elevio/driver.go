@@ -56,7 +56,7 @@ func SetMotorDirection(dir MotorDirection) {
 
 func SetButtonLamp(button ButtonType, floor int, value bool) {
 	write([4]byte{2, byte(button), byte(floor), toByte(value)})
-} 
+}
 
 func SetFloorIndicator(floor int) {
 	write([4]byte{3, byte(floor), 0, 0})
