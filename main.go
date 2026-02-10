@@ -6,6 +6,8 @@ import (
 	"elevator-project-g7/internal/parser"
 	"fmt"
 	"os"
+	"os/signal"
+	"syscall"
 )
 
 // IMPORTANT
@@ -38,7 +40,8 @@ func main() {
 	// gg
 	movement.Start(id, port)
 
-	for {
-	}
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
+	<-sigCh
 
 }

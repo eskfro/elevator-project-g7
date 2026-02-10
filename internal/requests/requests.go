@@ -13,11 +13,8 @@ type DirnMovementPair struct {
 
 func RequestAbove(LocalOrderTable [elev.N_FLOORS][elev.N_BUTTONS]bool, currentFloor int) bool {
 
-	numFloors := len(LocalOrderTable)
-	numButtons := len(LocalOrderTable[0])
-
-	for f := currentFloor + 1; f < numFloors; f++ {
-		for b := 0; b < numButtons; b++ {
+	for f := currentFloor + 1; f < elev.N_FLOORS; f++ {
+		for b := 0; b < elev.N_BUTTONS; b++ {
 			if LocalOrderTable[f][b] {
 				return true
 			}
@@ -28,10 +25,8 @@ func RequestAbove(LocalOrderTable [elev.N_FLOORS][elev.N_BUTTONS]bool, currentFl
 
 func RequestBelow(LocalOrderTable [elev.N_FLOORS][elev.N_BUTTONS]bool, currentFloor int) bool {
 
-	numButtons := len(LocalOrderTable[0])
-
 	for f := 0; f < currentFloor; f++ {
-		for b := 0; b < numButtons; b++ {
+		for b := 0; b < elev.N_BUTTONS; b++ {
 			if LocalOrderTable[f][b] {
 				return true
 			}
@@ -42,8 +37,7 @@ func RequestBelow(LocalOrderTable [elev.N_FLOORS][elev.N_BUTTONS]bool, currentFl
 
 func RequestHere(LocalOrderTable [elev.N_FLOORS][elev.N_BUTTONS]bool, currentFloor int) bool {
 
-	numButtons := len(LocalOrderTable[0])
-	for b := 0; b < numButtons; b++ {
+	for b := 0; b < elev.N_BUTTONS; b++ {
 		if LocalOrderTable[currentFloor][b] {
 			return true
 		}
@@ -178,7 +172,7 @@ func ClearCurrentFloor(LocalOrderTable [elev.N_FLOORS][elev.N_BUTTONS]bool,
 			LOT[cf][elevio.BT_HallUp] = false
 		}
 		LOT[cf][elevio.BT_HallDown] = false
-		
+
 	default:
 		LOT[cf][elevio.BT_HallUp] = false
 		LOT[cf][elevio.BT_HallDown] = false
