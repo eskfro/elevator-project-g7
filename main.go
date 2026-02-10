@@ -1,8 +1,8 @@
 package main
 
 import (
+	"elevator-project-g7/internal/elev"
 	"elevator-project-g7/internal/elevio"
-	"elevator-project-g7/internal/movement"
 	"elevator-project-g7/internal/parser"
 	"fmt"
 	"os"
@@ -22,8 +22,8 @@ func main() {
 	}
 
 	// init things
-	movement.InitPhysicalElevatorToFloor("localhost", port)
-	movement.CreateElevator(id, port)
+	elev.InitPhysicalElevator("localhost", port)
+	elev.CreateElevator(id, port)
 	fmt.Printf("elevator starting | id = %d | port = %d\n", id, port)
 
 	// channels
