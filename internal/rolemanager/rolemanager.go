@@ -12,3 +12,4 @@ const (
 	ROLE_Backup  Role = 0
 	ROLE_Primary Role = 1
 )
+//TODO: define NumElevs, Id

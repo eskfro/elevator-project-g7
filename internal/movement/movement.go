@@ -8,6 +8,12 @@ import (
 	"time"
 )
 
+type Channels struct {
+	printTimer chan bool
+	obstruction chan bool
+	floorArrival chan int
+}
+
 func setAllLights(LocalOrderTable [elev.N_FLOORS][elev.N_BUTTONS]bool) {
 	for f := 0; f < elev.N_FLOORS; f++ {
 		for b := 0; b < elev.N_BUTTONS; b++ {
@@ -19,39 +25,38 @@ func setAllLights(LocalOrderTable [elev.N_FLOORS][elev.N_BUTTONS]bool) {
 func Start(pe *elev.ElevatorPhysicalInfo,
 	LocalOrderTable *[elev.N_FLOORS][elev.N_BUTTONS]bool) { //TODO: maybe pekar maybe not
 
-	//Input channels
-	ch_printTimer := make(chan bool)
-	ch_obstruction := make(chan bool)
-	ch_floorArrival := make(chan int)
+	Ch := Channels{
+		printTimer 	: make(chan bool),
+		obstruction 	: make(chan bool),
+		floorArrival : make(chan int),
+	}
 
-	go elevio.PollObstructionSwitch(ch_obstruction)
-	go elevio.PollFloorSensor(ch_floorArrival)
+	go elevio.PollObstructionSwitch(Ch.obstruction)
+	go elevio.PollFloorSensor(Ch.floorArrival)
 
-	go generatePrintTimerEvents(ch_printTimer)
+	go generatePrintTimerEvents(Ch.printTimer)
 
-	go HandleEvents(pe, LocalOrderTable, ch_floorArrival, ch_obstruction, ch_printTimer)
+	go HandleEvents(pe, LocalOrderTable, &Ch)
 }
 
 func HandleEvents(pe *elev.ElevatorPhysicalInfo,
 	LocalOrderTable *[elev.N_FLOORS][elev.N_BUTTONS]bool,
-	ch_floorArrival chan int,
-	ch_obstruction chan bool,
-	ch_printTimer chan bool) { //Her er forslag til struktur på FSM
+	Ch *Channels) {
 
 	for {
 		select {
 
-		case <-ch_printTimer:
+		case <-Ch.printTimer:
 			fmt.Println(":) debugging melding :)")
 
 		case <-pe.DoorTimer.C:
 			fmt.Println("fsm doortimer event")
 			FSM_OnDoorTimeout(pe, *LocalOrderTable)
 
-		case floor := <-ch_floorArrival:
+		case floor := <-Ch.floorArrival:
 			FSM_OnFloorArrival(pe, *LocalOrderTable, floor)
 
-		case obst := <-ch_obstruction:
+		case obst := <-Ch.obstruction:
 			pe.Obstructed = obst
 		}
 	}
