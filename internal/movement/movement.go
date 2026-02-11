@@ -9,8 +9,8 @@ import (
 )
 
 type Channels struct {
-	printTimer chan bool
-	obstruction chan bool
+	printTimer   chan bool
+	obstruction  chan bool
 	floorArrival chan int
 }
 
@@ -26,9 +26,9 @@ func Start(pe *elev.ElevatorPhysicalInfo,
 	LocalOrderTable *[elev.N_FLOORS][elev.N_BUTTONS]bool) { //TODO: maybe pekar maybe not
 
 	Ch := Channels{
-		printTimer 	: make(chan bool),
-		obstruction 	: make(chan bool),
-		floorArrival : make(chan int),
+		printTimer:   make(chan bool),
+		obstruction:  make(chan bool),
+		floorArrival: make(chan int),
 	}
 
 	go elevio.PollObstructionSwitch(Ch.obstruction)

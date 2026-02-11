@@ -109,9 +109,7 @@ func Start(WorldView *WorldView,
 	go orderControl(WorldView, AllWorldViews, Ch)
 }
 
-func orderControl(WorldView *WorldView,
-	AllWorldViews *[elev.N_MAX_ELEVS]WorldView, //Primary
-	Ch Channels) {
+func orderControl(WorldView *WorldView, AllWorldViews *[elev.N_MAX_ELEVS]WorldView, Ch Channels) {
 
 	currentRole := rolemanager.ROLE_Backup
 
