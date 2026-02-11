@@ -44,16 +44,11 @@ func HandleEvents(e *elev.ElevatorPhysicalInfo,
 		select {
 
 		case <-printTimerCh:
-			fmt.Println("tenkte feil nvm")
+			fmt.Println(":) debugging melding :)")
 
-		// TODO: eskil la til denne
 		case btnEvent := <-buttonPressCh:
-			btnFloor := btnEvent.Floor
-			btnType := btnEvent.Button
-			// Testing shit maybe unecesarry
-			if !e.LocalOrderTable[btnFloor][btnType] {
-				FSM_OnButtonPress(e, btnEvent)
-			}
+			FSM_OnButtonPress(e, btnEvent)
+
 		case <-e.DoorTimer.C:
 			fmt.Println("fsm doortimer event")
 			FSM_OnDoorTimeout(e)
@@ -83,7 +78,6 @@ func FSM_OnButtonPress(e *elev.ElevatorPhysicalInfo, buttonEvent elevio.ButtonEv
 	case elev.EM_DoorOpen:
 		if requests.ShouldClearImmediately(e.Floor, e.MotorDir, btnFloor, btnType) {
 			// TODO: Marius; sjekk om jeg skjønte timeren riktig
-			e.DoorTimer.Set(elev.DOOR_OPEN_TIME)
 			e.DoorTimer.Start()
 			fmt.Println("timer set 2")
 		} else {
@@ -108,8 +102,6 @@ func FSM_OnButtonPress(e *elev.ElevatorPhysicalInfo, buttonEvent elevio.ButtonEv
 
 		case elev.EM_DoorOpen:
 			elevio.SetDoorOpenLamp(true)
-			// TODO: sjekk timer
-			e.DoorTimer.Set(elev.DOOR_OPEN_TIME)
 			e.DoorTimer.Start()
 			fmt.Println("timer set 1")
 			updated_LOT := requests.ClearCurrentFloor(e.LocalOrderTable, e.Floor, e.MotorDir)
@@ -150,8 +142,6 @@ func FSM_OnFloorArrival(e *elev.ElevatorPhysicalInfo, floor int) {
 			e.LocalOrderTable = updated_LOT
 
 			requests.PrintLOT(e.LocalOrderTable)
-
-			e.DoorTimer.Set(elev.DOOR_OPEN_TIME)
 			e.DoorTimer.Start()
 			fmt.Println("timer set 3")
 
@@ -167,12 +157,10 @@ func FSM_OnFloorArrival(e *elev.ElevatorPhysicalInfo, floor int) {
 
 func FSM_OnDoorTimeout(e *elev.ElevatorPhysicalInfo) {
 
-	/*
-		if e.Obstructed {
-			timer.Start(e.DoorTimer)
-			return
-			}
-	*/
+	if e.Obstructed {
+		e.DoorTimer.Start()
+		return
+	}
 
 	switch e.State {
 
@@ -184,7 +172,6 @@ func FSM_OnDoorTimeout(e *elev.ElevatorPhysicalInfo) {
 		switch e.State {
 
 		case elev.EM_DoorOpen:
-			e.DoorTimer.Set(elev.DOOR_OPEN_TIME)
 			e.DoorTimer.Start()
 			fmt.Println("timer set 4")
 			updated_LOT := requests.ClearCurrentFloor(e.LocalOrderTable, e.Floor, e.MotorDir)
@@ -195,10 +182,7 @@ func FSM_OnDoorTimeout(e *elev.ElevatorPhysicalInfo) {
 		case elev.EM_Idle:
 			elevio.SetDoorOpenLamp(false)
 			elevio.SetMotorDirection(e.MotorDir)
-			//elevio.SetMotorDirection(elevio.MD_Stop)
 
-		// TOOD: This is maybe wrong ???
-		// Neida va rett det, da funker heisen :=)
 		case elev.EM_Moving:
 			elevio.SetDoorOpenLamp(false)
 			elevio.SetMotorDirection(e.MotorDir)
@@ -210,18 +194,6 @@ func FSM_OnDoorTimeout(e *elev.ElevatorPhysicalInfo) {
 
 	printElevatorState(e)
 }
-
-/*
-
-	// TODO
-
-	This was inside OnDoorTimeout
-
-	elevio.SetDoorOpenLamp(false)
-	e.State = elev.EM_Idle
-	timer.Stop(e.DoorTimer)
-
-*/
 
 func printElevatorState(e *elev.ElevatorPhysicalInfo) {
 

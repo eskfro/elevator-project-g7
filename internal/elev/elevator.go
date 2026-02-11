@@ -32,23 +32,23 @@ type ElevatorPhysicalInfo struct {
 }
 
 func CreateElevator(_Id int, _Port int) ElevatorPhysicalInfo {
-	Elev := ElevatorPhysicalInfo{}
-	Elev.Id = _Id
-	Elev.Port = _Port
-	Elev.NumFloors = N_FLOORS
-	Elev.Floor = elevio.GetFloor()
-	Elev.MotorDir = elevio.MD_Stop
-	Elev.State = EM_Idle
+	e := ElevatorPhysicalInfo{}
+	e.Id = _Id
+	e.Port = _Port
+	e.NumFloors = N_FLOORS
+	e.Floor = elevio.GetFloor()
+	e.MotorDir = elevio.MD_Stop
+	e.State = EM_Idle
 
-	Elev.DoorTimer = timer.New(0 * time.Second)
+	e.DoorTimer = timer.New(DOOR_OPEN_TIME)
 
 	for f := 0; f < N_FLOORS; f++ {
 		for b := 0; b < N_BUTTONS; b++ {
-			Elev.LocalOrderTable[f][b] = false
+			e.LocalOrderTable[f][b] = false
 		}
 	}
 
-	return Elev
+	return e
 }
 
 func InitPhysicalElevator(ip string, port int) {

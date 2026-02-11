@@ -57,11 +57,6 @@ func (t *Timer) Stop() {
 	}
 }
 
-func (t *Timer) Set(d time.Duration) {
-	t.duration = d
-	t.Start()
-}
-
 func (t *Timer) Close() {
 	close(t.stop)
 	t.Stop()
