@@ -6,11 +6,9 @@ package rolemanager
 - CurrentPrimary
 */
 
-import (
-	_ "elevator-project-g7/internal/network"
-	"fmt"
-)
+type Role int
 
-func PrintMessageFromRoleManager() {
-	fmt.Println("This is a message frome the RoleManager module")
-}
+const (
+	ROLE_Backup  Role = 0
+	ROLE_Primary Role = 1
+)

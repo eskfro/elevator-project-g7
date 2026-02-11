@@ -32,16 +32,19 @@ func main() {
 		}
 	}
 
-	// init things
 	elev.InitPhysicalElevator("localhost", port)
+
+	elevator := elev.CreateElevator(id, port)
+
+	// init things
 	//elev.CreateElevator(id, port)
 	fmt.Printf("elevator starting | id = %d | port = %d\n", id, port)
 
 	// gg
-	movement.Start(id, port)
+	movement.Start(&elevator.PhysicalInfo, elevator.WorldView.LocalOrderTable)
 
-	sigCh := make(chan os.Signal, 1)
-	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
-	<-sigCh
+	ch_sig := make(chan os.Signal, 1)
+	signal.Notify(ch_sig, os.Interrupt, syscall.SIGTERM)
+	<-ch_sig
 
 }

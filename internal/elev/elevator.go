@@ -2,6 +2,8 @@ package elev
 
 import (
 	"elevator-project-g7/internal/elevio"
+	"elevator-project-g7/internal/ordercontrol"
+	"elevator-project-g7/internal/rolemanager"
 	"elevator-project-g7/internal/timer"
 	"fmt"
 	"time"
@@ -10,6 +12,7 @@ import (
 const N_FLOORS = 4
 const N_BUTTONS = 3
 const DOOR_OPEN_TIME = time.Second * 3
+const N_MAX_ELEVS = 9
 
 type ElevatorMovement int
 
@@ -20,35 +23,45 @@ const (
 )
 
 type ElevatorPhysicalInfo struct {
-	Id              int
-	Port            int
-	Floor           int
-	LocalOrderTable [N_FLOORS][N_BUTTONS]bool
-	MotorDir        elevio.MotorDirection
-	State           ElevatorMovement
-	NumFloors       int
-	Obstructed      bool
-	DoorTimer       *timer.Timer
+	Floor      int
+	MotorDir   elevio.MotorDirection
+	State      ElevatorMovement
+	NumFloors  int
+	Obstructed bool
+	DoorTimer  *timer.Timer
 }
 
-func CreateElevator(_Id int, _Port int) ElevatorPhysicalInfo {
-	e := ElevatorPhysicalInfo{}
-	e.Id = _Id
-	e.Port = _Port
-	e.NumFloors = N_FLOORS
-	e.Floor = elevio.GetFloor()
-	e.MotorDir = elevio.MD_Stop
-	e.State = EM_Idle
+type Elevator struct {
+	WorldView     ordercontrol.WorldView
+	Role          rolemanager.Role
+	Id            int
+	Port          int
+	PhysicalInfo  ElevatorPhysicalInfo
+	AllWorldViews [N_MAX_ELEVS]ordercontrol.WorldView //Primary
+}
 
-	e.DoorTimer = timer.New(DOOR_OPEN_TIME)
-
-	for f := 0; f < N_FLOORS; f++ {
-		for b := 0; b < N_BUTTONS; b++ {
-			e.LocalOrderTable[f][b] = false
-		}
+func CreateElevator(_Id int, _Port int) Elevator {
+	e := Elevator{
+		Id:            _Id,
+		Port:          _Port,
+		Role:          rolemanager.ROLE_Backup,
+		PhysicalInfo:  CreatePhysicalElevator(),
+		WorldView:     ordercontrol.CreateWorldView(),
+		AllWorldViews: ordercontrol.CreateAllWorldViews(), //Primary
 	}
 
 	return e
+}
+
+func CreatePhysicalElevator() ElevatorPhysicalInfo {
+	pe := ElevatorPhysicalInfo{
+		NumFloors: N_FLOORS,
+		Floor:     elevio.GetFloor(),
+		MotorDir:  elevio.MD_Stop,
+		State:     EM_Idle,
+		DoorTimer: timer.New(DOOR_OPEN_TIME),
+	}
+	return pe
 }
 
 func InitPhysicalElevator(ip string, port int) {
