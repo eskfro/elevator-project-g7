@@ -1,6 +1,9 @@
 package rolemanager
 
-import "time"
+import (
+	"elevator-project-g7/internal/elev"
+	"time"
+)
 
 const POLL_RATE = 1 * time.Second
 
@@ -10,22 +13,35 @@ const POLL_RATE = 1 * time.Second
 - CurrentPrimary
 */
 
-type Role int
+type ElevatorRole int
 
 const (
-	ROLE_Backup  Role = 0
-	ROLE_Primary Role = 1
-	ROLE_Init	 Role = 2
+	ER_Backup  ElevatorRole = 0
+	ER_Primary ElevatorRole = 1
+	ER_Init    ElevatorRole = 2
 )
+
+type RoleIdPair struct {
+	Id   int
+	Role ElevatorRole
+}
 
 //TODO: define NumElevs, Id
 
-func PollRoleUpdate(receiver chan<- Role) {
-	prev := ROLE_Init
+type RoleManager struct {
+	NumElevs  int
+	AliveList RoleIdPair
+}
+
+// TODO: EAF: this func
+func PollAliveListUpdate(reciever chan<- RoleManager, rcvBcast <-chan elev.WorldView)
+
+func PollRoleUpdate(receiver chan<- ElevatorRole, role ElevatorRole) {
+	prev := ER_Init
 	for {
 		time.Sleep(POLL_RATE)
-		current := //TODO: Nåverande rolle
-		if current != prev && v != ROLE_Init {
+		current := role //TODO: Check if Marius agree
+		if current != prev && role != ER_Init {
 			receiver <- current
 		}
 		prev = current

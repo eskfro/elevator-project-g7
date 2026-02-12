@@ -2,7 +2,6 @@ package elev
 
 import (
 	"elevator-project-g7/internal/elevio"
-	"elevator-project-g7/internal/ordercontrol"
 	"elevator-project-g7/internal/rolemanager"
 	"elevator-project-g7/internal/timer"
 	"fmt"
@@ -13,6 +12,35 @@ const N_FLOORS = 4
 const N_BUTTONS = 3
 const DOOR_OPEN_TIME = time.Second * 3
 const N_MAX_ELEVS = 9
+
+// TODO: vi må fikse alle import cycles.
+// Tror vi må prøve å lage alle elementene til Elevator her egentlig.
+
+// ================= Orders ===============================
+
+type Order struct {
+	ElevatorNumber int
+	Floor          int
+	ButtonType     elevio.ButtonType
+}
+
+type OrderStatus int
+
+const (
+	OS_NO_ORDER  OrderStatus = 0
+	OS_REQUESTED OrderStatus = 1
+	OS_CONFIRMED OrderStatus = 2
+	OS_CLEAR     OrderStatus = 3
+)
+
+// ================ Elevator WorldView(s) =======================
+
+type WorldView struct {
+	OrderTable      [N_MAX_ELEVS][N_FLOORS][N_BUTTONS]OrderStatus //Orders for all elevators
+	LocalOrderTable [N_FLOORS][N_BUTTONS]bool                     //Local orders assigned by primary
+}
+
+// ==================== Elevator Stuff =============================
 
 type ElevatorMovement int
 
@@ -32,22 +60,22 @@ type ElevatorPhysicalInfo struct {
 }
 
 type Elevator struct {
-	WorldView     ordercontrol.WorldView
-	Role          rolemanager.Role
+	WorldView     WorldView
+	Role          rolemanager.ElevatorRole
 	Id            int
 	Port          int
 	PhysicalInfo  ElevatorPhysicalInfo
-	AllWorldViews [N_MAX_ELEVS]ordercontrol.WorldView //Primary
+	AllWorldViews [N_MAX_ELEVS]WorldView //Primary
 }
 
 func CreateElevator(_Id int, _Port int) Elevator {
 	e := Elevator{
 		Id:            _Id,
 		Port:          _Port,
-		Role:          rolemanager.ROLE_Backup,
+		Role:          rolemanager.ER_Init,
 		PhysicalInfo:  CreatePhysicalElevator(),
-		WorldView:     ordercontrol.CreateWorldView(),
-		AllWorldViews: ordercontrol.CreateAllWorldViews(), //Primary
+		WorldView:     CreateWorldView(),
+		AllWorldViews: CreateAllWorldViews(), //Primary
 	}
 
 	return e
@@ -78,4 +106,34 @@ func InitPhysicalElevator(ip string, port int) {
 	}
 	elevio.SetDoorOpenLamp(false)
 	elevio.SetFloorIndicator(elevio.GetFloor())
+
+}
+func CreateWorldView() WorldView {
+	wv := WorldView{}
+
+	//Init OrderTable
+	for n_e := 0; n_e < N_MAX_ELEVS; n_e++ {
+		for f := 0; f < N_MAX_ELEVS; f++ {
+			for b := 0; b < N_MAX_ELEVS; b++ {
+				wv.OrderTable[n_e][f][b] = OS_NO_ORDER
+			}
+		}
+	}
+
+	//Init LocalOrderTable
+	for f := 0; f < N_MAX_ELEVS; f++ {
+		for b := 0; b < N_MAX_ELEVS; b++ {
+			wv.LocalOrderTable[f][b] = false
+		}
+	}
+
+	return wv
+}
+
+func CreateAllWorldViews() [N_MAX_ELEVS]WorldView {
+	var allWorldViews [N_MAX_ELEVS]WorldView
+	for i := 0; i < N_MAX_ELEVS; i++ {
+		allWorldViews[i] = CreateWorldView()
+	}
+	return allWorldViews
 }
