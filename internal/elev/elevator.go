@@ -56,8 +56,8 @@ const (
 )
 
 type WorldView struct {
-	OrderTable      [N_MAX_ELEVS][N_FLOORS][N_BUTTONS]OrderStatus //Orders for all elevators
-	LocalOrderTable [N_FLOORS][N_BUTTONS]bool                     //Local orders assigned by primary
+	EveryonesOrders map[Order]OrderStatus     //Bytta navn fra OrderTable men angrer ekstremt😔 Har ikkje tid å endre tilbake no
+	LocalOrderTable [N_FLOORS][N_BUTTONS]bool //Local orders assigned by primary
 }
 
 type ElevatorPhysicalInfo struct {

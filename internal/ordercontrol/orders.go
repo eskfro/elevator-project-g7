@@ -17,13 +17,13 @@ import (
 )
 
 type Channels struct {
-	ButtonPress      chan elevio.ButtonEvent
-	ClearOrder       chan elev.Order     //Primary
-	RequestConfirmed chan elev.Order     //Primary
-	RcvBcast         chan elev.WorldView //Primary
-	NewOrderRequest  chan elev.Order     //Primary
-	MsgFromPrimary   chan [elev.N_MAX_ELEVS][elev.N_FLOORS][elev.N_BUTTONS]elev.OrderStatus
-	RoleUpdate       chan elev.ElevatorRole
+	ButtonPress        chan elevio.ButtonEvent
+	ClearOrder         chan elev.Order     //Primary
+	RequestConfirmed   chan elev.Order     //Primary
+	RcvBcast           chan elev.WorldView //Primary
+	NewOrderRequest    chan elev.Order     //Primary
+	MsgFromPrimary     chan [elev.N_MAX_ELEVS][elev.N_FLOORS][elev.N_BUTTONS]elev.OrderStatus
+	RoleUpdate         chan elev.ElevatorRole
 	BroadcastWorldView <-chan time.Time
 }
 
@@ -83,8 +83,8 @@ func OrderControl(WorldView *elev.WorldView,
 					}
 				}
 
-			case btnPress := <-Ch.ClearOrder:
-				WorldView.OrderTable[*ElevatorId][btnPress.Floor][btnPress.ButtonType] = elev.OS_CLEAR
+			case order := <-Ch.ClearOrder:
+				WorldView.EveryonesOrders[order] = elev.OS_CLEAR
 
 			case <-Ch.BroadcastWorldView:
 				//TODO: send heile WorldView til Primary
@@ -92,64 +92,88 @@ func OrderControl(WorldView *elev.WorldView,
 
 		case elev.ER_Primary:
 
-			select { //TODO: Slik det er no vil goroutinen blokke fram til noken leser (f.eks. Ch.clearOrder <-order)
-			//		Ingen vil lese fordi det skjer i samme routine.
-			//		Alternativer: - Kjør logikk direkte								⭐⭐⭐
-			//					  - Lag funksjoner som kalles direkte				⭐⭐⭐
-			//					  - Behold channels men i to separate go-routines	🤨🏎️
-			//					  - Behold channels men med buffer					🙅
+			select {
 
 			case *currentRole = <-Ch.RoleUpdate:
 
-			case order := <-Ch.NewOrderRequest:
-				//TODO: IdForOrder := Calculate which elevator
-				WorldView.OrderTable[IdForOrder][order.Floor][order.ButtonType] = elev.OS_REQUESTED
+			case rcvWorldView := <-Ch.RcvBcast:
+				//TODO: rcvID := Who sent the order??
+				AllWorldViews[rcvID] = rcvWorldView
 
-			case order := <-Ch.RequestConfirmed:
-				WorldView.OrderTable[order.ElevatorNumber][order.Floor][order.ButtonType] = elev.OS_CONFIRMED
+				for rcvOrder, rcvStatus := range rcvWorldView.EveryonesOrders { //Bytta navn fra OrderTable til EveryonesOrders, men angrer☹️
+					currentStatus := WorldView.EveryonesOrders[rcvOrder]
 
-			case order := <-Ch.ClearOrder:
-				//TODO: Acceptance test
-				WorldView.OrderTable[order.ElevatorNumber][order.Floor][order.ButtonType] = elev.OS_NO_ORDER
-
-			case rcvWorldView := <-Ch.RcvBcast: //TODO: Sende kun OrderTable og ikkje heile worldview???
-				// TODO: Update tables based on changes made
-
-				
-				
-				/*for elevID := 0; elevID < *NumElevs; elevID++ {
-					for floor := 0; floor < elev.N_FLOORS; floor++ {
-						for btn := 0; btn < elev.N_BUTTONS; btn++ {
-
-							if rcvWorldView.OrderTable[elevID][floor][btn] == WorldView.OrderTable[elevID][floor][btn] {
-								continue
-							}
-
-							order := elev.Order{
-								Floor:          floor,
-								ElevatorNumber: elevID,
-								ButtonType:     elevio.ButtonType(btn),
-							}
-
-							if rcvWorldView.OrderTable[elevID][floor][btn] == elev.OS_CLEAR {
-								Ch.ClearOrder <- order
-							}
-
-							if isRequestedByAll(AllWorldViews, order, NumElevs) {
-								Ch.RequestConfirmed <- order
-							}
-						}
+					if isReassignable(rcvOrder, rcvStatus, currentStatus) {
+						assignedID := CalculateWhichElevator(rcvOrder, AllWorldViews)
+						rcvOrder.ElevatorNumber = assignedID
 					}
+
+					WorldView.EveryonesOrders[rcvOrder] = CalculateNewStatus(rcvOrder, rcvStatus, currentStatus, rcvID, *AllWorldViews, *NumElevs)
 				}
-				*/
 			}
 		}
 	}
 }
 
-func isRequestedByAll(AllWorldViews *[elev.N_MAX_ELEVS]elev.WorldView, order elev.Order, NumElevs *int) bool {
-	for id := 0; id < *NumElevs; id++ {
-		if AllWorldViews[id].OrderTable[order.ElevatorNumber][order.Floor][order.ButtonType] != elev.OS_REQUESTED {
+func isReassignable(rcvOrder elev.Order, rcvStatus elev.OrderStatus, currentStatus elev.OrderStatus) bool {
+	isHallOrder := rcvOrder.ButtonType != elevio.BT_Cab
+	shouldBeAssigned := (rcvStatus == elev.OS_REQUESTED) && (currentStatus == elev.OS_NO_ORDER)
+	return isHallOrder && shouldBeAssigned
+}
+
+// Foreløpig ikkje ferdig funksjon
+func CalculateNewStatus(rcvOrder elev.Order,
+	rcvStatus elev.OrderStatus,
+	currentStatus elev.OrderStatus,
+	rcvID int,
+	AllWorldViews [elev.N_MAX_ELEVS]elev.WorldView,
+	NumElevs int) elev.OrderStatus {
+
+	if rcvStatus == currentStatus {
+		return currentStatus
+	}
+
+	isOwner := rcvID == rcvOrder.ElevatorNumber
+	if isOwner {
+		switch rcvStatus {
+
+		case elev.OS_REQUESTED:
+			if currentStatus == elev.OS_NO_ORDER {
+				return elev.OS_REQUESTED
+			}
+
+		case elev.OS_CLEAR:
+			//TODO: Make acceptance test
+			return elev.OS_NO_ORDER
+
+		case elev.OS_CONFIRMED:
+			//TODO:
+		}
+
+	} else {
+		switch rcvStatus {
+
+		case elev.OS_REQUESTED:
+			if AllWorldViews[rcvOrder.ElevatorNumber].EveryonesOrders[rcvOrder] != elev.OS_REQUESTED {
+				// FAILED ACCEPTANCE TEST
+			}
+			if isRequestedByAll(AllWorldViews, rcvOrder, NumElevs) {
+				return elev.OS_CONFIRMED
+			}
+
+		case elev.OS_CLEAR:
+			// FAILED ACCEPTANCE TEST
+
+		case elev.OS_CONFIRMED:
+			//TODO:
+
+		}
+	}
+}
+
+func isRequestedByAll(AllWorldViews [elev.N_MAX_ELEVS]elev.WorldView, order elev.Order, NumElevs int) bool {
+	for id := 0; id < NumElevs; id++ {
+		if AllWorldViews[id].EveryonesOrders[order] != elev.OS_REQUESTED {
 			return false
 		}
 	}
