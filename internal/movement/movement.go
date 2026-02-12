@@ -9,9 +9,9 @@ import (
 )
 
 type Channels struct {
-	printTimer   chan bool
-	obstruction  chan bool
-	floorArrival chan int
+	PrintTimer   chan bool
+	Obstruction  chan bool
+	FloorArrival chan int
 }
 
 func setAllLights(LocalOrderTable [elev.N_FLOORS][elev.N_BUTTONS]bool) {
@@ -22,6 +22,7 @@ func setAllLights(LocalOrderTable [elev.N_FLOORS][elev.N_BUTTONS]bool) {
 	}
 }
 
+/*
 func Start(pe *elev.ElevatorPhysicalInfo,
 	LocalOrderTable *[elev.N_FLOORS][elev.N_BUTTONS]bool) { //TODO: maybe pekar maybe not
 
@@ -38,6 +39,7 @@ func Start(pe *elev.ElevatorPhysicalInfo,
 
 	go HandleEvents(pe, LocalOrderTable, &Ch)
 }
+*/
 
 func HandleEvents(pe *elev.ElevatorPhysicalInfo,
 	LocalOrderTable *[elev.N_FLOORS][elev.N_BUTTONS]bool,
@@ -46,17 +48,17 @@ func HandleEvents(pe *elev.ElevatorPhysicalInfo,
 	for {
 		select {
 
-		case <-Ch.printTimer:
+		case <-Ch.PrintTimer:
 			fmt.Println(":) debugging melding :)")
 
 		case <-pe.DoorTimer.C:
 			fmt.Println("fsm doortimer event")
 			FSM_OnDoorTimeout(pe, *LocalOrderTable)
 
-		case floor := <-Ch.floorArrival:
+		case floor := <-Ch.FloorArrival:
 			FSM_OnFloorArrival(pe, *LocalOrderTable, floor)
 
-		case obst := <-Ch.obstruction:
+		case obst := <-Ch.Obstruction:
 			pe.Obstructed = obst
 		}
 	}
@@ -209,7 +211,7 @@ func printElevatorState(state elev.ElevatorMovement) {
 }
 
 // Maybe shit
-func generatePrintTimerEvents(ch_printTimer chan<- bool) {
+func GeneratePrintTimerEvents(ch_printTimer chan<- bool) {
 	ticker := time.NewTicker(50000 * time.Millisecond)
 	defer ticker.Stop()
 	for range ticker.C {

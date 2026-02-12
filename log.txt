@@ -1,0 +1,11 @@
+Eskil 12.02:
+-> Flyttet Start() funksjoner til main
+-> Lagd noen små funksjoner i rolemanager
+-> Endret litt på Elevator structen
+-> Fikset litt på OrderControl funksjonen (må endre fordi vi må bruke channels)
+
+TODO 12.02:
+-> Sende inn data som threadene trenger i channels
+-> Oversette hra koden, som kalkulerer hvem som tar OrderControl
+-> 
+
