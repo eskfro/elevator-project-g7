@@ -81,7 +81,7 @@ type Elevator struct {
 }
 
 func CreateElevator(_Id int, _Port int) Elevator {
-	e := Elevator{
+	elev := Elevator{
 		Id:            _Id,
 		Port:          _Port,
 		Role:          ER_Init,
@@ -90,7 +90,7 @@ func CreateElevator(_Id int, _Port int) Elevator {
 		AllWorldViews: CreateAllWorldViews(), //Primary
 	}
 
-	return e
+	return elev
 }
 
 func CreatePhysicalElevator() ElevatorPhysicalInfo {
@@ -128,18 +128,18 @@ func CreateWorldView() WorldView {
 	wv := WorldView{}
 
 	//Init OrderTable
-	for n_e := 0; n_e < N_MAX_ELEVS; n_e++ {
-		for f := 0; f < N_FLOORS; f++ {
-			for b := 0; b < N_BUTTONS; b++ {
-				wv.OrderTable[n_e][f][b] = OS_NO_ORDER
+	for elevID := 0; elevID < N_MAX_ELEVS; elevID++ {
+		for floor := 0; floor < N_FLOORS; floor++ {
+			for btn := 0; btn < N_BUTTONS; btn++ {
+				wv.OrderTable[elevID][floor][btn] = OS_NO_ORDER
 			}
 		}
 	}
 
 	//Init LocalOrderTable
-	for f := 0; f < N_MAX_ELEVS; f++ {
-		for b := 0; b < N_MAX_ELEVS; b++ {
-			wv.LocalOrderTable[f][b] = false
+	for floor := 0; floor < N_FLOORS; floor++ {
+		for btn := 0; btn < N_BUTTONS; btn++ {
+			wv.LocalOrderTable[floor][btn] = false
 		}
 	}
 

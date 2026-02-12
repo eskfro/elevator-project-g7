@@ -41,33 +41,30 @@ func PollRoleUpdate(receiver chan<- elev.ElevatorRole, role *elev.ElevatorRole) 
 	}
 }
 
-// Teller # master i AliveList
-func CountMasterInAliveList(AliveList []RoleIdPair) int {
-	numMaster := 0
-	length := len(AliveList)
-
-	for i := 0; i < length; i++ {
-		if AliveList[i].Role == elev.ER_Primary {
-			numMaster++
+func CountPrimaries(List []RoleIdPair) int {
+	numPrimaries := 0
+	for _, pair := range List {
+		if pair.Role == elev.ER_Primary {
+			numPrimaries++
 		}
 	}
-	return numMaster
+	return numPrimaries
 }
 
 // acceptance test for at det bare er en master i AliveList
-func AT_OneMaster(AliveList []RoleIdPair) bool {
-	return CountMasterInAliveList(AliveList) == 1
+func HasOnePrimary(List []RoleIdPair) bool {
+	return CountPrimaries(List) == 1
 }
 
 // acceptance test for at NumElevs == len(AliveList) -> kanskje unødvendig
-func AT_CorrectNumElevs(NumElevs int, AliveList []RoleIdPair) bool {
-	return NumElevs == len(AliveList)
+func AT_CorrectNumElevs(NumElevs int, List []RoleIdPair) bool {
+	return NumElevs == len(List)
 }
 
 // lag funksjon som sjekker om en backup skal bli mastyer
-func ShouldBecomeMaster(ElevatorId int, NextMasterId int, AliveList []RoleIdPair) bool {
+func ShouldBecomePrimary(ElevatorId int, NextMasterId int, AliveList []RoleIdPair) bool {
 
-	if CountMasterInAliveList(AliveList) != 0 {
+	if CountPrimaries(AliveList) != 0 {
 		return false
 	}
 

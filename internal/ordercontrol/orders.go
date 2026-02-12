@@ -24,7 +24,7 @@ type Channels struct {
 	NewOrderRequest  chan elev.Order     //Primary
 	MsgFromPrimary   chan [elev.N_MAX_ELEVS][elev.N_FLOORS][elev.N_BUTTONS]elev.OrderStatus
 	RoleUpdate       chan elev.ElevatorRole
-	OrderBcastTicker <-chan time.Time
+	BroadcastWorldView <-chan time.Time
 }
 
 // EAF: I MOVED THIS TO MAIN
@@ -63,7 +63,6 @@ func OrderControl(WorldView *elev.WorldView,
 	for {
 		switch *currentRole {
 		case elev.ER_Backup:
-			//Marius: Fjerna for løkker her inne, slik at det går ann å flytte seg mellom Primary og Backup
 			select {
 			case *currentRole = <-Ch.RoleUpdate:
 
@@ -78,16 +77,16 @@ func OrderControl(WorldView *elev.WorldView,
 
 				WorldView.OrderTable = OrderTableFromPrimary
 
-				for f := 0; f < elev.N_FLOORS; f++ {
-					for b := 0; b < elev.N_BUTTONS; b++ {
-						WorldView.LocalOrderTable[f][b] = OrderTableFromPrimary[rolemanager.Id][f][b] == elev.OS_CONFIRMED
+				for floor := 0; floor < elev.N_FLOORS; floor++ {
+					for btn := 0; btn < elev.N_BUTTONS; btn++ {
+						WorldView.LocalOrderTable[floor][btn] = OrderTableFromPrimary[rolemanager.Id][floor][btn] == elev.OS_CONFIRMED
 					}
 				}
 
 			case btnPress := <-Ch.ClearOrder:
 				WorldView.OrderTable[*ElevatorId][btnPress.Floor][btnPress.ButtonType] = elev.OS_CLEAR
 
-			case <-Ch.OrderBcastTicker:
+			case <-Ch.BroadcastWorldView:
 				//TODO: send heile WorldView til Primary
 			}
 
@@ -116,37 +115,39 @@ func OrderControl(WorldView *elev.WorldView,
 			case rcvWorldView := <-Ch.RcvBcast: //TODO: Sende kun OrderTable og ikkje heile worldview???
 				// TODO: Update tables based on changes made
 
-				for n_e := 0; n_e < *NumElevs; n_e++ {
-					for f := 0; f < elev.N_FLOORS; f++ {
-						for b := 0; b < elev.N_BUTTONS; b++ {
+				
+				
+				/*for elevID := 0; elevID < *NumElevs; elevID++ {
+					for floor := 0; floor < elev.N_FLOORS; floor++ {
+						for btn := 0; btn < elev.N_BUTTONS; btn++ {
 
-							if rcvWorldView.OrderTable[n_e][f][b] == WorldView.OrderTable[n_e][f][b] {
+							if rcvWorldView.OrderTable[elevID][floor][btn] == WorldView.OrderTable[elevID][floor][btn] {
 								continue
 							}
 
 							order := elev.Order{
-								Floor:          f,
-								ElevatorNumber: n_e,
-								ButtonType:     elevio.ButtonType(b),
+								Floor:          floor,
+								ElevatorNumber: elevID,
+								ButtonType:     elevio.ButtonType(btn),
 							}
 
-							if rcvWorldView.OrderTable[n_e][f][b] == elev.OS_CLEAR {
+							if rcvWorldView.OrderTable[elevID][floor][btn] == elev.OS_CLEAR {
 								Ch.ClearOrder <- order
 							}
 
-							if isConfirmedByAll(AllWorldViews, order, NumElevs) {
+							if isRequestedByAll(AllWorldViews, order, NumElevs) {
 								Ch.RequestConfirmed <- order
 							}
 						}
 					}
 				}
+				*/
 			}
 		}
 	}
 }
 
-func isConfirmedByAll(AllWorldViews *[elev.N_MAX_ELEVS]elev.WorldView, order elev.Order, NumElevs *int) bool {
-	//Returns true if all backups have the order marked as OS_REQUESTED
+func isRequestedByAll(AllWorldViews *[elev.N_MAX_ELEVS]elev.WorldView, order elev.Order, NumElevs *int) bool {
 	for id := 0; id < *NumElevs; id++ {
 		if AllWorldViews[id].OrderTable[order.ElevatorNumber][order.Floor][order.ButtonType] != elev.OS_REQUESTED {
 			return false

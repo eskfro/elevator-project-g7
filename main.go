@@ -63,7 +63,7 @@ func main() {
 		NewOrderRequest:  make(chan elev.Order),     //Primary
 		MsgFromPrimary:   make(chan [elev.N_MAX_ELEVS][elev.N_FLOORS][elev.N_BUTTONS]elev.OrderStatus),
 		RoleUpdate:       make(chan elev.ElevatorRole),
-		OrderBcastTicker: ticker.C,
+		BroadcastWorldView: ticker.C,
 	}
 
 	// Her må vi gå bort fra pekere fordi det blir jo race conditions :)
