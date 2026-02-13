@@ -13,19 +13,6 @@ const POLL_RATE = 1 * time.Second
 - CurrentPrimary
 */
 
-// Structen som skal være i AliveList
-type RoleIdPair struct {
-	Id   int
-	Role elev.ElevatorRole
-}
-
-/*
-type RoleManager struct {
-	NumElevs  int
-	AliveList []RoleIdPair
-}
-*/
-
 // TODO: EAF: this func
 //func PollAliveListUpdate(reciever chan<- RoleManager, rcvBcast <-chan elev.WorldView)
 
@@ -41,7 +28,7 @@ func PollRoleUpdate(receiver chan<- elev.ElevatorRole, role *elev.ElevatorRole) 
 	}
 }
 
-func CountPrimaries(List []RoleIdPair) int {
+func CountPrimaries(List []elev.RoleIdPair) int {
 	numPrimaries := 0
 	for _, pair := range List {
 		if pair.Role == elev.ER_Primary {
@@ -52,17 +39,17 @@ func CountPrimaries(List []RoleIdPair) int {
 }
 
 // acceptance test for at det bare er en master i AliveList
-func HasOnePrimary(List []RoleIdPair) bool {
+func HasOnePrimary(List []elev.RoleIdPair) bool {
 	return CountPrimaries(List) == 1
 }
 
 // acceptance test for at NumElevs == len(AliveList) -> kanskje unødvendig
-func AT_CorrectNumElevs(NumElevs int, List []RoleIdPair) bool {
+func AT_CorrectNumElevs(NumElevs int, List []elev.RoleIdPair) bool {
 	return NumElevs == len(List)
 }
 
 // lag funksjon som sjekker om en backup skal bli mastyer
-func ShouldBecomePrimary(ElevatorId int, NextMasterId int, AliveList []RoleIdPair) bool {
+func ShouldBecomePrimary(ElevatorId int, NextMasterId int, AliveList []elev.RoleIdPair) bool {
 
 	if CountPrimaries(AliveList) != 0 {
 		return false

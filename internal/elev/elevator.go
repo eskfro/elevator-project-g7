@@ -16,15 +16,9 @@ const N_MAX_ELEVS = 9
 // Tror vi må prøve å lage alle elementene til Elevator her egentlig.
 // Eler så lager vi en types modul -> E: jeg ønsker ikke det
 
-// ================= Orders ===============================
+// ================= ENUM TYPES ===============================
 
-type Order struct {
-	ElevatorNumber int
-	Floor          int
-	ButtonType     elevio.ButtonType
-}
-
-type OrderStatus int
+type OrderStatus uint8
 
 const (
 	OS_NO_ORDER  OrderStatus = 0
@@ -33,21 +27,7 @@ const (
 	OS_CLEAR     OrderStatus = 3
 )
 
-// ================ Elevator WorldView(s) =======================
-
-// ================== Role Stuff ================================
-
-type ElevatorRole int
-
-const (
-	ER_Backup  ElevatorRole = 0
-	ER_Primary ElevatorRole = 1
-	ER_Init    ElevatorRole = 2
-)
-
-// ==================== Elevator Stuff =============================
-
-type ElevatorMovement int
+type ElevatorMovement uint8
 
 const (
 	EM_Idle     ElevatorMovement = 0
@@ -55,10 +35,40 @@ const (
 	EM_DoorOpen ElevatorMovement = 2
 )
 
-type WorldView struct {
-	EveryonesOrders map[Order]OrderStatus     //Bytta navn fra OrderTable men angrer ekstremt😔 Har ikkje tid å endre tilbake no
-	LocalOrderTable [N_FLOORS][N_BUTTONS]bool //Local orders assigned by primary
+type ElevatorRole uint8
+
+const (
+	ER_Backup  ElevatorRole = 0
+	ER_Primary ElevatorRole = 1
+	ER_Init    ElevatorRole = 2
+)
+
+// ================ Helper Structs ===========================
+
+type Order struct {
+	ElevatorNumber int
+	Floor          int
+	ButtonType     elevio.ButtonType
 }
+
+type RoleIdPair struct {
+	Id   int
+	Role ElevatorRole
+}
+
+type WorldView struct {
+	// E: hva skal vi med map her?
+	// E: jeg føler map er litt lite forutsigbart med tenke på at vi skal sende det over en 1024 byte buffer.
+	// Men idk assa
+	//OrderTable      map[Order]OrderStatus     //Bytta navn fra OrderTable men angrer ekstremt😔 Har ikkje tid å endre tilbake no
+
+
+	
+	OrderTable      [N_MAX_ELEVS][N_FLOORS][N_BUTTONS]OrderStatus //E: vi får diskutere denne :)
+	LocalOrderTable [N_FLOORS][N_BUTTONS]bool                     //Local orders assigned by primary
+}
+
+// ============ ELEVATOR CORE =======================================
 
 type ElevatorPhysicalInfo struct {
 	Floor      int
@@ -72,15 +82,16 @@ type ElevatorPhysicalInfo struct {
 
 type Elevator struct {
 	Role          ElevatorRole // E: Føler Role passer inn her egentlig
-	Id            int
-	Port          int
+	Id            uint16
+	Port          uint16
 	PhysicalInfo  ElevatorPhysicalInfo
 	WorldView     WorldView
-	AllWorldViews [N_MAX_ELEVS]WorldView //Primary
-	NumElevs      int
+	AllWorldViews [N_MAX_ELEVS]WorldView  //Primary
+	AliveList     [N_MAX_ELEVS]RoleIdPair //Primary
+	NumElevs      uint8
 }
 
-func CreateElevator(_Id int, _Port int) Elevator {
+func CreateElevator(_Id uint16, _Port uint16) Elevator {
 	elev := Elevator{
 		Id:            _Id,
 		Port:          _Port,
@@ -107,7 +118,7 @@ func CreatePhysicalElevator() ElevatorPhysicalInfo {
 }
 
 // Moves elevator to a floor
-func InitPhysicalElevator(ip string, port int) {
+func InitPhysicalElevator(ip string, port uint16) {
 
 	elevio.Init(fmt.Sprintf("localhost:%d", port), N_FLOORS)
 
@@ -154,7 +165,7 @@ func CreateAllWorldViews() [N_MAX_ELEVS]WorldView {
 	return allWorldViews
 }
 
-func PrintElevatorInit(id int, port int) {
+func PrintElevatorInit(id uint16, port uint16) {
 	fmt.Printf("elevator starting | id = %d | port = %d\n", id, port)
 
 }

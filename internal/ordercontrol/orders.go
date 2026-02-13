@@ -56,7 +56,7 @@ func Start(WorldView *elev.WorldView,
 func OrderControl(WorldView *elev.WorldView,
 	AllWorldViews *[elev.N_MAX_ELEVS]elev.WorldView,
 	Ch Channels,
-	NumElevs *int,
+	NumElevs *uint16,
 	ElevatorId *int,
 	currentRole *elev.ElevatorRole) {
 
@@ -179,3 +179,15 @@ func isRequestedByAll(AllWorldViews [elev.N_MAX_ELEVS]elev.WorldView, order elev
 	}
 	return true
 }
+
+// Denne må returnere hvilke av heisene med minst cost function
+func CalculateWhichElevator(rcvOrder elev.Order,
+	OrderTable [elev.N_MAX_ELEVS][elev.N_FLOORS][elev.N_BUTTONS]elev.OrderStatus)
+
+// Denne beregner hvor mye det koster der heis nummer elevNum å komme seg til rcvOrder.
+// cost++ antall floor unna target
+// cost++ beveger seg i feil retning
+// cost++ antall stopp (kanskje man ikke trenger så heftig logikk)
+func CalculateCost(rcvOrder elev.Order, elevNum int)
+
+//TODO: se spec hvor strengt det er

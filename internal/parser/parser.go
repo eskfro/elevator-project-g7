@@ -1,34 +1,30 @@
 package parser
 
 import (
-	"errors"
+	"log"
 	"strconv"
 )
 
-func ParseOsArgs(args []string) (int, int, error) {
+func ParseOsArgs(args []string, sim bool) (uint16, uint16) {
 	/*
 		Parser for OS-args when running program from cmd line
-
-		Example:
-		./out 1 15657
-		id = 1
-		port = 15657
-
 	*/
 
+	if sim {
+		return 1, 15657
+	}
 	if len(args) < 3 {
-		return 0, 0, errors.New("Missing arguments")
+		log.Fatalln("OS args missing - #1")
+	}
+	id, err := strconv.ParseUint(args[1], 10, 16)
+	if err != nil {
+		log.Fatalln("OS args missing - #2")
+	}
+	port, err := strconv.ParseUint(args[2], 10, 16)
+	if err != nil {
+		log.Fatalln("OS args missing - #3")
 	}
 
-	id, err := strconv.Atoi(args[1])
-	if err != nil {
-		return 0, 0, errors.New("Int conversion failed (1)")
-	}
-	port, err := strconv.Atoi(args[2])
-	if err != nil {
-		return 0, 0, errors.New("Int conversion failed (2)")
-	}
-
-	return id, port, nil
+	return uint16(id), uint16(port)
 
 }
