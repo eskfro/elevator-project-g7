@@ -16,7 +16,15 @@ OrderControl funksjunen ChooseWhichElevator trenger denne informasjonen.
 -> Begynte med ChooseWhichElevator funksjonen
 -> La til noen uint8 fordi det tar mye mindre plass, spesielt for WorldView som nesten bruker
 hele 1024 byte bufferet hvis ikke. Mulig ikke alle trenger det da vi får se. 
--> Flyttet LocalOrderTable inne i ElevaPhysicalInfo fordi det er info om kun den ene heisen
 -> Fjerna channel structs fordi nå er de i main
+
+-> TODO: vi må finne ut hvordan vi skal sette opp elevator structen. 
+Feks trenger LocalOrderTable en gang være i WorldView? Jeg mener nei fordi 
+all den ekte informasjonen ligger allerede i OrderTable, og hvis en av heisene dør
+så lager man bare en funksjon som overfører cab calls til når heisen er tilbake. 
+Da vil jeg heller at LocalOrderTable skal ligge sammen med ElevaPhysicalInfo slik 
+at vi skiller mellom informasjonen som bare omhandler sin egen heis, og informasjon 
+som inneholder info om alle andre heiser også som feks OrderTable, NumElevs og AliveList. 
+Målet må vel være å gjøre slik at vi trenger færrest channels kanskje. 
 
 

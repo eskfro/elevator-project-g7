@@ -10,7 +10,7 @@ import (
 const N_FLOORS = 4
 const N_BUTTONS = 3
 const DOOR_OPEN_TIME = 3 * time.Second
-const N_MAX_ELEVS = 3
+const N_MAX_ELEVS = 4
 
 // ================= ENUM TYPES ===============================
 
