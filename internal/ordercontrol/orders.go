@@ -13,6 +13,7 @@ import (
 	"elevator-project-g7/internal/elev"
 	"elevator-project-g7/internal/elevio"
 	"elevator-project-g7/internal/rolemanager"
+	"math"
 	"time"
 )
 
@@ -56,7 +57,7 @@ func Start(WorldView *elev.WorldView,
 func OrderControl(WorldView *elev.WorldView,
 	AllWorldViews *[elev.N_MAX_ELEVS]elev.WorldView,
 	Ch Channels,
-	NumElevs *uint16,
+	NumElevs *uint8,
 	ElevatorId *int,
 	currentRole *elev.ElevatorRole) {
 
@@ -180,14 +181,65 @@ func isRequestedByAll(AllWorldViews [elev.N_MAX_ELEVS]elev.WorldView, order elev
 	return true
 }
 
-// Denne må returnere hvilke av heisene med minst cost function
+// Returnerer best heis
 func CalculateWhichElevator(rcvOrder elev.Order,
-	OrderTable [elev.N_MAX_ELEVS][elev.N_FLOORS][elev.N_BUTTONS]elev.OrderStatus)
+	OrderTable [elev.N_MAX_ELEVS][elev.N_FLOORS][elev.N_BUTTONS]elev.OrderStatus,
+	AliveList []elev.ElevatorPhysicalInfo,
+	NumElevs int) int {
+
+	if NumElevs == 1 {
+		return AliveList[0].Id
+	}
+
+	// Large number lol
+	minCost := 1000
+	bestElevId := 1000
+
+	for e := 0; e < NumElevs; e++ {
+
+		currentElev := AliveList[e]
+		cost := CalculateCost(rcvOrder, currentElev)
+
+		if cost < minCost {
+			minCost = cost
+			bestElevId = int(currentElev.Id)
+		}
+	}
+
+	return bestElevId
+
+}
 
 // Denne beregner hvor mye det koster der heis nummer elevNum å komme seg til rcvOrder.
+func CalculateCost(rcvOrder elev.Order, elevator elev.ElevatorPhysicalInfo, OrderTable [elev.N_FLOORS][elev.N_BUTTONS]elev.OrderStatus) int {
+
+	penaltyFloorDiff := 10
+	penaltyNumOrders := 5
+	penaltyWrongDir := 20
+
+	floorDiff := math.Abs(float64(rcvOrder.Floor - elevator.Floor))
+
+	numOrders := 0
+	// Count num active orders for elevator
+	for f := 0; f < elev.N_FLOORS; f++ {
+		for b := 0; b < elev.N_BUTTONS; b++ {
+			if OrderTable[f][b] == elev.OS_CONFIRMED {
+				numOrders++
+			}
+		}
+	}
+
+	wrongDir := false
+	if (rcvOrder.Floor < elevator.Floor && elevator.MotorDir == elevio.MD_Up) || 
+	 (rcvOrder.Floor > elevator.Floor && elevator.MotorDir == elevio.MD_Down) || 
+	 (rcvOrder.Floor == elevator.Floor && )
+
+
+
+
+}
+
 // cost++ antall floor unna target
 // cost++ beveger seg i feil retning
 // cost++ antall stopp (kanskje man ikke trenger så heftig logikk)
-func CalculateCost(rcvOrder elev.Order, elevNum int)
-
 //TODO: se spec hvor strengt det er

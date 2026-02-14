@@ -7,5 +7,15 @@ Eskil 12.02:
 TODO 12.02:
 -> Sende inn data som threadene trenger i channels
 -> Oversette hra koden, som kalkulerer hvem som tar OrderControl
+
+
+================== Eskil 14.02 =============================
+-> Flytta Id, Role, og Port inne i ElevatorPhysicalInfo.
+Gjorde dette fordi da kan hele ElevatorPhysicalInfo structen være i AliveList fordi 
+OrderControl funksjunen ChooseWhichElevator trenger denne informasjonen. 
+-> Begynte med ChooseWhichElevator funksjonen
+-> La til noen uint8 fordi det tar mye mindre plass, spesielt for WorldView som nesten bruker
+hele 1024 byte bufferet hvis ikke. Mulig ikke alle trenger det da vi får se. 
 -> 
+
 

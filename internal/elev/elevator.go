@@ -62,52 +62,48 @@ type WorldView struct {
 	// Men idk assa
 	//OrderTable      map[Order]OrderStatus     //Bytta navn fra OrderTable men angrer ekstremt😔 Har ikkje tid å endre tilbake no
 
-
-	
 	OrderTable      [N_MAX_ELEVS][N_FLOORS][N_BUTTONS]OrderStatus //E: vi får diskutere denne :)
 	LocalOrderTable [N_FLOORS][N_BUTTONS]bool                     //Local orders assigned by primary
 }
 
 // ============ ELEVATOR CORE =======================================
 
+// All denne infoen handler bare om en heis
 type ElevatorPhysicalInfo struct {
+	Id         int
+	Port       int
 	Floor      int
+	Role       ElevatorRole
 	MotorDir   elevio.MotorDirection
 	State      ElevatorMovement
-	NumFloors  int
-	NumButtons int
 	Obstructed bool
 	DoorTimer  *timer.Timer
 }
 
+// All denne infoen inneholder også info om alle de andre heisene
 type Elevator struct {
-	Role          ElevatorRole // E: Føler Role passer inn her egentlig
-	Id            uint16
-	Port          uint16
 	PhysicalInfo  ElevatorPhysicalInfo
 	WorldView     WorldView
-	AllWorldViews [N_MAX_ELEVS]WorldView  //Primary
-	AliveList     [N_MAX_ELEVS]RoleIdPair //Primary
+	AllWorldViews [N_MAX_ELEVS]WorldView //Primary
+	AliveList     []ElevatorPhysicalInfo //Primary
 	NumElevs      uint8
 }
 
 func CreateElevator(_Id uint16, _Port uint16) Elevator {
-	elev := Elevator{
-		Id:            _Id,
-		Port:          _Port,
-		Role:          ER_Init,
-		PhysicalInfo:  CreatePhysicalElevator(),
+	e := Elevator{
+		PhysicalInfo:  CreatePhysicalElevator(_Id, _Port),
 		WorldView:     CreateWorldView(),
 		AllWorldViews: CreateAllWorldViews(), //Primary
 	}
 
-	return elev
+	return e
 }
 
-func CreatePhysicalElevator() ElevatorPhysicalInfo {
+func CreatePhysicalElevator(_Id uint16, _Port uint16) ElevatorPhysicalInfo {
 	pe := ElevatorPhysicalInfo{
-		NumFloors:  N_FLOORS,
-		NumButtons: N_BUTTONS,
+		Id:         _Id,
+		Port:       _Port,
+		Role:       ER_Init,
 		Floor:      elevio.GetFloor(),
 		MotorDir:   elevio.MD_Stop,
 		State:      EM_Idle,
