@@ -12,6 +12,7 @@ package ordercontrol
 import (
 	"elevator-project-g7/internal/elev"
 	"elevator-project-g7/internal/elevio"
+	"elevator-project-g7/internal/requests"
 	"elevator-project-g7/internal/rolemanager"
 	"math"
 	"time"
@@ -182,6 +183,7 @@ func isRequestedByAll(AllWorldViews [elev.N_MAX_ELEVS]elev.WorldView, order elev
 }
 
 // Returnerer best heis
+// Dette er bare secondary requirement i specen så tenker vi bare lager en enkel algoritme
 func CalculateWhichElevator(rcvOrder elev.Order,
 	OrderTable [elev.N_MAX_ELEVS][elev.N_FLOORS][elev.N_BUTTONS]elev.OrderStatus,
 	AliveList []elev.ElevatorPhysicalInfo,
@@ -193,12 +195,12 @@ func CalculateWhichElevator(rcvOrder elev.Order,
 
 	// Large number lol
 	minCost := 1000
-	bestElevId := 1000
+	bestElevId := AliveList[0].Id
 
 	for e := 0; e < NumElevs; e++ {
 
 		currentElev := AliveList[e]
-		cost := CalculateCost(rcvOrder, currentElev)
+		cost := CalculateCost(rcvOrder, currentElev, OrderTable[currentElev.Id])
 
 		if cost < minCost {
 			minCost = cost
@@ -211,15 +213,19 @@ func CalculateWhichElevator(rcvOrder elev.Order,
 }
 
 // Denne beregner hvor mye det koster der heis nummer elevNum å komme seg til rcvOrder.
+// Funksjonen er nok ikke optimal men sikkert bra nok :)
 func CalculateCost(rcvOrder elev.Order, elevator elev.ElevatorPhysicalInfo, OrderTable [elev.N_FLOORS][elev.N_BUTTONS]elev.OrderStatus) int {
 
-	penaltyFloorDiff := 10
-	penaltyNumOrders := 5
-	penaltyWrongDir := 20
-
-	floorDiff := math.Abs(float64(rcvOrder.Floor - elevator.Floor))
+	// Cost function penalties
+	penaltyFloorDiff := 3
+	penaltyNumOrders := 3
+	penaltyWrongDir := 10
 
 	numOrders := 0
+	OrderTableBool := orderTableToBool(OrderTable)
+	orderFloor := rcvOrder.Floor
+	floorDiff := int(math.Abs(float64(rcvOrder.Floor - elevator.Floor)))
+
 	// Count num active orders for elevator
 	for f := 0; f < elev.N_FLOORS; f++ {
 		for b := 0; b < elev.N_BUTTONS; b++ {
@@ -229,17 +235,33 @@ func CalculateCost(rcvOrder elev.Order, elevator elev.ElevatorPhysicalInfo, Orde
 		}
 	}
 
-	wrongDir := false
-	if (rcvOrder.Floor < elevator.Floor && elevator.MotorDir == elevio.MD_Up) || 
-	 (rcvOrder.Floor > elevator.Floor && elevator.MotorDir == elevio.MD_Down) || 
-	 (rcvOrder.Floor == elevator.Floor && )
+	wrongDir := (orderFloor < elevator.Floor && elevator.MotorDir == elevio.MD_Up) || //Elev going up, above the order
+		(orderFloor > elevator.Floor && elevator.MotorDir == elevio.MD_Down) || //Elev goign down, below the order
+		(orderFloor == elevator.Floor && elevator.MotorDir == elevio.MD_Down && requests.RequestBelow(OrderTableBool, elevator.Floor)) || //Elev just went passed the order floor (down)
+		(orderFloor == elevator.Floor && elevator.MotorDir == elevio.MD_Up && requests.RequestAbove(OrderTableBool, elevator.Floor)) //Elev just went passed the order floor (up)
 
-
-
+	totalCost := penaltyFloorDiff*floorDiff + penaltyNumOrders*numOrders
+	if wrongDir {
+		totalCost += penaltyWrongDir
+	}
+	return totalCost
 
 }
 
 // cost++ antall floor unna target
 // cost++ beveger seg i feil retning
 // cost++ antall stopp (kanskje man ikke trenger så heftig logikk)
-//TODO: se spec hvor strengt det er
+
+func orderTableToBool(OrderTable [elev.N_FLOORS][elev.N_BUTTONS]elev.OrderStatus) [elev.N_FLOORS][elev.N_BUTTONS]bool {
+	var OrderTableBool [elev.N_FLOORS][elev.N_BUTTONS]bool
+
+	for f := 0; f < elev.N_FLOORS; f++ {
+		for b := 0; b < elev.N_BUTTONS; b++ {
+			if OrderTable[f][b] == elev.OS_CONFIRMED {
+				OrderTableBool[f][b] = true
+			}
+		}
+	}
+
+	return OrderTableBool
+}

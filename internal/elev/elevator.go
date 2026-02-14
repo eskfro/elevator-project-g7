@@ -56,36 +56,27 @@ type RoleIdPair struct {
 	Role ElevatorRole
 }
 
-type WorldView struct {
-	// E: hva skal vi med map her?
-	// E: jeg føler map er litt lite forutsigbart med tenke på at vi skal sende det over en 1024 byte buffer.
-	// Men idk assa
-	//OrderTable      map[Order]OrderStatus     //Bytta navn fra OrderTable men angrer ekstremt😔 Har ikkje tid å endre tilbake no
-
-	OrderTable      [N_MAX_ELEVS][N_FLOORS][N_BUTTONS]OrderStatus //E: vi får diskutere denne :)
-	LocalOrderTable [N_FLOORS][N_BUTTONS]bool                     //Local orders assigned by primary
-}
-
 // ============ ELEVATOR CORE =======================================
 
 // All denne infoen handler bare om en heis
 type ElevatorPhysicalInfo struct {
-	Id         int
-	Port       int
-	Floor      int
-	Role       ElevatorRole
-	MotorDir   elevio.MotorDirection
-	State      ElevatorMovement
-	Obstructed bool
-	DoorTimer  *timer.Timer
+	Id              int
+	Port            int
+	Floor           int
+	Role            ElevatorRole
+	MotorDir        elevio.MotorDirection
+	State           ElevatorMovement
+	Obstructed      bool
+	DoorTimer       *timer.Timer
+	LocalOrderTable [N_FLOORS][N_BUTTONS]bool
 }
 
 // All denne infoen inneholder også info om alle de andre heisene
 type Elevator struct {
-	PhysicalInfo  ElevatorPhysicalInfo
-	WorldView     WorldView
-	AllWorldViews [N_MAX_ELEVS]WorldView //Primary
-	AliveList     []ElevatorPhysicalInfo //Primary
+	PhysicalInfo  ElevatorPhysicalInfo                                       // Info about the single elevator
+	WorldView     [N_MAX_ELEVS][N_FLOORS][N_BUTTONS]OrderStatus              // Primary + Backup
+	AllWorldViews [N_MAX_ELEVS][N_MAX_ELEVS][N_FLOORS][N_BUTTONS]OrderStatus //Primary
+	AliveList     []ElevatorPhysicalInfo                                     //Primary
 	NumElevs      uint8
 }
 

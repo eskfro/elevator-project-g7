@@ -16,6 +16,7 @@ OrderControl funksjunen ChooseWhichElevator trenger denne informasjonen.
 -> Begynte med ChooseWhichElevator funksjonen
 -> La til noen uint8 fordi det tar mye mindre plass, spesielt for WorldView som nesten bruker
 hele 1024 byte bufferet hvis ikke. Mulig ikke alle trenger det da vi får se. 
--> 
+-> Flyttet LocalOrderTable inne i ElevaPhysicalInfo fordi det er info om kun den ene heisen
+-> Fjerna channel structs fordi nå er de i main
 
 
