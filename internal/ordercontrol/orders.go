@@ -29,32 +29,6 @@ type Channels struct {
 	BroadcastWorldView <-chan time.Time
 }
 
-// EAF: I MOVED THIS TO MAIN
-/*
-func Start(WorldView *elev.WorldView,
-	AllWorldViews *[elev.N_MAX_ELEVS]elev.WorldView,
-	Role *elev.ElevatorRole) {
-
-	ticker := time.NewTicker(100 * time.Millisecond)
-
-	Ch := Channels{
-		buttonPress:      make(chan elevio.ButtonEvent),
-		clearOrder:       make(chan elev.Order),     //Primary
-		requestConfirmed: make(chan elev.Order),     //Primary
-		rcvBcast:         make(chan elev.WorldView), //Primary		 //TODO: WorldView is not a type
-		newOrderRequest:  make(chan elev.Order),     //Primary
-		msgFromPrimary:   make(chan [elev.N_MAX_ELEVS][elev.N_FLOORS][elev.N_BUTTONS]elev.OrderStatus),
-		roleUpdate:       make(chan elev.ElevatorRole),
-		orderBcastTicker: ticker.C,
-	}
-
-	go elevio.PollButtons(Ch.buttonPress)
-	go rolemanager.PollRoleUpdate(Ch.roleUpdate, *Role)
-	go orderControl(WorldView, AllWorldViews, Ch)
-}
-
-*/
-
 func OrderControl(WorldView *elev.WorldView,
 	AllWorldViews *[elev.N_MAX_ELEVS]elev.WorldView,
 	Ch Channels,
@@ -187,7 +161,7 @@ func isRequestedByAll(AllWorldViews [elev.N_MAX_ELEVS]elev.WorldView, order elev
 func CalculateWhichElevator(rcvOrder elev.Order,
 	OrderTable [elev.N_MAX_ELEVS][elev.N_FLOORS][elev.N_BUTTONS]elev.OrderStatus,
 	AliveList []elev.ElevatorPhysicalInfo,
-	NumElevs int) int {
+	NumElevs int) uint16 {
 
 	if NumElevs == 1 {
 		return AliveList[0].Id
@@ -204,7 +178,7 @@ func CalculateWhichElevator(rcvOrder elev.Order,
 
 		if cost < minCost {
 			minCost = cost
-			bestElevId = int(currentElev.Id)
+			bestElevId = currentElev.Id
 		}
 	}
 

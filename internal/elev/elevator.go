@@ -10,11 +10,7 @@ import (
 const N_FLOORS = 4
 const N_BUTTONS = 3
 const DOOR_OPEN_TIME = 3 * time.Second
-const N_MAX_ELEVS = 9
-
-// TODO: vi må fikse alle import cycles.
-// Tror vi må prøve å lage alle elementene til Elevator her egentlig.
-// Eler så lager vi en types modul -> E: jeg ønsker ikke det
+const N_MAX_ELEVS = 3
 
 // ================= ENUM TYPES ===============================
 
@@ -56,27 +52,37 @@ type RoleIdPair struct {
 	Role ElevatorRole
 }
 
+type WorldView struct {
+	// E: hva skal vi med map her?
+	// E: jeg føler map er litt lite forutsigbart med tenke på at vi skal sende det over en 1024 byte buffer.
+	// Men idk assa
+	//OrderTable      map[Order]OrderStatus     //Bytta navn fra OrderTable men angrer ekstremt😔 Har ikkje tid å endre tilbake no
+
+	OrderTable      [N_MAX_ELEVS][N_FLOORS][N_BUTTONS]OrderStatus //E: vi får diskutere denne :)
+	LocalOrderTable [N_FLOORS][N_BUTTONS]bool                     //Local orders assigned by primary
+}
+
 // ============ ELEVATOR CORE =======================================
 
 // All denne infoen handler bare om en heis
 type ElevatorPhysicalInfo struct {
-	Id              int
-	Port            int
-	Floor           int
-	Role            ElevatorRole
-	MotorDir        elevio.MotorDirection
-	State           ElevatorMovement
-	Obstructed      bool
-	DoorTimer       *timer.Timer
-	LocalOrderTable [N_FLOORS][N_BUTTONS]bool
+	Id         uint16
+	Port       uint16
+	Floor      int
+	Role       ElevatorRole
+	MotorDir   elevio.MotorDirection
+	State      ElevatorMovement
+	Obstructed bool
+	DoorTimer  *timer.Timer
+	// LocalOrderTable [N_FLOORS][N_BUTTONS]bool TODO: finn ut om denne kan være her
 }
 
 // All denne infoen inneholder også info om alle de andre heisene
 type Elevator struct {
-	PhysicalInfo  ElevatorPhysicalInfo                                       // Info about the single elevator
-	WorldView     [N_MAX_ELEVS][N_FLOORS][N_BUTTONS]OrderStatus              // Primary + Backup
-	AllWorldViews [N_MAX_ELEVS][N_MAX_ELEVS][N_FLOORS][N_BUTTONS]OrderStatus //Primary
-	AliveList     []ElevatorPhysicalInfo                                     //Primary
+	PhysicalInfo  ElevatorPhysicalInfo // Info about the single elevator
+	WorldView     WorldView
+	AllWorldViews [N_MAX_ELEVS]WorldView //Primary
+	AliveList     []ElevatorPhysicalInfo //Primary
 	NumElevs      uint8
 }
 
