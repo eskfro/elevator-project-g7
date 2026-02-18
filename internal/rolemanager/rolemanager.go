@@ -16,6 +16,20 @@ const POLL_RATE = 1 * time.Second
 // TODO: EAF: this func
 //func PollAliveListUpdate(reciever chan<- RoleManager, rcvBcast <-chan elev.WorldView)
 
+func RoleManager(
+	ch_Update chan elev.Elevator,
+	ch_RcvAliveList chan elev.AliveList) {
+
+	var localE elev.Elevator
+
+	for {
+		select {
+		case localE = <-ch_Update:
+		}
+	}
+}
+
+// TODO: flytt inn i RoleManager
 func PollRoleUpdate(receiver chan<- elev.ElevatorRole, role *elev.ElevatorRole) {
 	prev := elev.ER_Init
 	for {

@@ -32,38 +32,66 @@ func main() {
 	ticker := time.NewTicker(100 * time.Millisecond)
 
 	// TODO: kanskje ikke bruke struct nå lenger fordi tror dette skal være i main
-	ch_Movement := movement.Channels{
-		PrintTimer:   make(chan bool),
-		Obstruction:  make(chan bool),
-		FloorArrival: make(chan int),
-	}
 
-	ch_OrderControl := ordercontrol.Channels{
-		ButtonPress:        make(chan elevio.ButtonEvent),
-		ClearOrder:         make(chan elev.Order),     //Primary
-		RequestConfirmed:   make(chan elev.Order),     //Primary
-		RcvBcast:           make(chan elev.WorldView), //Primary		 //TODO: WorldView is not a type.
-		NewOrderRequest:    make(chan elev.Order),     //Primary
-		MsgFromPrimary:     make(chan [elev.N_MAX_ELEVS][elev.N_FLOORS][elev.N_BUTTONS]elev.OrderStatus),
-		RoleUpdate:         make(chan elev.ElevatorRole),
-		BroadcastWorldView: ticker.C,
-	}
+	ch_Elevator := 			make(chan elev.Elevator)
+	ch_PrintTimer :=  		make(chan bool)
+	ch_Obstruction :=  		make(chan bool)
+	ch_FloorArrival := 		make(chan int)
+	ch_ButtonPress := 		make(chan elevio.ButtonEvent)
+	ch_RcvOrderTable :=     make(chan elev.OrderTable)
+	ch_RcvAliveList := 		make(chan elev.AliveList)
+	ch_RoleUpdate :=       	make(chan elev.ElevatorRole)
+	ch_BcastTick := ticker.C
+
+	ch_UpdateOC := 			make(chan elev.Elevator)
+	ch_UpdateMV := 			make(chan elev.Elevator)
+	ch_UpdateRM := 			make(chan elev.Elevator)
+
+
 
 	// Her må vi gå bort fra pekere fordi det blir jo race conditions :)
 	// Tenker sender vel inn en channel for elevator og diverse.
 
 	// ============ GO MOVEMENT =======================
 
-	go elevio.PollObstructionSwitch(ch_Movement.Obstruction)
-	go elevio.PollFloorSensor(ch_Movement.FloorArrival)
-	go movement.GeneratePrintTimerEvents(ch_Movement.PrintTimer)
-	go movement.HandleEvents(&E.PhysicalInfo, &E.WorldView.LocalOrderTable, &ch_Movement)
+	go elevio.PollObstructionSwitch(ch_Obstruction)
+	go elevio.PollFloorSensor(ch_FloorArrival)
+	go movement.GeneratePrintTimerEvents(ch_PrintTimer)
+	go movement.Movement(ch_UpdateMV)
 
-	// ============= GO CONTROL =====================
+	// ============= GO ORDERCONTROL ===================
 
-	go elevio.PollButtons(ch_OrderControl.ButtonPress)
-	go rolemanager.PollRoleUpdate(ch_OrderControl.RoleUpdate, &E.Role)
-	go ordercontrol.OrderControl(&E.WorldView, &E.AllWorldViews, ch_OrderControl, &E.NumElevs, &E.Id, &E.Role)
+	go elevio.PollButtons(ch_ButtonPress)
+	go rolemanager.PollRoleUpdate(ch_RoleUpdate, &E.Role)
+	go ordercontrol.OrderControl(ch_UpdateOC, ch_RcvOrderTable)
+
+	// ============= GO ROLE MANAGER ===================
+	go rolemanager.RoleManager(ch_RcvAliveList, ch_UpdateRM)
+
+	// ============= GO NETWORK ========================
+	go network.RecieveInfo(ch_RcvOrderTable, ch_RcvAliveList)
+	go network.SendInfo(ch_BcastTick, ch_xxxOrderTable, ch_xxxAlivelist)
+
+
+	go func () {
+
+		for { 
+			select {
+			case obst := <-ch_Obstruction:
+				elevator.PhysicalInfo.Obstructed = obst
+
+			case ...:
+
+			case ...:
+
+			}
+			ch_UpdateOC <- E
+			ch_UpdateMV <- E
+			ch_UpdateRM <- E
+		}
+	}()
+
+
 
 	WaitForInterrupt()
 

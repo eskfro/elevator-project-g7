@@ -14,44 +14,46 @@ import (
 	"elevator-project-g7/internal/elevio"
 	"elevator-project-g7/internal/requests"
 	"elevator-project-g7/internal/rolemanager"
+	"log"
 	"math"
 	"time"
 )
 
 type Channels struct {
 	ButtonPress        chan elevio.ButtonEvent
-	ClearOrder         chan elev.Order     //Primary
-	RequestConfirmed   chan elev.Order     //Primary
-	RcvBcast           chan elev.WorldView //Primary
-	NewOrderRequest    chan elev.Order     //Primary
+	ClearOrder         chan elev.Order                                                        //Primary
+	RequestConfirmed   chan elev.Order                                                        //Primary
+	RcvBcast           chan [elev.N_MAX_ELEVS][elev.N_FLOORS][elev.N_BUTTONS]elev.OrderStatus //Primary
+	NewOrderRequest    chan elev.Order                                                        //Primary
 	MsgFromPrimary     chan [elev.N_MAX_ELEVS][elev.N_FLOORS][elev.N_BUTTONS]elev.OrderStatus
 	RoleUpdate         chan elev.ElevatorRole
 	BroadcastWorldView <-chan time.Time
 }
 
-func OrderControl(WorldView *elev.WorldView,
-	AllWorldViews *[elev.N_MAX_ELEVS]elev.WorldView,
-	Ch Channels,
-	NumElevs *uint8,
-	ElevatorId *int,
-	currentRole *elev.ElevatorRole) {
+func OrderControl(
+	ch_Update chan elev.Elevator,
+	ch_RcvOrderTable chan elev.OrderTable) { //TODO: fix {}
+
+	var elevator elev.Elevator
 
 	for {
-		switch *currentRole {
+		switch currentRole {
 		case elev.ER_Backup:
 			select {
-			case *currentRole = <-Ch.RoleUpdate:
+			case elevator = <-ch_Update:
+
+			case currentRole = <-Ch.RoleUpdate:
 
 			case btnPress := <-Ch.ButtonPress:
 				elevio.PrintButtonpress(btnPress)
-				WorldView.OrderTable[*ElevatorId][btnPress.Floor][btnPress.Button] = elev.OS_REQUESTED
+				elevator.OrderTable[ElevatorId][btnPress.Floor][btnPress.Button] = elev.OS_REQUESTED
 
-			case OrderTableFromPrimary := <-Ch.MsgFromPrimary:
+			case OrderTableFromPrimary := <-ch_RcvOrderTable:
 				if true { //not acceptance test passed {//TODO: fix if statement
 					break //TODO: maybe kill???
 				}
 
-				WorldView.OrderTable = OrderTableFromPrimary
+				OrderTable = OrderTableFromPrimary
 
 				for floor := 0; floor < elev.N_FLOORS; floor++ {
 					for btn := 0; btn < elev.N_BUTTONS; btn++ {
@@ -62,94 +64,119 @@ func OrderControl(WorldView *elev.WorldView,
 			case order := <-Ch.ClearOrder:
 				WorldView.EveryonesOrders[order] = elev.OS_CLEAR
 
-			case <-Ch.BroadcastWorldView:
-				//TODO: send heile WorldView til Primary
-			}
+			case elev.ER_Primary:
 
-		case elev.ER_Primary:
+				select {
 
-			select {
+				case elevator = <-ch_Update:
 
-			case *currentRole = <-Ch.RoleUpdate:
+				case *currentRole = <-Ch.RoleUpdate:
 
-			case rcvWorldView := <-Ch.RcvBcast:
-				//TODO: rcvID := Who sent the order??
-				AllWorldViews[rcvID] = rcvWorldView
+				case rcvOrderTable := <-ch_RcvOrderTable:
+					//TODO: senderID := Who sent the order??
 
-				for rcvOrder, rcvStatus := range rcvWorldView.EveryonesOrders { //Bytta navn fra OrderTable til EveryonesOrders, men angrer☹️
-					currentStatus := WorldView.EveryonesOrders[rcvOrder]
+					// TODO: Send to Coordinator
+					elevator.AllOrderTables[senderID] = rcvOrderTable
 
-					if isReassignable(rcvOrder, rcvStatus, currentStatus) {
-						assignedID := CalculateWhichElevator(rcvOrder, AllWorldViews)
-						rcvOrder.ElevatorNumber = assignedID
+					for orderID := 0; orderID < int(*NumElevs); orderID++ {
+						for floor := 0; floor < elev.N_FLOORS; floor++ {
+							for btn := 0; floor < elev.N_BUTTONS; btn++ {
+
+								primaryStatus := elevator.OrderTable[orderID][floor][btn]
+								rcvStatus := rcvOrderTable[orderID][floor][btn]
+
+								if isReassignable(elevio.ButtonType(btn), rcvStatus, primaryStatus) {
+									orderID = CalculateWhichElevator(orderID, floor, btn, rcvOrderTable, elevator.AliveList, int(elevator.NumElevs))
+								}
+
+								elevator.OrderTable[orderID][floor][btn] = CalculateNewStatus(orderID, floor, btn, rcvStatus, primaryStatus, senderID, *AllWorldViews, *NumElevs)
+
+							}
+						}
+
 					}
-
-					WorldView.EveryonesOrders[rcvOrder] = CalculateNewStatus(rcvOrder, rcvStatus, currentStatus, rcvID, *AllWorldViews, *NumElevs)
 				}
 			}
 		}
 	}
 }
 
-func isReassignable(rcvOrder elev.Order, rcvStatus elev.OrderStatus, currentStatus elev.OrderStatus) bool {
-	isHallOrder := rcvOrder.ButtonType != elevio.BT_Cab
+func isReassignable(buttonType elevio.ButtonType, rcvStatus elev.OrderStatus, currentStatus elev.OrderStatus) bool {
+	isHallOrder := buttonType != elevio.BT_Cab
 	shouldBeAssigned := (rcvStatus == elev.OS_REQUESTED) && (currentStatus == elev.OS_NO_ORDER)
 	return isHallOrder && shouldBeAssigned
 }
 
 // Foreløpig ikkje ferdig funksjon
-func CalculateNewStatus(rcvOrder elev.Order,
+func CalculateNewStatus(
+	orderID int,
+	floor int,
+	btn int,
 	rcvStatus elev.OrderStatus,
-	currentStatus elev.OrderStatus,
-	rcvID int,
-	AllWorldViews [elev.N_MAX_ELEVS]elev.WorldView,
+	primaryStatus elev.OrderStatus,
+	senderID int,
+	AllOrderTables elev.AllOrderTables,
 	NumElevs int) elev.OrderStatus {
 
-	if rcvStatus == currentStatus {
-		return currentStatus
+	if rcvStatus == primaryStatus {
+		return primaryStatus
 	}
 
-	isOwner := rcvID == rcvOrder.ElevatorNumber
+	isOwner := orderID == senderID
+
 	if isOwner {
 		switch rcvStatus {
 
 		case elev.OS_REQUESTED:
-			if currentStatus == elev.OS_NO_ORDER {
+			if primaryStatus == elev.OS_NO_ORDER {
 				return elev.OS_REQUESTED
 			}
+			return primaryStatus
 
 		case elev.OS_CLEAR:
 			//TODO: Make acceptance test
+			// Lag kode som sjekker om vi kan fjerne ordre
+
 			return elev.OS_NO_ORDER
 
 		case elev.OS_CONFIRMED:
 			//TODO:
+
 		}
 
-	} else {
+	} else { // senderID not owner of order -> only for acks
 		switch rcvStatus {
 
 		case elev.OS_REQUESTED:
-			if AllWorldViews[rcvOrder.ElevatorNumber].EveryonesOrders[rcvOrder] != elev.OS_REQUESTED {
+			if AllOrderTables[orderID][orderID][floor][btn] != elev.OS_REQUESTED {
 				// FAILED ACCEPTANCE TEST
+				log.Printf("Heis %d påstår at %d har en request i etasje %d, men det stemmer ikke i min matrise!\n", senderID, orderID, floor)
+				log.Fatalln("Du kan ikkje sei at ei he requesta når ei ikkje he requesta sjølv!")
 			}
-			if isRequestedByAll(AllWorldViews, rcvOrder, NumElevs) {
+			if isRequestedByAll(AllOrderTables, orderID, floor, btn, NumElevs) {
 				return elev.OS_CONFIRMED
 			}
 
 		case elev.OS_CLEAR:
 			// FAILED ACCEPTANCE TEST
+			log.Fatalln("Kun owner kan cleare. Elev %d => selfkill", senderID)
+			// TODO: kanskje drepe senderen, ikkje seg selv, idk
 
 		case elev.OS_CONFIRMED:
-			//TODO:
+			// Acceptance test
+			// Trur ikkje det er noke meir
+			if primaryStatus != elev.OS_CONFIRMED {
+				log.Fatalln("Elev %d tried to confirm before primary confirmed => selfkill", senderID)
+			}
+			return elev.OS_CONFIRMED
 
 		}
 	}
 }
 
-func isRequestedByAll(AllWorldViews [elev.N_MAX_ELEVS]elev.WorldView, order elev.Order, NumElevs int) bool {
-	for id := 0; id < NumElevs; id++ {
-		if AllWorldViews[id].EveryonesOrders[order] != elev.OS_REQUESTED {
+func isRequestedByAll(AllOrderTables elev.AllOrderTables, orderID int, floor int, btn int, NumElevs int) bool {
+	for i := 0; i < NumElevs; i++ {
+		if AllOrderTables[i][orderID][floor][btn] != elev.OS_REQUESTED {
 			return false
 		}
 	}
@@ -158,10 +185,13 @@ func isRequestedByAll(AllWorldViews [elev.N_MAX_ELEVS]elev.WorldView, order elev
 
 // Returnerer best heis
 // Dette er bare secondary requirement i specen så tenker vi bare lager en enkel algoritme
-func CalculateWhichElevator(rcvOrder elev.Order,
-	OrderTable [elev.N_MAX_ELEVS][elev.N_FLOORS][elev.N_BUTTONS]elev.OrderStatus,
-	AliveList []elev.ElevatorPhysicalInfo,
-	NumElevs int) uint16 {
+func CalculateWhichElevator(
+	orderId int,
+	floor int,
+	btn int,
+	OrderTable elev.OrderTable,
+	AliveList elev.AliveList,
+	NumElevs int) int {
 
 	if NumElevs == 1 {
 		return AliveList[0].Id
@@ -174,7 +204,10 @@ func CalculateWhichElevator(rcvOrder elev.Order,
 	for e := 0; e < NumElevs; e++ {
 
 		currentElev := AliveList[e]
-		cost := CalculateCost(rcvOrder, currentElev, OrderTable[currentElev.Id])
+
+		LocalOrderTable := orderTableToBool(OrderTable[currentElev.Id])
+
+		cost := CalculateCost(rcvOrder, currentElev, LocalOrderTable)
 
 		if cost < minCost {
 			minCost = cost
@@ -188,7 +221,7 @@ func CalculateWhichElevator(rcvOrder elev.Order,
 
 // Denne beregner hvor mye det koster der heis nummer elevNum å komme seg til rcvOrder.
 // Funksjonen er nok ikke optimal men sikkert bra nok :)
-func CalculateCost(rcvOrder elev.Order, elevator elev.ElevatorPhysicalInfo, OrderTable [elev.N_FLOORS][elev.N_BUTTONS]elev.OrderStatus) int {
+func CalculateCost(rcvOrder elev.Order, elevator elev.ElevatorPhysicalInfo, LocalOrderTable elev.LocalOrderTable) int {
 
 	// Cost function penalties
 	penaltyFloorDiff := 3
@@ -196,14 +229,14 @@ func CalculateCost(rcvOrder elev.Order, elevator elev.ElevatorPhysicalInfo, Orde
 	penaltyWrongDir := 10
 
 	numOrders := 0
-	OrderTableBool := orderTableToBool(OrderTable)
+
 	orderFloor := rcvOrder.Floor
 	floorDiff := int(math.Abs(float64(rcvOrder.Floor - elevator.Floor)))
 
 	// Count num active orders for elevator
 	for f := 0; f < elev.N_FLOORS; f++ {
 		for b := 0; b < elev.N_BUTTONS; b++ {
-			if OrderTable[f][b] == elev.OS_CONFIRMED {
+			if LocalOrderTable[f][b] {
 				numOrders++
 			}
 		}
@@ -211,8 +244,8 @@ func CalculateCost(rcvOrder elev.Order, elevator elev.ElevatorPhysicalInfo, Orde
 
 	wrongDir := (orderFloor < elevator.Floor && elevator.MotorDir == elevio.MD_Up) || //Elev going up, above the order
 		(orderFloor > elevator.Floor && elevator.MotorDir == elevio.MD_Down) || //Elev goign down, below the order
-		(orderFloor == elevator.Floor && elevator.MotorDir == elevio.MD_Down && requests.RequestBelow(OrderTableBool, elevator.Floor)) || //Elev just went passed the order floor (down)
-		(orderFloor == elevator.Floor && elevator.MotorDir == elevio.MD_Up && requests.RequestAbove(OrderTableBool, elevator.Floor)) //Elev just went passed the order floor (up)
+		(orderFloor == elevator.Floor && elevator.MotorDir == elevio.MD_Down && requests.RequestBelow(LocalOrderTable, elevator.Floor)) || //Elev just went passed the order floor (down)
+		(orderFloor == elevator.Floor && elevator.MotorDir == elevio.MD_Up && requests.RequestAbove(LocalOrderTable, elevator.Floor)) //Elev just went passed the order floor (up)
 
 	totalCost := penaltyFloorDiff*floorDiff + penaltyNumOrders*numOrders
 	if wrongDir {

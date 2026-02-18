@@ -4,6 +4,7 @@ import (
 	"elevator-project-g7/internal/elev"
 	"elevator-project-g7/internal/elevio"
 	"elevator-project-g7/internal/requests"
+	"elevator-project-g7/internal/timer"
 	"fmt"
 	"time"
 )
@@ -35,31 +36,35 @@ func Start(pe *elev.ElevatorPhysicalInfo,
 	go elevio.PollObstructionSwitch(Ch.obstruction)
 	go elevio.PollFloorSensor(Ch.floorArrival)
 
-	go generatePrintTimerEvents(Ch.printTimer)
+	go generatePrintTimerEvent
+				elevator.AllOrderTables[senderID] = rcvOrs(Ch.printTimer)
 
 	go HandleEvents(pe, LocalOrderTable, &Ch)
 }
 */
 
-func HandleEvents(pe *elev.ElevatorPhysicalInfo,
-	LocalOrderTable *[elev.N_FLOORS][elev.N_BUTTONS]bool,
-	Ch *Channels) {
+func Movement(
+	ch_Update chan elev.Elevator,
+	ch_PrintTimer chan bool,
+	ch_FloorArrival chan int) {
 
+	var elevator elev.Elevator
+	doorTimer := timer.New(elev.DOOR_OPEN_TIME)
 	for {
 		select {
 
-		case <-Ch.PrintTimer:
+		case elevator = <-ch_Update:
+
+		case <-ch_PrintTimer:
 			fmt.Println(":) debugging melding :)")
 
-		case <-pe.DoorTimer.C:
+		case <-doorTimer.C:
 			fmt.Println("fsm doortimer event")
-			FSM_OnDoorTimeout(pe, *LocalOrderTable)
+			FSM_OnDoorTimeout(elevator, doorTimer)
 
-		case floor := <-Ch.FloorArrival:
-			FSM_OnFloorArrival(pe, *LocalOrderTable, floor)
+		case floor := <-ch_FloorArrival:
+			FSM_OnFloorArrival(elevator, floor)
 
-		case obst := <-Ch.Obstruction:
-			pe.Obstructed = obst
 		}
 	}
 }
@@ -72,83 +77,35 @@ func SetAllLights(localOrderTable [elev.N_FLOORS][elev.N_BUTTONS]bool) {
 	}
 }
 
-/*
-func FSM_OnButtonPress(e *elev.ElevatorPhysicalInfo, buttonEvent elevio.ButtonEvent) {
-	btnType, btnFloor := buttonEvent.Button, buttonEvent.Floor
+func FSM_OnFloorArrival(elevator elev.Elevator,
+	doorTimer *timer.Timer,
+	floor int) {
 
-	switch e.State {
-
-	case elev.EM_DoorOpen:
-		if requests.ShouldClearImmediately(e.Floor, e.MotorDir, btnFloor, btnType) {
-			e.DoorTimer.Start()
-			fmt.Println("timer set 2")
-		} else {
-			// TODO: her må det komme master/backup logic før det settes i local order table
-			// Merker alle det gjelder med tag: "MB logikk"
-			e.LocalOrderTable[btnFloor][btnType] = true
-		}
-
-	case elev.EM_Moving:
-		// TODO: MB logikk
-		e.LocalOrderTable[btnFloor][btnType] = true
-
-	case elev.EM_Idle:
-		// TODO: MB logikk
-		e.LocalOrderTable[btnFloor][btnType] = true
-
-		pair := requests.ChooseDirection(e.LocalOrderTable, e.Floor, e.MotorDir)
-		e.MotorDir = pair.Direction
-		e.State = pair.Movement
-
-		switch pair.Movement {
-
-		case elev.EM_DoorOpen:
-			elevio.SetDoorOpenLamp(true)
-			e.DoorTimer.Start()
-			fmt.Println("timer set 1")
-			updated_LOT := requests.ClearCurrentFloor(e.LocalOrderTable, e.Floor, e.MotorDir)
-			// TODO: MB logikk
-			e.LocalOrderTable = updated_LOT
-
-		case elev.EM_Moving:
-			elevio.SetMotorDirection(e.MotorDir)
-
-		default:
-			fmt.Println("OnButtonPress case default")
-		}
-
-	}
-
-	// TODO: MB logikk
-	setAllLights(e.LocalOrderTable)
-	printElevatorState(e)
-
-}
-*/
-
-func FSM_OnFloorArrival(pe *elev.ElevatorPhysicalInfo, LocalOrderTable [elev.N_FLOORS][elev.N_BUTTONS]bool, floor int) {
+	pe := elevator.PhysicalInfo
 
 	pe.Floor = floor
 	elevio.SetFloorIndicator(floor)
 
 	switch pe.State {
 	case elev.EM_Moving:
-		if requests.ShouldStop(LocalOrderTable, pe.Floor, pe.MotorDir) {
+		if requests.ShouldStop(pe.LocalOrderTable, pe.Floor, pe.MotorDir) {
 
-			requests.PrintLOT(LocalOrderTable)
+			requests.PrintLOT(pe.LocalOrderTable)
 
 			elevio.SetMotorDirection(elevio.MD_Stop)
 			elevio.SetDoorOpenLamp(true)
-			updated_LOT := requests.ClearCurrentFloor(LocalOrderTable, pe.Floor, pe.MotorDir)
-			// TODO: MB logikk
-			LocalOrderTable = updated_LOT
 
-			requests.PrintLOT(LocalOrderTable)
-			pe.DoorTimer.Start()
+			updated_LOT := requests.ClearCurrentFloor(pe.LocalOrderTable, pe.Floor, pe.MotorDir)
+			// TODO: MB logikk
+			pe.LocalOrderTable = updated_LOT
+
+			requests.PrintLOT(pe.LocalOrderTable)
+			doorTimer.Start()
 			fmt.Println("timer set 3")
 
-			SetAllLights(LocalOrderTable)
+			SetAllLights(pe.LocalOrderTable)
 
+			// TODO: Update shit
 			pe.State = elev.EM_DoorOpen
 		}
 	}
@@ -156,17 +113,21 @@ func FSM_OnFloorArrival(pe *elev.ElevatorPhysicalInfo, LocalOrderTable [elev.N_F
 	printElevatorState(pe.State)
 }
 
-func FSM_OnDoorTimeout(pe *elev.ElevatorPhysicalInfo, LocalOrderTable [elev.N_FLOORS][elev.N_BUTTONS]bool) {
+func FSM_OnDoorTimeout(elevator elev.Elevator, doorTimer *timer.Timer) {
+
+	pe := elevator.PhysicalInfo
 
 	if pe.Obstructed {
-		pe.DoorTimer.Start()
+
+		doorTimer.Start()
+
 		return
 	}
 
 	switch pe.State {
 
 	case elev.EM_DoorOpen:
-		pair := requests.ChooseDirection(LocalOrderTable, pe.Floor, pe.MotorDir)
+		pair := requests.ChooseDirection(pe.LocalOrderTable, pe.Floor, pe.MotorDir)
 		pe.MotorDir = pair.Direction
 		pe.State = pair.Movement
 
@@ -175,10 +136,10 @@ func FSM_OnDoorTimeout(pe *elev.ElevatorPhysicalInfo, LocalOrderTable [elev.N_FL
 		case elev.EM_DoorOpen:
 			pe.DoorTimer.Start()
 			fmt.Println("timer set 4")
-			updated_LOT := requests.ClearCurrentFloor(LocalOrderTable, pe.Floor, pe.MotorDir)
+			updated_LOT := requests.ClearCurrentFloor(pe.LocalOrderTable, pe.Floor, pe.MotorDir)
 			// TODO: MB logikk
-			LocalOrderTable = updated_LOT
-			setAllLights(LocalOrderTable)
+			pe.LocalOrderTable = updated_LOT
+			setAllLights(pe.LocalOrderTable)
 
 		case elev.EM_Idle:
 			elevio.SetDoorOpenLamp(false)

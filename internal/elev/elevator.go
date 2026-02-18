@@ -7,8 +7,6 @@ import (
 	"time"
 )
 
-// Enkel kommentar
-
 const N_FLOORS = 4
 const N_BUTTONS = 3
 const DOOR_OPEN_TIME = 3 * time.Second
@@ -36,9 +34,10 @@ const (
 type ElevatorRole uint8
 
 const (
-	ER_Backup  ElevatorRole = 0
-	ER_Primary ElevatorRole = 1
-	ER_Init    ElevatorRole = 2
+	ER_Dead    ElevatorRole = 0
+	ER_Init    ElevatorRole = 1
+	ER_Backup  ElevatorRole = 2
+	ER_Primary ElevatorRole = 3
 )
 
 // ================ Helper Structs ===========================
@@ -54,51 +53,43 @@ type RoleIdPair struct {
 	Role ElevatorRole
 }
 
-type WorldView struct {
-	OrderTable      [N_MAX_ELEVS][N_FLOORS][N_BUTTONS]OrderStatus //E: vi får diskutere denne :)
-	LocalOrderTable [N_FLOORS][N_BUTTONS]bool                     //Local orders assigned by primary
-}
-
 // ============ ELEVATOR CORE =======================================
 
-// All denne infoen handler bare om en heis
+// Info about single elevator
 type ElevatorPhysicalInfo struct {
-	Id              uint16
-	Port            uint16
+	Id              int
+	Port            int
 	Floor           int
 	Role            ElevatorRole
 	MotorDir        elevio.MotorDirection
 	State           ElevatorMovement
 	Obstructed      bool
-	DoorTimer       *timer.Timer
+	DoorTimer       *timer.Timer //TODO: maybe remove
 	LocalOrderTable [N_FLOORS][N_BUTTONS]bool
 }
 
-/*
+// .
+type LocalOrderTable [N_FLOORS][N_BUTTONS]bool
+type OrderTable [N_MAX_ELEVS][N_FLOORS][N_BUTTONS]OrderStatus
+type AllOrderTables [N_MAX_ELEVS]OrderTable
+type AliveList [N_MAX_ELEVS]ElevatorPhysicalInfo
 
-Id
-Port
-Role
-MotorDir
-
-*/
-
-// All denne infoen inneholder også info om alle de andre heisene
+// Info about all elevators
 type Elevator struct {
-	PhysicalInfo  ElevatorPhysicalInfo // Info about the single elevator
-	OrderTable    [N_MAX_ELEVS][N_FLOORS][N_BUTTONS]OrderStatus
-	AllWorldViews [N_MAX_ELEVS][N_MAX_ELEVS][N_FLOORS][N_BUTTONS]OrderStatus //Primary
-	AliveList     [N_MAX_ELEVS]ElevatorPhysicalInfo
-	NumElevs      uint8
+	PhysicalInfo   ElevatorPhysicalInfo // Info about the single elevator
+	OrderTable     OrderTable
+	AllOrderTables AllOrderTables //Primary
+	AliveList      AliveList
+	NumElevs       uint8
 }
 
 func CreateElevator(_Id uint16, _Port uint16) Elevator {
 	e := Elevator{
 
-		PhysicalInfo:  CreatePhysicalElevator(_Id, _Port),
-		WorldView:     CreateWorldView(),
-		AllWorldViews: CreateAllWorldViews(), //Primary
+		PhysicalInfo: CreatePhysicalElevator(_Id, _Port),
 	}
+
+	e.AliveList[_Id] = e.PhysicalInfo
 
 	return e
 }
@@ -112,7 +103,6 @@ func CreatePhysicalElevator(_Id uint16, _Port uint16) ElevatorPhysicalInfo {
 		MotorDir:   elevio.MD_Stop,
 		State:      EM_Idle,
 		Obstructed: false,
-		DoorTimer:  timer.New(DOOR_OPEN_TIME),
 	}
 	return pe
 }
@@ -133,36 +123,6 @@ func InitPhysicalElevator(ip string, port uint16) {
 	elevio.SetDoorOpenLamp(false)
 	elevio.SetFloorIndicator(elevio.GetFloor())
 
-}
-
-func CreateWorldView() WorldView {
-	wv := WorldView{}
-
-	//Init OrderTable
-	for elevID := 0; elevID < N_MAX_ELEVS; elevID++ {
-		for floor := 0; floor < N_FLOORS; floor++ {
-			for btn := 0; btn < N_BUTTONS; btn++ {
-				wv.OrderTable[elevID][floor][btn] = OS_NO_ORDER
-			}
-		}
-	}
-
-	//Init LocalOrderTable
-	for floor := 0; floor < N_FLOORS; floor++ {
-		for btn := 0; btn < N_BUTTONS; btn++ {
-			wv.LocalOrderTable[floor][btn] = false
-		}
-	}
-
-	return wv
-}
-
-func CreateAllWorldViews() [N_MAX_ELEVS]WorldView {
-	var allWorldViews [N_MAX_ELEVS]WorldView
-	for i := 0; i < N_MAX_ELEVS; i++ {
-		allWorldViews[i] = CreateWorldView()
-	}
-	return allWorldViews
 }
 
 func PrintElevatorInit(id uint16, port uint16) {
