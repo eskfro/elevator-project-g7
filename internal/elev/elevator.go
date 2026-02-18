@@ -7,6 +7,8 @@ import (
 	"time"
 )
 
+// Enkel kommentar
+
 const N_FLOORS = 4
 const N_BUTTONS = 3
 const DOOR_OPEN_TIME = 3 * time.Second
@@ -92,7 +94,7 @@ type Elevator struct {
 
 func CreateElevator(_Id uint16, _Port uint16) Elevator {
 	e := Elevator{
-		
+
 		PhysicalInfo:  CreatePhysicalElevator(_Id, _Port),
 		WorldView:     CreateWorldView(),
 		AllWorldViews: CreateAllWorldViews(), //Primary
