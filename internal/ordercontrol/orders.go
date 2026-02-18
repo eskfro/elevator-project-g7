@@ -229,10 +229,10 @@ func CalculateCost(rcvOrder elev.Order, elevator elev.ElevatorPhysicalInfo, Orde
 func orderTableToBool(OrderTable [elev.N_FLOORS][elev.N_BUTTONS]elev.OrderStatus) [elev.N_FLOORS][elev.N_BUTTONS]bool {
 	var OrderTableBool [elev.N_FLOORS][elev.N_BUTTONS]bool
 
-	for f := 0; f < elev.N_FLOORS; f++ {
-		for b := 0; b < elev.N_BUTTONS; b++ {
-			if OrderTable[f][b] == elev.OS_CONFIRMED {
-				OrderTableBool[f][b] = true
+	for floor := 0; floor < elev.N_FLOORS; floor++ {
+		for btn := 0; btn < elev.N_BUTTONS; btn++ {
+			if OrderTable[floor][btn] == elev.OS_CONFIRMED {
+				OrderTableBool[floor][btn] = true
 			}
 		}
 	}

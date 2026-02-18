@@ -53,11 +53,6 @@ type RoleIdPair struct {
 }
 
 type WorldView struct {
-	// E: hva skal vi med map her?
-	// E: jeg føler map er litt lite forutsigbart med tenke på at vi skal sende det over en 1024 byte buffer.
-	// Men idk assa
-	//OrderTable      map[Order]OrderStatus     //Bytta navn fra OrderTable men angrer ekstremt😔 Har ikkje tid å endre tilbake no
-
 	OrderTable      [N_MAX_ELEVS][N_FLOORS][N_BUTTONS]OrderStatus //E: vi får diskutere denne :)
 	LocalOrderTable [N_FLOORS][N_BUTTONS]bool                     //Local orders assigned by primary
 }
@@ -66,28 +61,38 @@ type WorldView struct {
 
 // All denne infoen handler bare om en heis
 type ElevatorPhysicalInfo struct {
-	Id         uint16
-	Port       uint16
-	Floor      int
-	Role       ElevatorRole
-	MotorDir   elevio.MotorDirection
-	State      ElevatorMovement
-	Obstructed bool
-	DoorTimer  *timer.Timer
-	// LocalOrderTable [N_FLOORS][N_BUTTONS]bool TODO: finn ut om denne kan være her
+	Id              uint16
+	Port            uint16
+	Floor           int
+	Role            ElevatorRole
+	MotorDir        elevio.MotorDirection
+	State           ElevatorMovement
+	Obstructed      bool
+	DoorTimer       *timer.Timer
+	LocalOrderTable [N_FLOORS][N_BUTTONS]bool
 }
+
+/*
+
+Id
+Port
+Role
+MotorDir
+
+*/
 
 // All denne infoen inneholder også info om alle de andre heisene
 type Elevator struct {
 	PhysicalInfo  ElevatorPhysicalInfo // Info about the single elevator
-	WorldView     WorldView
-	AllWorldViews [N_MAX_ELEVS]WorldView //Primary
-	AliveList     []ElevatorPhysicalInfo //Primary
+	OrderTable    [N_MAX_ELEVS][N_FLOORS][N_BUTTONS]OrderStatus
+	AllWorldViews [N_MAX_ELEVS][N_MAX_ELEVS][N_FLOORS][N_BUTTONS]OrderStatus //Primary
+	AliveList     [N_MAX_ELEVS]ElevatorPhysicalInfo
 	NumElevs      uint8
 }
 
 func CreateElevator(_Id uint16, _Port uint16) Elevator {
 	e := Elevator{
+		
 		PhysicalInfo:  CreatePhysicalElevator(_Id, _Port),
 		WorldView:     CreateWorldView(),
 		AllWorldViews: CreateAllWorldViews(), //Primary
