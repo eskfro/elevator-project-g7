@@ -13,59 +13,42 @@ import (
 	"elevator-project-g7/internal/elev"
 	"elevator-project-g7/internal/elevio"
 	"elevator-project-g7/internal/requests"
-	"elevator-project-g7/internal/rolemanager"
 	"log"
 	"math"
-	"time"
 )
-
-type Channels struct {
-	ButtonPress        chan elevio.ButtonEvent
-	ClearOrder         chan elev.Order                                                        //Primary
-	RequestConfirmed   chan elev.Order                                                        //Primary
-	RcvBcast           chan [elev.N_MAX_ELEVS][elev.N_FLOORS][elev.N_BUTTONS]elev.OrderStatus //Primary
-	NewOrderRequest    chan elev.Order                                                        //Primary
-	MsgFromPrimary     chan [elev.N_MAX_ELEVS][elev.N_FLOORS][elev.N_BUTTONS]elev.OrderStatus
-	RoleUpdate         chan elev.ElevatorRole
-	BroadcastWorldView <-chan time.Time
-}
 
 func OrderControl(
 	ch_Update chan elev.Elevator,
-	ch_RcvOrderTable chan elev.OrderTable) { //TODO: fix {}
+	ch_RoleUpdate chan elev.ElevatorRole,
+	ch_RcvOrderTable chan elev.OrderTable,
+	ch_LOTFromOC chan elev.LocalOrderTable) {
 
 	var elevator elev.Elevator
 
 	for {
-		switch currentRole {
-		
-			// -----------------------Backup begin------------------------------------
+		switch elevator.PhysicalInfo.Role {
+
+		// -----------------------Backup begin------------------------------------
 		case elev.ER_Backup:
 			select {
 			case elevator = <-ch_Update:
 
-			case currentRole = <-Ch.RoleUpdate:
-
-			case btnPress := <-Ch.ButtonPress:
-				elevio.PrintButtonpress(btnPress)
-				elevator.OrderTable[ElevatorId][btnPress.Floor][btnPress.Button] = elev.OS_REQUESTED
+			//case btnPress := <-ch_ButtonPress:
 
 			case OrderTableFromPrimary := <-ch_RcvOrderTable:
-				if true { //not acceptance test passed {//TODO: fix if statement
-					break //TODO: maybe kill???
+				// TODO: Acceptance test
+				if false {
+					break
 				}
 
-				OrderTable = OrderTableFromPrimary
-
+				// TODO: check if this is OK
 				for floor := 0; floor < elev.N_FLOORS; floor++ {
 					for btn := 0; btn < elev.N_BUTTONS; btn++ {
-						WorldView.LocalOrderTable[floor][btn] = OrderTableFromPrimary[rolemanager.Id][floor][btn] == elev.OS_CONFIRMED
+						elevator.PhysicalInfo.LocalOrderTable[floor][btn] = OrderTableFromPrimary[elevator.PhysicalInfo.Id][floor][btn] == elev.OS_CONFIRMED
 					}
 				}
-
-			case order := <-Ch.ClearOrder:
-				WorldView.EveryonesOrders[order] = elev.OS_CLEAR
-
+				ch_LOTFromOC <- elevator.PhysicalInfo.LocalOrderTable
+			}
 		//---------------------------------Primary begin-----------------------------------
 		case elev.ER_Primary:
 
@@ -73,8 +56,6 @@ func OrderControl(
 
 			case elevator = <-ch_Update:
 
-			case *currentRole = <-Ch.RoleUpdate:
-
 			case rcvOrderTable := <-ch_RcvOrderTable:
 				//TODO: senderID := Who sent the order??
 
@@ -94,37 +75,10 @@ func OrderControl(
 
 							elevator.OrderTable[orderID][floor][btn] = CalculateNewStatus(orderID, floor, btn, rcvStatus, primaryStatus, senderID, *AllWorldViews, *NumElevs)
 
-							}
 						}
-
 					}
-				}case elev.ER_Primary:
 
-			select {
-
-			case elevator = <-ch_Update:
-
-			case *currentRole = <-Ch.RoleUpdate:
-
-			case rcvOrderTable := <-ch_RcvOrderTable:
-				//TODO: senderID := Who sent the order??
-
-				// TODO: Send to Coordinator
-				elevator.AllOrderTables[senderID] = rcvOrderTable
-
-				for orderID := 0; orderID < int(*NumElevs); orderID++ {
-					for floor := 0; floor < elev.N_FLOORS; floor++ {
-						for btn := 0; floor < elev.N_BUTTONS; btn++ {
-
-							primaryStatus := elevator.OrderTable[orderID][floor][btn]
-							rcvStatus := rcvOrderTable[orderID][floor][btn]
-
-							if isReassignable(elevio.ButtonType(btn), rcvStatus, primaryStatus) {
-								orderID = CalculateWhichElevator(orderID, floor, btn, rcvOrderTable, elevator.AliveList, int(elevator.NumElevs))
-							}
-
-							elevator.OrderTable[orderID][floor][btn] = CalculateNewStatus(orderID, floor, btn, rcvStatus, primaryStatus, senderID, *AllWorldViews, *NumElevs)
-
+				}
 			}
 		}
 	}

@@ -43,13 +43,19 @@ func Start(pe *elev.ElevatorPhysicalInfo,
 }
 */
 
+// [X]
 func Movement(
 	ch_Update chan elev.Elevator,
 	ch_PrintTimer chan bool,
-	ch_FloorArrival chan int) {
+	ch_FloorArrival chan int,
+	ch_LOTFromMV chan elev.LocalOrderTable,
+	ch_StateFromMV chan elev.ElevatorMovement,
+	ch_MotorDirFromMV chan elevio.MotorDirection) {
 
 	var elevator elev.Elevator
+
 	doorTimer := timer.New(elev.DOOR_OPEN_TIME)
+
 	for {
 		select {
 
@@ -60,15 +66,17 @@ func Movement(
 
 		case <-doorTimer.C:
 			fmt.Println("fsm doortimer event")
-			FSM_OnDoorTimeout(elevator, doorTimer)
+			FSM_OnDoorTimeout(elevator.PhysicalInfo, doorTimer, ch_LOTFromMV, ch_StateFromMV, ch_MotorDirFromMV)
 
-		case floor := <-ch_FloorArrival:
-			FSM_OnFloorArrival(elevator, floor)
+		case <-ch_FloorArrival:
+
+			FSM_OnFloorArrival(elevator.PhysicalInfo, doorTimer, ch_LOTFromMV, ch_StateFromMV)
 
 		}
 	}
 }
 
+// [X]
 func SetAllLights(localOrderTable [elev.N_FLOORS][elev.N_BUTTONS]bool) {
 	for f := 0; f < elev.N_FLOORS; f++ {
 		for b := 0; b < elev.N_BUTTONS; b++ {
@@ -77,45 +85,39 @@ func SetAllLights(localOrderTable [elev.N_FLOORS][elev.N_BUTTONS]bool) {
 	}
 }
 
-func FSM_OnFloorArrival(elevator elev.Elevator,
-	doorTimer *timer.Timer,
-	floor int) {
+// [X]
+func FSM_OnFloorArrival(
+	pe elev.ElevatorPhysicalInfo,
+	doorTimer *timer.Timer, // Maybe shit [X]
+	ch_LOTFromMV chan elev.LocalOrderTable,
+	ch_StateFromMV chan elev.ElevatorMovement) {
 
-	pe := elevator.PhysicalInfo
+	elevio.SetFloorIndicator(pe.Floor)
 
-	pe.Floor = floor
-	elevio.SetFloorIndicator(floor)
-
-	switch pe.State {
-	case elev.EM_Moving:
-		if requests.ShouldStop(pe.LocalOrderTable, pe.Floor, pe.MotorDir) {
-
-			requests.PrintLOT(pe.LocalOrderTable)
-
-			elevio.SetMotorDirection(elevio.MD_Stop)
-			elevio.SetDoorOpenLamp(true)
-
-			updated_LOT := requests.ClearCurrentFloor(pe.LocalOrderTable, pe.Floor, pe.MotorDir)
-			// TODO: MB logikk
-			pe.LocalOrderTable = updated_LOT
-
-			requests.PrintLOT(pe.LocalOrderTable)
-			doorTimer.Start()
-			fmt.Println("timer set 3")
-
-			SetAllLights(pe.LocalOrderTable)
-
-			// TODO: Update shit
-			pe.State = elev.EM_DoorOpen
-		}
+	if pe.State != elev.EM_Moving || !requests.ShouldStop(pe.LocalOrderTable, pe.Floor, pe.MotorDir) {
+		return
 	}
 
-	printElevatorState(pe.State)
+	elevio.SetMotorDirection(elevio.MD_Stop)
+	elevio.SetDoorOpenLamp(true)
+	doorTimer.Start()
+	fmt.Println("timer set 3")
+
+	updated_LOT := requests.ClearCurrentFloor(pe.LocalOrderTable, pe.Floor, pe.MotorDir)
+	ch_LOTFromMV <- updated_LOT
+
+	SetAllLights(updated_LOT)
+
+	ch_StateFromMV <- elev.EM_DoorOpen
+
 }
 
-func FSM_OnDoorTimeout(elevator elev.Elevator, doorTimer *timer.Timer) {
-
-	pe := elevator.PhysicalInfo
+// [X]
+func FSM_OnDoorTimeout(pe elev.ElevatorPhysicalInfo,
+	doorTimer *timer.Timer,
+	ch_LOTFromMV chan elev.LocalOrderTable,
+	ch_StateFromMV chan elev.ElevatorMovement,
+	ch_MotorDirFromMV chan elevio.MotorDirection) {
 
 	if pe.Obstructed {
 
@@ -128,18 +130,22 @@ func FSM_OnDoorTimeout(elevator elev.Elevator, doorTimer *timer.Timer) {
 
 	case elev.EM_DoorOpen:
 		pair := requests.ChooseDirection(pe.LocalOrderTable, pe.Floor, pe.MotorDir)
-		pe.MotorDir = pair.Direction
-		pe.State = pair.Movement
+
+		ch_StateFromMV <- pair.Movement
+		ch_MotorDirFromMV <- pair.Direction
 
 		switch pe.State {
 
 		case elev.EM_DoorOpen:
+
+			// We think this goes fint
 			pe.DoorTimer.Start()
+
 			fmt.Println("timer set 4")
 			updated_LOT := requests.ClearCurrentFloor(pe.LocalOrderTable, pe.Floor, pe.MotorDir)
-			// TODO: MB logikk
-			pe.LocalOrderTable = updated_LOT
-			setAllLights(pe.LocalOrderTable)
+			ch_LOTFromMV <- updated_LOT
+
+			setAllLights(updated_LOT)
 
 		case elev.EM_Idle:
 			elevio.SetDoorOpenLamp(false)
@@ -157,6 +163,7 @@ func FSM_OnDoorTimeout(elevator elev.Elevator, doorTimer *timer.Timer) {
 	printElevatorState(pe.State)
 }
 
+// [X]
 func printElevatorState(state elev.ElevatorMovement) {
 
 	switch state {
@@ -171,7 +178,7 @@ func printElevatorState(state elev.ElevatorMovement) {
 	}
 }
 
-// Maybe shit
+// TODO: slett før vi levera
 func GeneratePrintTimerEvents(ch_printTimer chan<- bool) {
 	ticker := time.NewTicker(50000 * time.Millisecond)
 	defer ticker.Stop()

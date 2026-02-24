@@ -18,27 +18,15 @@ const POLL_RATE = 1 * time.Second
 
 func RoleManager(
 	ch_Update chan elev.Elevator,
-	ch_RcvAliveList chan elev.AliveList) {
+	ch_RcvAliveList chan elev.AliveList,
+	ch_RoleUpdateFromRM chan elev.ElevatorRole) {
 
-	var localE elev.Elevator
+	var elevator elev.Elevator
 
 	for {
 		select {
-		case localE = <-ch_Update:
+		case elevator = <-ch_Update:
 		}
-	}
-}
-
-// TODO: flytt inn i RoleManager
-func PollRoleUpdate(receiver chan<- elev.ElevatorRole, role *elev.ElevatorRole) {
-	prev := elev.ER_Init
-	for {
-		time.Sleep(POLL_RATE)
-		current := *role //TODO: Check if Marius agree
-		if current != prev && *role != elev.ER_Init {
-			receiver <- current
-		}
-		prev = current
 	}
 }
 

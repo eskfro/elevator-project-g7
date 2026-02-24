@@ -27,71 +27,120 @@ func main() {
 
 	// Init The Elevator Core
 	elevio.InitPhysicalElevator("localhost", port, elev.N_FLOORS)
-	E := elev.CreateElevator(id, port)
+	elevator := elev.CreateElevator(id, port)
 	elev.PrintElevatorInit(id, port)
 	ticker := time.NewTicker(100 * time.Millisecond)
 
 	// TODO: kanskje ikke bruke struct nå lenger fordi tror dette skal være i main
 
-	ch_Elevator := 			make(chan elev.Elevator)
-	ch_PrintTimer :=  		make(chan bool)
-	ch_Obstruction :=  		make(chan bool)
-	ch_FloorArrival := 		make(chan int)
-	ch_ButtonPress := 		make(chan elevio.ButtonEvent)
-	ch_RcvOrderTable :=     make(chan elev.OrderTable)
-	ch_RcvAliveList := 		make(chan elev.AliveList)
-	ch_RoleUpdate :=       	make(chan elev.ElevatorRole)
+	//ch_Elevator := 			make(chan elev.Elevator)
+	ch_PrintTimer := make(chan bool)
+	ch_PollObstruction := make(chan bool)
+	ch_PollFloorSensor := make(chan int)
+	ch_PollButtonPress := make(chan elevio.ButtonEvent)
+
+	ch_RcvOrderTable := make(chan elev.OrderTable)
+	ch_RcvAliveList := make(chan elev.AliveList)
 	ch_BcastTick := ticker.C
 
-	ch_UpdateOC := 			make(chan elev.Elevator)
-	ch_UpdateMV := 			make(chan elev.Elevator)
-	ch_UpdateRM := 			make(chan elev.Elevator)
+	// Channels for updating local elevators in modules
+	ch_UpdateOC := make(chan elev.Elevator)
+	ch_UpdateMV := make(chan elev.Elevator)
+	ch_UpdateRM := make(chan elev.Elevator)
 
+	// Trigger to Movement
+	ch_FloorArrival := make(chan struct{})
 
+	// Updates from Movement
+	ch_LOTFromMV := make(chan elev.LocalOrderTable)
+	ch_StateFromMV := make(chan elev.ElevatorMovement)
+	ch_MotorDirFromMV := make(chan elevio.MotorDirection)
 
-	// Her må vi gå bort fra pekere fordi det blir jo race conditions :)
-	// Tenker sender vel inn en channel for elevator og diverse.
+	// Trigger to OrderControl
+
+	// Updates from OrderControl
+	ch_ClearOrderFromOC := make(chan elevio.ButtonEvent)
+
+	// Trigger to RoleManager
+
+	// Updates from RoleManager
+	ch_RoleUpdateFromRM := make(chan elev.ElevatorRole)
 
 	// ============ GO MOVEMENT =======================
 
-	go elevio.PollObstructionSwitch(ch_Obstruction)
-	go elevio.PollFloorSensor(ch_FloorArrival)
+	go elevio.PollObstructionSwitch(ch_PollObstruction)
+	go elevio.PollFloorSensor(ch_PollFloorSensor)
 	go movement.GeneratePrintTimerEvents(ch_PrintTimer)
-	go movement.Movement(ch_UpdateMV)
+	go movement.Movement(ch_UpdateMV, ch_PrintTimer, ch_FloorArrival, ch_LOTFromMV, ch_StateFromMV)
 
 	// ============= GO ORDERCONTROL ===================
 
 	go elevio.PollButtons(ch_ButtonPress)
-	go rolemanager.PollRoleUpdate(ch_RoleUpdate, &E.Role)
 	go ordercontrol.OrderControl(ch_UpdateOC, ch_RcvOrderTable)
 
 	// ============= GO ROLE MANAGER ===================
 	go rolemanager.RoleManager(ch_RcvAliveList, ch_UpdateRM)
+	go rolemanager.PollRoleUpdate(ch_PollRoleUpdate)
 
 	// ============= GO NETWORK ========================
 	go network.RecieveInfo(ch_RcvOrderTable, ch_RcvAliveList)
 	go network.SendInfo(ch_BcastTick, ch_xxxOrderTable, ch_xxxAlivelist)
 
+	ch_UpdateOC <- elevator
+	ch_UpdateMV <- elevator
+	ch_UpdateRM <- elevator
 
-	go func () {
+	go func() {
 
-		for { 
-			select {
-			case obst := <-ch_Obstruction:
+		for {
+			select {
+
+			// To Movement cases
+			case obst := <-ch_PollObstruction:
 				elevator.PhysicalInfo.Obstructed = obst
 
-			case ...:
+			case floor := <-ch_PollFloorSensor:
+				elevator.PhysicalInfo.Floor = floor
+				ch_UpdateMV <- elevator
+				ch_FloorArrival <- struct{}{}
 
-			case ...:
+			//From Movement cases
+			case newLOT := <-ch_LOTFromMV:
+				elevator.PhysicalInfo.LocalOrderTable = newLOT
+
+			case newState := <-ch_StateFromMV:
+				elevator.PhysicalInfo.State = newState
+
+			case newMotorDir := <-ch_MotorDirFromMV:
+				elevator.PhysicalInfo.MotorDir = newMotorDir
+
+			// To OrderControl cases
+			case btnPress := <-ch_PollButtonPress:
+				elevator.OrderTable[elevator.PhysicalInfo.Id][btnPress.Floor][btnPress.Button] = elev.OS_REQUESTED
+				elevio.PrintButtonpress(btnPress)
+
+			// From OrderControl cases
+			case order := <-ch_ClearOrderFromOC:
+				elevator.OrderTable[elevator.PhysicalInfo.Id][order.Floor][order.Button] = elev.OS_CLEAR
+
+			// To Rolemanager cases
+			//case :
+			// From Rolemanager cases
+			case newRole := <-ch_RoleUpdateFromRM:
+				elevator.PhysicalInfo.Role = newRole
+
+				// To Network cases
+
+				// From Network cases
 
 			}
-			ch_UpdateOC <- E
-			ch_UpdateMV <- E
-			ch_UpdateRM <- E
+
+			// Update all local elevator objects
+			ch_UpdateOC <- elevator
+			ch_UpdateMV <- elevator
+			ch_UpdateRM <- elevator
 		}
 	}()
-
-
 
 	WaitForInterrupt()
 
