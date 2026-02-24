@@ -47,7 +47,7 @@ func Start(pe *elev.ElevatorPhysicalInfo,
 func Movement(
 	ch_Update chan elev.Elevator,
 	ch_PrintTimer chan bool,
-	ch_FloorArrival chan int,
+	ch_FloorArrival chan struct{},
 	ch_LOTFromMV chan elev.LocalOrderTable,
 	ch_StateFromMV chan elev.ElevatorMovement,
 	ch_MotorDirFromMV chan elevio.MotorDirection) {

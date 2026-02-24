@@ -53,7 +53,18 @@ type RoleIdPair struct {
 	Role ElevatorRole
 }
 
+type OrderTablePacket struct {
+	Id         int
+	OrderTable OrderTable
+}
+
 // ============ ELEVATOR CORE =======================================
+
+// Custom types
+type LocalOrderTable [N_FLOORS][N_BUTTONS]bool
+type OrderTable [N_MAX_ELEVS][N_FLOORS][N_BUTTONS]OrderStatus
+type AllOrderTables [N_MAX_ELEVS]OrderTable
+type AliveList [N_MAX_ELEVS]ElevatorPhysicalInfo
 
 // Info about single elevator
 type ElevatorPhysicalInfo struct {
@@ -68,13 +79,7 @@ type ElevatorPhysicalInfo struct {
 	LocalOrderTable [N_FLOORS][N_BUTTONS]bool
 }
 
-// .
-type LocalOrderTable [N_FLOORS][N_BUTTONS]bool
-type OrderTable [N_MAX_ELEVS][N_FLOORS][N_BUTTONS]OrderStatus
-type AllOrderTables [N_MAX_ELEVS]OrderTable
-type AliveList [N_MAX_ELEVS]ElevatorPhysicalInfo
-
-// Info about all elevators
+// ELEVATOR
 type Elevator struct {
 	PhysicalInfo   ElevatorPhysicalInfo // Info about the single elevator
 	OrderTable     OrderTable

@@ -19,8 +19,8 @@ import (
 
 func OrderControl(
 	ch_Update chan elev.Elevator,
-	ch_RoleUpdate chan elev.ElevatorRole,
-	ch_RcvOrderTable chan elev.OrderTable,
+	ch_RoleUpdateFromRM chan elev.ElevatorRole,
+	ch_RcvOrderTablePacket chan elev.OrderTablePacket,
 	ch_LOTFromOC chan elev.LocalOrderTable) {
 
 	var elevator elev.Elevator
@@ -28,55 +28,80 @@ func OrderControl(
 	for {
 		switch elevator.PhysicalInfo.Role {
 
-		// -----------------------Backup begin------------------------------------
+		// ======================= BACKUP OC =============================================
 		case elev.ER_Backup:
 			select {
 			case elevator = <-ch_Update:
 
 			//case btnPress := <-ch_ButtonPress:
 
-			case OrderTableFromPrimary := <-ch_RcvOrderTable:
-				// TODO: Acceptance test
+			case packet := <-ch_RcvOrderTablePacket:
 				if false {
+					// TODO: Acceptance test
 					break
 				}
 
-				// TODO: check if this is OK
-				for floor := 0; floor < elev.N_FLOORS; floor++ {
-					for btn := 0; btn < elev.N_BUTTONS; btn++ {
-						elevator.PhysicalInfo.LocalOrderTable[floor][btn] = OrderTableFromPrimary[elevator.PhysicalInfo.Id][floor][btn] == elev.OS_CONFIRMED
-					}
-				}
+				newLOT := orderTableToLOT(packet.OrderTable, elevator.PhysicalInfo.Id)
+
+				elevator.PhysicalInfo.LocalOrderTable = newLOT
+
 				ch_LOTFromOC <- elevator.PhysicalInfo.LocalOrderTable
 			}
-		//---------------------------------Primary begin-----------------------------------
+		// ======================= PRIMARY OC =============================================
 		case elev.ER_Primary:
 
-			select {
+			for {
 
-			case elevator = <-ch_Update:
+				select {
 
-			case rcvOrderTable := <-ch_RcvOrderTable:
-				//TODO: senderID := Who sent the order??
+				case elevator = <-ch_Update:
 
-				// TODO: Send to Coordinator
-				elevator.AllOrderTables[senderID] = rcvOrderTable
+				case packet := <-ch_RcvOrderTablePacket:
 
-				for orderID := 0; orderID < int(*NumElevs); orderID++ {
-					for floor := 0; floor < elev.N_FLOORS; floor++ {
-						for btn := 0; floor < elev.N_BUTTONS; btn++ {
+					// TODO: Send to Coordinator
+					elevator.AllOrderTables[packet.Id] = packet.OrderTable
 
-							primaryStatus := elevator.OrderTable[orderID][floor][btn]
-							rcvStatus := rcvOrderTable[orderID][floor][btn]
+					for orderID := 0; orderID < int(elevator.NumElevs); orderID++ {
+						for floor := 0; floor < elev.N_FLOORS; floor++ {
+							for btn := 0; btn < elev.N_BUTTONS; btn++ {
 
-							if isReassignable(elevio.ButtonType(btn), rcvStatus, primaryStatus) {
-								orderID = CalculateWhichElevator(orderID, floor, btn, rcvOrderTable, elevator.AliveList, int(elevator.NumElevs))
+								primaryStatus := elevator.OrderTable[orderID][floor][btn]
+								rcvStatus := packet.OrderTable[orderID][floor][btn]
+
+								if isReassignable(elevio.ButtonType(btn), rcvStatus, primaryStatus) {
+									// TODO: fiks variabelnavn OrderID, kan ikke være samme som indeks variabel
+									// marius se på denne fordi jeg skjønner ikkje
+									orderID = CalculateWhichElevator(rcvOrder, orderID, floor, btn, packet.OrderTable, elevator.AliveList, int(elevator.NumElevs))
+
+								}
+
+								elevator.OrderTable[orderID][floor][btn] = CalculateNewStatus(orderID, floor, btn, rcvStatus, primaryStatus, packet.Id, elevator.AllOrderTables, int(elevator.NumElevs))
+
 							}
-
-							elevator.OrderTable[orderID][floor][btn] = CalculateNewStatus(orderID, floor, btn, rcvStatus, primaryStatus, senderID, *AllWorldViews, *NumElevs)
-
 						}
+
 					}
+
+					// Ny kode lagd av eskil ()
+					// case packet := <-ch_RcvOrderTablePacket:
+
+					// 	// Oppdater AllOrderTables
+					// 	elevator.AllOrderTables[packet.Id] = packet.OrderTable
+
+					// 	//
+
+					// 	for elevId := 0; elevId < elev.N_MAX_ELEVS; elevId++ {
+
+					// 		if elevator.AliveList[elevId].Role == elev.ER_Dead {
+					// 			continue
+					// 		}
+
+					// 		for floor := 0; floor < elev.N_FLOORS; floor++ {
+					// 			for btn := 0; btn < elev.N_BUTTONS; btn++ {
+
+					// 			}
+					// 		}
+					// 	}
 
 				}
 			}
@@ -157,8 +182,18 @@ func CalculateNewStatus(
 	}
 }
 
-func isRequestedByAll(AllOrderTables elev.AllOrderTables, orderID int, floor int, btn int, NumElevs int) bool {
-	for i := 0; i < NumElevs; i++ {
+func isRequestedByAll(AllOrderTables elev.AllOrderTables,
+	orderID int,
+	floor int,
+	btn int,
+	NumElevs int,
+	AliveList elev.AliveList) bool {
+	for i := 0; i < elev.N_MAX_ELEVS; i++ {
+
+		if AliveList[i].Role == elev.ER_Dead {
+			continue
+		}
+
 		if AllOrderTables[i][orderID][floor][btn] != elev.OS_REQUESTED {
 			return false
 		}
@@ -169,6 +204,7 @@ func isRequestedByAll(AllOrderTables elev.AllOrderTables, orderID int, floor int
 // Returnerer best heis
 // Dette er bare secondary requirement i specen så tenker vi bare lager en enkel algoritme
 func CalculateWhichElevator(
+	rcvOrder elev.Order,
 	orderId int,
 	floor int,
 	btn int,
@@ -184,11 +220,15 @@ func CalculateWhichElevator(
 	minCost := 1000
 	bestElevId := AliveList[0].Id
 
-	for e := 0; e < NumElevs; e++ {
+	for i := 0; i < elev.N_MAX_ELEVS; i++ {
 
-		currentElev := AliveList[e]
+		if AliveList[i].Role == elev.ER_Dead {
+			continue
+		}
 
-		LocalOrderTable := orderTableToBool(OrderTable[currentElev.Id])
+		currentElev := AliveList[i]
+
+		LocalOrderTable := orderTableToLOT(OrderTable, currentElev.Id)
 
 		cost := CalculateCost(rcvOrder, currentElev, LocalOrderTable)
 
@@ -242,16 +282,15 @@ func CalculateCost(rcvOrder elev.Order, elevator elev.ElevatorPhysicalInfo, Loca
 // cost++ beveger seg i feil retning
 // cost++ antall stopp (kanskje man ikke trenger så heftig logikk)
 
-func orderTableToBool(OrderTable [elev.N_FLOORS][elev.N_BUTTONS]elev.OrderStatus) [elev.N_FLOORS][elev.N_BUTTONS]bool {
-	var OrderTableBool [elev.N_FLOORS][elev.N_BUTTONS]bool
+func orderTableToLOT(OrderTable elev.OrderTable, elevId int) elev.LocalOrderTable {
 
-	for floor := 0; floor < elev.N_FLOORS; floor++ {
-		for btn := 0; btn < elev.N_BUTTONS; btn++ {
-			if OrderTable[floor][btn] == elev.OS_CONFIRMED {
-				OrderTableBool[floor][btn] = true
-			}
+	var LOT elev.LocalOrderTable
+
+	for f := 0; f < elev.N_FLOORS; f++ {
+		for b := 0; b < elev.N_BUTTONS; b++ {
+			LOT[f][b] = OrderTable[elevId][f][b] == elev.OS_CONFIRMED
 		}
 	}
 
-	return OrderTableBool
+	return LOT
 }

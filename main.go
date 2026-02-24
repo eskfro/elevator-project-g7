@@ -33,7 +33,6 @@ func main() {
 
 	// TODO: kanskje ikke bruke struct nå lenger fordi tror dette skal være i main
 
-	//ch_Elevator := 			make(chan elev.Elevator)
 	ch_PrintTimer := make(chan bool)
 	ch_PollObstruction := make(chan bool)
 	ch_PollFloorSensor := make(chan int)
@@ -57,9 +56,11 @@ func main() {
 	ch_MotorDirFromMV := make(chan elevio.MotorDirection)
 
 	// Trigger to OrderControl
+	ch_RcvBcastPacket := make(chan elev.OrderTablePacket)
 
 	// Updates from OrderControl
 	ch_ClearOrderFromOC := make(chan elevio.ButtonEvent)
+	ch_LOTFromOC := make(chan elev.LocalOrderTable)
 
 	// Trigger to RoleManager
 
@@ -71,12 +72,12 @@ func main() {
 	go elevio.PollObstructionSwitch(ch_PollObstruction)
 	go elevio.PollFloorSensor(ch_PollFloorSensor)
 	go movement.GeneratePrintTimerEvents(ch_PrintTimer)
-	go movement.Movement(ch_UpdateMV, ch_PrintTimer, ch_FloorArrival, ch_LOTFromMV, ch_StateFromMV)
+	go movement.Movement(ch_UpdateMV, ch_PrintTimer, ch_FloorArrival, ch_LOTFromMV, ch_StateFromMV, ch_MotorDirFromMV)
 
 	// ============= GO ORDERCONTROL ===================
 
-	go elevio.PollButtons(ch_ButtonPress)
-	go ordercontrol.OrderControl(ch_UpdateOC, ch_RcvOrderTable)
+	go elevio.PollButtons(ch_PollButtonPress)
+	go ordercontrol.OrderControl(ch_UpdateOC, ch_RoleUpdateFromRM, ch_RcvOrderTable, ch_RcvBcastPacket, ch_LOTFromOC)
 
 	// ============= GO ROLE MANAGER ===================
 	go rolemanager.RoleManager(ch_RcvAliveList, ch_UpdateRM)
@@ -86,6 +87,7 @@ func main() {
 	go network.RecieveInfo(ch_RcvOrderTable, ch_RcvAliveList)
 	go network.SendInfo(ch_BcastTick, ch_xxxOrderTable, ch_xxxAlivelist)
 
+	// Init stack elevators
 	ch_UpdateOC <- elevator
 	ch_UpdateMV <- elevator
 	ch_UpdateRM <- elevator
