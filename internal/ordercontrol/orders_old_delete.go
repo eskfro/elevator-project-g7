@@ -25,14 +25,17 @@ func OrderControl(
 	var elevator elev.Elevator
 
 	for {
+		switch elevator.PhysicalInfo.Role { //TODO: Bytte rekkefølge på switch Role og events. Bør heller ha for{ select{ case event: if primary {stuff} else {other stuff} } }
+		//		 									Viss ikkje vil vi kunne blokke i backup sin select case etter at vi har blitt primary.
 
-		select {
-		case elevator = <-ch_Update:
+		// ======================= BACKUP OC =============================================
+		case elev.ER_Backup:
+			select {
+			case elevator = <-ch_Update:
 
-		case packet := <-ch_OTPacket:
+			//case btnPress := <-ch_ButtonPress:
 
-			switch elevator.PhysicalInfo.Role {
-			case elev.ER_Backup:
+			case packet := <-ch_OTPacket:
 				if false {
 					// TODO: Acceptance test
 					break
@@ -43,48 +46,64 @@ func OrderControl(
 				elevator.PhysicalInfo.LocalOrderTable = newLOT
 
 				ch_LOTFromOC <- elevator.PhysicalInfo.LocalOrderTable
+			}
+		// ======================= PRIMARY OC =============================================
+		case elev.ER_Primary:
 
-			case elev.ER_Primary:
-				newOrderTable := elevator.AllOrderTables[packet.Id]
+			for {
 
-				for orderID := 0; orderID < int(elevator.NumElevs); orderID++ {
-					for floor := 0; floor < elev.N_FLOORS; floor++ {
-						for btn := 0; btn < elev.N_BUTTONS; btn++ {
+				select {
 
-							primaryStatus := elevator.OrderTable[orderID][floor][btn]
-							rcvStatus := newOrderTable[orderID][floor][btn]
+				case elevator = <-ch_Update:
 
-							if isReassignable(elevio.ButtonType(btn), rcvStatus, primaryStatus) {
-								// TODO: fiks variabelnavn OrderID, kan ikke være samme som indeks variabel // Marius: Jo må vere samme, den skal kunne bli overskrevet dersom ordren isReassignable
-								// marius se på denne fordi jeg skjønner ikkje // Skal vere good no😎
-								orderID = CalculateWhichElevator(orderID, floor, btn, newOrderTable, elevator.AliveList, int(elevator.NumElevs))
+				case packet := <-ch_OTPacket:
+
+					// Flytta til main, under "From network cases":
+					// elevator.AllOrderTables[packet.Id] = packet.OrderTable
+
+					newOrderTable := elevator.AllOrderTables[packet.Id]
+
+					for orderID := 0; orderID < int(elevator.NumElevs); orderID++ {
+						for floor := 0; floor < elev.N_FLOORS; floor++ {
+							for btn := 0; btn < elev.N_BUTTONS; btn++ {
+
+								primaryStatus := elevator.OrderTable[orderID][floor][btn]
+								rcvStatus := newOrderTable[orderID][floor][btn]
+
+								if isReassignable(elevio.ButtonType(btn), rcvStatus, primaryStatus) {
+									// TODO: fiks variabelnavn OrderID, kan ikke være samme som indeks variabel // Marius: Jo må vere samme, den skal kunne bli overskrevet dersom ordren isReassignable
+									// marius se på denne fordi jeg skjønner ikkje // Skal vere good no😎
+									orderID = CalculateWhichElevator(orderID, floor, btn, newOrderTable, elevator.AliveList, int(elevator.NumElevs))
+
+								}
+
+								elevator.OrderTable[orderID][floor][btn] = CalculateNewStatus(orderID, floor, btn, rcvStatus, primaryStatus, packet.Id, elevator.AllOrderTables, elevator.AliveList)
 
 							}
-
-							elevator.OrderTable[orderID][floor][btn] = CalculateNewStatus(orderID, floor, btn, rcvStatus, primaryStatus, packet.Id, elevator.AllOrderTables, elevator.AliveList)
 						}
+
 					}
+
+					//Ny kode lagd av eskil ()
+					// case packet := <-ch_RcvOrderTablePacket:
+
+					// 	// Oppdater AllOrderTables //Marius: Dette er gjort i main no
+					// 	elevator.AllOrderTables[packet.Id] = packet.OrderTable
+
+					// 	for elevId := 0; elevId < elev.N_MAX_ELEVS; elevId++ {
+
+					// 		if elevator.AliveList[elevId].Role == elev.ER_Dead {
+					// 			continue // TODO: Ka skjer her då? Role manager greier eller Acceptance test?
+					// 		}
+
+					// 		for floor := 0; floor < elev.N_FLOORS; floor++ {
+					// 			for btn := 0; btn < elev.N_BUTTONS; btn++ {
+					// 				//TODO: Her skal vel implementerast noke
+					// 			}
+					// 		}
+					// 	}
+
 				}
-
-				//Ny kode lagd av eskil ()
-				// case packet := <-ch_RcvOrderTablePacket:
-
-				// 	// Oppdater AllOrderTables //Marius: Dette er gjort i main no
-				// 	elevator.AllOrderTables[packet.Id] = packet.OrderTable
-
-				// 	for elevId := 0; elevId < elev.N_MAX_ELEVS; elevId++ {
-
-				// 		if elevator.AliveList[elevId].Role == elev.ER_Dead {
-				// 			continue // TODO: Ka skjer her då? Role manager greier eller Acceptance test?
-				// 		}
-
-				// 		for floor := 0; floor < elev.N_FLOORS; floor++ {
-				// 			for btn := 0; btn < elev.N_BUTTONS; btn++ {
-				// 				//TODO: Her skal vel implementerast noke
-				// 			}
-				// 		}
-				// 	}
-
 			}
 		}
 	}

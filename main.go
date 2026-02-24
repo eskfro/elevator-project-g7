@@ -56,7 +56,7 @@ func main() {
 	ch_MotorDirFromMV := make(chan elevio.MotorDirection)
 
 	// Trigger to OrderControl
-	ch_RcvBcastPacket := make(chan elev.OrderTablePacket)
+	ch_OTPacketToOC := make(chan elev.OrderTablePacket)
 
 	// Updates from OrderControl
 	ch_ClearOrderFromOC := make(chan elevio.ButtonEvent)
@@ -66,6 +66,11 @@ func main() {
 
 	// Updates from RoleManager
 	ch_RoleUpdateFromRM := make(chan elev.ElevatorRole)
+
+	// Trigger to Network
+
+	// Updates from Network
+	ch_RcvOTPacket := make(chan elev.OrderTablePacket)
 
 	// ============ GO MOVEMENT =======================
 
@@ -77,11 +82,10 @@ func main() {
 	// ============= GO ORDERCONTROL ===================
 
 	go elevio.PollButtons(ch_PollButtonPress)
-	go ordercontrol.OrderControl(ch_UpdateOC, ch_RoleUpdateFromRM, ch_RcvOrderTable, ch_RcvBcastPacket, ch_LOTFromOC)
+	go ordercontrol.OrderControl(ch_UpdateOC, ch_OTPacketToOC, ch_LOTFromOC)
 
 	// ============= GO ROLE MANAGER ===================
-	go rolemanager.RoleManager(ch_RcvAliveList, ch_UpdateRM)
-	go rolemanager.PollRoleUpdate(ch_PollRoleUpdate)
+	go rolemanager.RoleManager(ch_UpdateRM, ch_RcvAliveList, ch_RoleUpdateFromRM)
 
 	// ============= GO NETWORK ========================
 	go network.RecieveInfo(ch_RcvOrderTable, ch_RcvAliveList)
@@ -126,18 +130,23 @@ func main() {
 				elevator.OrderTable[elevator.PhysicalInfo.Id][order.Floor][order.Button] = elev.OS_CLEAR
 
 			// To Rolemanager cases
-			//case :
+
 			// From Rolemanager cases
 			case newRole := <-ch_RoleUpdateFromRM:
 				elevator.PhysicalInfo.Role = newRole
 
-				// To Network cases
+			// To Network cases
 
-				// From Network cases
+			// From Network cases
 
+			//denne her er både From Network case og To OrderControl case
+			case packet := <-ch_RcvOTPacket:
+				elevator.AllOrderTables[packet.Id] = packet.OrderTable
+				ch_UpdateOC <- elevator
+				ch_OTPacketToOC <- packet
 			}
 
-			// Update all local elevator objects
+			// Update all local elevator objects after any case
 			ch_UpdateOC <- elevator
 			ch_UpdateMV <- elevator
 			ch_UpdateRM <- elevator
