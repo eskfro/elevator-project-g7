@@ -38,6 +38,8 @@ func OrderControl(
 
 	for {
 		switch currentRole {
+		
+			// -----------------------Backup begin------------------------------------
 		case elev.ER_Backup:
 			select {
 			case elevator = <-ch_Update:
@@ -64,38 +66,65 @@ func OrderControl(
 			case order := <-Ch.ClearOrder:
 				WorldView.EveryonesOrders[order] = elev.OS_CLEAR
 
-			case elev.ER_Primary:
+		//---------------------------------Primary begin-----------------------------------
+		case elev.ER_Primary:
 
-				select {
+			select {
 
-				case elevator = <-ch_Update:
+			case elevator = <-ch_Update:
 
-				case *currentRole = <-Ch.RoleUpdate:
+			case *currentRole = <-Ch.RoleUpdate:
 
-				case rcvOrderTable := <-ch_RcvOrderTable:
-					//TODO: senderID := Who sent the order??
+			case rcvOrderTable := <-ch_RcvOrderTable:
+				//TODO: senderID := Who sent the order??
 
-					// TODO: Send to Coordinator
-					elevator.AllOrderTables[senderID] = rcvOrderTable
+				// TODO: Send to Coordinator
+				elevator.AllOrderTables[senderID] = rcvOrderTable
 
-					for orderID := 0; orderID < int(*NumElevs); orderID++ {
-						for floor := 0; floor < elev.N_FLOORS; floor++ {
-							for btn := 0; floor < elev.N_BUTTONS; btn++ {
+				for orderID := 0; orderID < int(*NumElevs); orderID++ {
+					for floor := 0; floor < elev.N_FLOORS; floor++ {
+						for btn := 0; floor < elev.N_BUTTONS; btn++ {
 
-								primaryStatus := elevator.OrderTable[orderID][floor][btn]
-								rcvStatus := rcvOrderTable[orderID][floor][btn]
+							primaryStatus := elevator.OrderTable[orderID][floor][btn]
+							rcvStatus := rcvOrderTable[orderID][floor][btn]
 
-								if isReassignable(elevio.ButtonType(btn), rcvStatus, primaryStatus) {
-									orderID = CalculateWhichElevator(orderID, floor, btn, rcvOrderTable, elevator.AliveList, int(elevator.NumElevs))
-								}
+							if isReassignable(elevio.ButtonType(btn), rcvStatus, primaryStatus) {
+								orderID = CalculateWhichElevator(orderID, floor, btn, rcvOrderTable, elevator.AliveList, int(elevator.NumElevs))
+							}
 
-								elevator.OrderTable[orderID][floor][btn] = CalculateNewStatus(orderID, floor, btn, rcvStatus, primaryStatus, senderID, *AllWorldViews, *NumElevs)
+							elevator.OrderTable[orderID][floor][btn] = CalculateNewStatus(orderID, floor, btn, rcvStatus, primaryStatus, senderID, *AllWorldViews, *NumElevs)
 
 							}
 						}
 
 					}
-				}
+				}case elev.ER_Primary:
+
+			select {
+
+			case elevator = <-ch_Update:
+
+			case *currentRole = <-Ch.RoleUpdate:
+
+			case rcvOrderTable := <-ch_RcvOrderTable:
+				//TODO: senderID := Who sent the order??
+
+				// TODO: Send to Coordinator
+				elevator.AllOrderTables[senderID] = rcvOrderTable
+
+				for orderID := 0; orderID < int(*NumElevs); orderID++ {
+					for floor := 0; floor < elev.N_FLOORS; floor++ {
+						for btn := 0; floor < elev.N_BUTTONS; btn++ {
+
+							primaryStatus := elevator.OrderTable[orderID][floor][btn]
+							rcvStatus := rcvOrderTable[orderID][floor][btn]
+
+							if isReassignable(elevio.ButtonType(btn), rcvStatus, primaryStatus) {
+								orderID = CalculateWhichElevator(orderID, floor, btn, rcvOrderTable, elevator.AliveList, int(elevator.NumElevs))
+							}
+
+							elevator.OrderTable[orderID][floor][btn] = CalculateNewStatus(orderID, floor, btn, rcvStatus, primaryStatus, senderID, *AllWorldViews, *NumElevs)
+
 			}
 		}
 	}
