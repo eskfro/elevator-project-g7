@@ -107,24 +107,6 @@ func CreatePhysicalElevator(_Id uint16, _Port uint16) ElevatorPhysicalInfo {
 	return pe
 }
 
-// Moves elevator to a floor
-func InitPhysicalElevator(ip string, port uint16) {
-
-	elevio.Init(fmt.Sprintf("localhost:%d", port), N_FLOORS)
-
-	elevio.SetMotorDirection(elevio.MD_Down)
-	for elevio.GetFloor() == -1 {
-	}
-	elevio.SetMotorDirection(elevio.MD_Stop)
-
-	for elevio.GetObstruction() {
-		elevio.SetDoorOpenLamp(true)
-	}
-	elevio.SetDoorOpenLamp(false)
-	elevio.SetFloorIndicator(elevio.GetFloor())
-
-}
-
 func PrintElevatorInit(id uint16, port uint16) {
 	fmt.Printf("elevator starting | id = %d | port = %d\n", id, port)
 

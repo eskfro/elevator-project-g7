@@ -27,3 +27,21 @@ func PrintButtonpress(buttonEvent ButtonEvent) {
 		fmt.Println("Hall up button press at floor ", s_floor)
 	}
 }
+
+// Moves elevator to a floor
+func InitPhysicalElevator(ip string, port uint16, numFloors int) {
+
+	Init(fmt.Sprintf("localhost:%d", port), numFloors)
+
+	SetMotorDirection(MD_Down)
+	for GetFloor() == -1 {
+	}
+	SetMotorDirection(MD_Stop)
+
+	for GetObstruction() {
+		SetDoorOpenLamp(true)
+	}
+	SetDoorOpenLamp(false)
+	SetFloorIndicator(GetFloor())
+
+}

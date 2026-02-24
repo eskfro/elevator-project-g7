@@ -26,7 +26,7 @@ func main() {
 	id, port := parser.ParseOsArgs(os.Args, sim)
 
 	// Init The Elevator Core
-	elev.InitPhysicalElevator("localhost", port)
+	elevio.InitPhysicalElevator("localhost", port, elev.N_FLOORS)
 	E := elev.CreateElevator(id, port)
 	elev.PrintElevatorInit(id, port)
 	ticker := time.NewTicker(100 * time.Millisecond)
