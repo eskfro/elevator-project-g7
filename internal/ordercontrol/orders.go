@@ -32,10 +32,12 @@ func OrderControl(
 		case packet := <-ch_OTPacket:
 
 			switch elevator.PhysicalInfo.Role {
+			case elev.ER_Init:
+				// TODO
+
 			case elev.ER_Backup:
-				if false {
-					// TODO: Acceptance test
-					break
+				if packet.Id != elevator.PhysicalInfo.PrimaryId {
+					break //message not from primary
 				}
 
 				newLOT := orderTableToLOT(packet.OrderTable, elevator.PhysicalInfo.Id)
@@ -45,20 +47,32 @@ func OrderControl(
 				ch_LOTFromOC <- elevator.PhysicalInfo.LocalOrderTable
 
 			case elev.ER_Primary:
+
+				if packet.Id == elevator.PhysicalInfo.Id {
+					break //message from self
+				}
+
 				newOrderTable := elevator.AllOrderTables[packet.Id]
 
-				for orderID := 0; orderID < int(elevator.NumElevs); orderID++ {
+				for elevID := 0; elevID < elev.N_MAX_ELEVS; elevID++ {
 					for floor := 0; floor < elev.N_FLOORS; floor++ {
 						for btn := 0; btn < elev.N_BUTTONS; btn++ {
 
-							primaryStatus := elevator.OrderTable[orderID][floor][btn]
-							rcvStatus := newOrderTable[orderID][floor][btn]
+							primaryStatus := elevator.OrderTable[elevID][floor][btn]
+							rcvStatus := newOrderTable[elevID][floor][btn]
+
+							if rcvStatus == primaryStatus {
+								continue
+							}
+							var orderID int
 
 							if isReassignable(elevio.ButtonType(btn), rcvStatus, primaryStatus) {
 								// TODO: fiks variabelnavn OrderID, kan ikke være samme som indeks variabel // Marius: Jo må vere samme, den skal kunne bli overskrevet dersom ordren isReassignable
 								// marius se på denne fordi jeg skjønner ikkje // Skal vere good no😎
-								orderID = CalculateWhichElevator(orderID, floor, btn, newOrderTable, elevator.AliveList, int(elevator.NumElevs))
+								orderID = CalculateWhichElevator(elevID, floor, btn, newOrderTable, elevator.AliveList, int(elevator.NumElevs))
 
+							} else {
+								orderID = elevID
 							}
 
 							elevator.OrderTable[orderID][floor][btn] = CalculateNewStatus(orderID, floor, btn, rcvStatus, primaryStatus, packet.Id, elevator.AllOrderTables, elevator.AliveList)
@@ -106,10 +120,6 @@ func CalculateNewStatus(
 	senderID int,
 	AllOrderTables elev.AllOrderTables,
 	AliveList elev.AliveList) elev.OrderStatus {
-
-	if rcvStatus == primaryStatus {
-		return primaryStatus
-	}
 
 	isOwner := orderID == senderID
 

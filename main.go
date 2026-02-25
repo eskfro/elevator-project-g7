@@ -4,7 +4,7 @@ import (
 	"elevator-project-g7/internal/elev"
 	"elevator-project-g7/internal/elevio"
 	"elevator-project-g7/internal/movement"
-	network "elevator-project-g7/internal/network/bcast"
+	"elevator-project-g7/internal/network"
 	"elevator-project-g7/internal/ordercontrol"
 	"elevator-project-g7/internal/parser"
 	"elevator-project-g7/internal/rolemanager"
@@ -23,12 +23,12 @@ const sim bool = true
 
 func main() {
 	// PARSE ARGS
-	id, port := parser.ParseOsArgs(os.Args, sim)
+	id, port_HW, port_HB, port_OT := parser.ParseOsArgs(os.Args, sim)
 
 	// INIT
-	elevio.InitPhysicalElevator("localhost", port, elev.N_FLOORS)
-	elevator := elev.CreateElevator(id, port)
-	elev.PrintElevatorInit(id, port)
+	elevio.InitPhysicalElevator("localhost", port_HW, elev.N_FLOORS)
+	elevator := elev.CreateElevator(id, port_HW)
+	elev.PrintElevatorInit(id, port_HW)
 
 	//ticker := time.NewTicker(100 * time.Millisecond)
 	ch_PrintTimer := make(chan bool)
@@ -61,17 +61,20 @@ func main() {
 	ch_LOTFromOC := make(chan elev.LocalOrderTable)
 
 	// Trigger to RoleManager
+	ch_HeartBeatIdToRM := make(chan int)
+	ch_AliveListUpdated := make(chan struct{})
 
 	// Updates from RoleManager
 	ch_RoleUpdateFromRM := make(chan elev.ElevatorRole)
+	ch_SetDeadElev := make(chan int)
 
 	// Trigger to Network
 	ch_TxOrderTableP := make(chan elev.OrderTablePacket)
-	ch_TxAliveListP := make(chan elev.AliveListPacket)
+	ch_UpdateTxMessage := make(chan elev.ElevatorPhysicalInfo)
 
 	// Updates from Network
 	ch_RxOrderTableP := make(chan elev.OrderTablePacket)
-	ch_RxAliveListP := make(chan elev.AliveListPacket)
+	ch_RxPhysicalInfo := make(chan elev.ElevatorPhysicalInfo)
 
 	// ============ GO MOVEMENT =======================
 
@@ -87,12 +90,14 @@ func main() {
 
 	// ============= GO ROLE MANAGER ===================
 
-	go rolemanager.RoleManager(ch_UpdateRM, ch_RcvAliveList, ch_RoleUpdateFromRM)
+	go rolemanager.RoleManager(ch_UpdateRM, ch_RcvAliveList, ch_RoleUpdateFromRM, ch_HeartBeatIdToRM, ch_SetDeadElev, ch_AliveListUpdated)
 
 	// ============= GO NETWORK ========================
 
-	go network.Transmitter(port, ch_TxOrderTableP, ch_TxAliveListP)
-	go network.Receiver(port, ch_RxOrderTableP, ch_RxAliveListP)
+	go network.Transmitter(port_OT, ch_TxOrderTableP)
+	go network.Receiver(port_OT, ch_RxOrderTableP)
+	go network.TxHeartBeat(port_HB, ch_UpdateTxMessage)
+	go network.RxHeartBeat(port_HB, ch_RxPhysicalInfo)
 
 	// Init stack elevators
 	ch_UpdateOC <- elevator
@@ -144,6 +149,11 @@ func main() {
 
 			// FROM
 
+			case deadElevId := <-ch_SetDeadElev:
+				elevator.AliveList[deadElevId].Role = elev.ER_Dead
+				ch_UpdateRM <- elevator
+				ch_AliveListUpdated <- struct{}{}
+
 			case newRole := <-ch_RoleUpdateFromRM:
 				elevator.PhysicalInfo.Role = newRole
 
@@ -158,69 +168,27 @@ func main() {
 			//denne her er både From Network case og To OrderControl case
 			case packet := <-ch_RxOrderTableP:
 
-				switch elevator.PhysicalInfo.Role {
-
-				case elev.ER_Init:
-
-					// TODO
-
-				case elev.ER_Backup:
-
-					// message not from primary
-					if packet.Id != elevator.PhysicalInfo.PrimaryId {
-						break
-					}
+				if elevator.PhysicalInfo.Role == elev.ER_Primary {
 					elevator.AllOrderTables[packet.Id] = packet.OrderTable
 					ch_UpdateOC <- elevator
-					ch_OTPacketToOC <- packet
-
-				case elev.ER_Primary:
-
-					// message from self
-					if packet.Id == elevator.PhysicalInfo.Id {
-						break
-					}
-					elevator.AllOrderTables[packet.Id] = packet.OrderTable
-					ch_UpdateOC <- elevator
-					ch_OTPacketToOC <- packet
-
 				}
+				ch_OTPacketToOC <- packet
 
-			case packet := <-ch_RxAliveListP:
+			case heartBeat := <-ch_RxPhysicalInfo:
 
-				switch elevator.PhysicalInfo.Role {
-
-				case elev.ER_Init:
-
-					// TODO
-
-				case elev.ER_Backup:
-
-					// message not from primary
-					if packet.Id != elevator.PhysicalInfo.PrimaryId {
-						break
-					}
-					elevator.AliveList = packet.AliveList
-
-				case elev.ER_Primary:
-
-					// message from self
-					if packet.Id == elevator.PhysicalInfo.Id {
-						break
-					}
-
-				}
-
-				if packet.Id != elevator.PhysicalInfo.Id && packet.Id == elevator.PhysicalInfo.PrimaryId {
-					elevator.AliveList = packet.AliveList
-				}
+				elevator.AliveList[heartBeat.Id] = heartBeat
+				ch_UpdateRM <- elevator
+				ch_HeartBeatIdToRM <- heartBeat.Id
 
 			}
 
-			// Update all local elevator objects after any case
+			// ================= UPDATE ALL STACK ELEVATORS ==============================
+
 			ch_UpdateOC <- elevator
 			ch_UpdateMV <- elevator
 			ch_UpdateRM <- elevator
+			ch_UpdateTxMessage <- elevator.PhysicalInfo
+
 		}
 	}()
 

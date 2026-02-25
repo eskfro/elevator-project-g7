@@ -138,8 +138,7 @@ func FSM_OnDoorTimeout(pe elev.ElevatorPhysicalInfo,
 
 		case elev.EM_DoorOpen:
 
-			// We think this goes fint
-			pe.DoorTimer.Start()
+			doorTimer.Start()
 
 			fmt.Println("timer set 4")
 			updated_LOT := requests.ClearCurrentFloor(pe.LocalOrderTable, pe.Floor, pe.MotorDir)

@@ -20,3 +20,4 @@ test:
 clean: 
 	go clean
 	rm -f $(TARGET)
+

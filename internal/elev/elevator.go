@@ -9,6 +9,7 @@ import (
 const N_FLOORS = 4
 const N_BUTTONS = 3
 const DOOR_OPEN_TIME = 3 * time.Second
+const HEARTBEAT_TIMEOUT = 3 * time.Second
 const N_MAX_ELEVS = 4
 
 // ================= ENUM TYPES ===============================
@@ -73,7 +74,6 @@ type AliveList [N_MAX_ELEVS]ElevatorPhysicalInfo
 // Info about single elevator
 type ElevatorPhysicalInfo struct {
 	Id              int
-	Port            int
 	Floor           int
 	PrimaryId       int
 	Role            ElevatorRole
@@ -95,7 +95,7 @@ type Elevator struct {
 func CreateElevator(_Id int, _Port int) Elevator {
 	e := Elevator{
 
-		PhysicalInfo: CreatePhysicalElevator(_Id, _Port),
+		PhysicalInfo: CreatePhysicalElevator(_Id),
 	}
 
 	e.AliveList[_Id] = e.PhysicalInfo
@@ -103,10 +103,9 @@ func CreateElevator(_Id int, _Port int) Elevator {
 	return e
 }
 
-func CreatePhysicalElevator(_Id int, _Port int) ElevatorPhysicalInfo {
+func CreatePhysicalElevator(_Id int) ElevatorPhysicalInfo {
 	pe := ElevatorPhysicalInfo{
 		Id:         _Id,
-		Port:       _Port,
 		Role:       ER_Init,
 		Floor:      elevio.GetFloor(),
 		MotorDir:   elevio.MD_Stop,
