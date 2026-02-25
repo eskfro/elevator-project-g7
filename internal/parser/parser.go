@@ -8,6 +8,7 @@ import (
 func ParseOsArgs(args []string, sim bool) (int, int, int, int) {
 	/*
 		Parser for OS-args when running program from cmd line
+		Returns Id, HardwarePort, HeartBeatPort, OrderTablePort
 	*/
 
 	if sim {

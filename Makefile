@@ -16,6 +16,11 @@ run: build
 test:
 	go test -v -race ./...
 
+
+sim:
+	chmod +x scripts/sim.sh
+	./scripts/sim.sh
+
 ## Remove generated files
 clean: 
 	go clean
