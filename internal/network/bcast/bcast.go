@@ -1,4 +1,4 @@
-package bcast
+package network
 
 import (
 	"elevator-project-g7/internal/network/conn"

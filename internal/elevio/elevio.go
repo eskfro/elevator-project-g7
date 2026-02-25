@@ -29,7 +29,7 @@ func PrintButtonpress(buttonEvent ButtonEvent) {
 }
 
 // Moves elevator to a floor
-func InitPhysicalElevator(ip string, port uint16, numFloors int) {
+func InitPhysicalElevator(ip string, port int, numFloors int) {
 
 	Init(fmt.Sprintf("localhost:%d", port), numFloors)
 

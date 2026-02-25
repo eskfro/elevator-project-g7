@@ -5,7 +5,7 @@ import (
 	"strconv"
 )
 
-func ParseOsArgs(args []string, sim bool) (uint16, uint16) {
+func ParseOsArgs(args []string, sim bool) (int, int) {
 	/*
 		Parser for OS-args when running program from cmd line
 	*/
@@ -16,15 +16,15 @@ func ParseOsArgs(args []string, sim bool) (uint16, uint16) {
 	if len(args) < 3 {
 		log.Fatalln("OS args missing - #1")
 	}
-	id, err := strconv.ParseUint(args[1], 10, 16)
+	id, err := strconv.Atoi(args[1])
 	if err != nil {
 		log.Fatalln("OS args missing - #2")
 	}
-	port, err := strconv.ParseUint(args[2], 10, 16)
+	port, err := strconv.Atoi(args[2])
 	if err != nil {
 		log.Fatalln("OS args missing - #3")
 	}
 
-	return uint16(id), uint16(port)
+	return id, port
 
 }

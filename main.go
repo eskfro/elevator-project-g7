@@ -4,13 +4,13 @@ import (
 	"elevator-project-g7/internal/elev"
 	"elevator-project-g7/internal/elevio"
 	"elevator-project-g7/internal/movement"
+	network "elevator-project-g7/internal/network/bcast"
 	"elevator-project-g7/internal/ordercontrol"
 	"elevator-project-g7/internal/parser"
 	"elevator-project-g7/internal/rolemanager"
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 )
 
 func WaitForInterrupt() {
@@ -22,30 +22,28 @@ func WaitForInterrupt() {
 const sim bool = true
 
 func main() {
-	// Parse args
+	// PARSE ARGS
 	id, port := parser.ParseOsArgs(os.Args, sim)
 
-	// Init The Elevator Core
+	// INIT
 	elevio.InitPhysicalElevator("localhost", port, elev.N_FLOORS)
 	elevator := elev.CreateElevator(id, port)
 	elev.PrintElevatorInit(id, port)
-	ticker := time.NewTicker(100 * time.Millisecond)
 
-	// TODO: kanskje ikke bruke struct nå lenger fordi tror dette skal være i main
-
+	//ticker := time.NewTicker(100 * time.Millisecond)
 	ch_PrintTimer := make(chan bool)
+
+	// POLLING
 	ch_PollObstruction := make(chan bool)
 	ch_PollFloorSensor := make(chan int)
 	ch_PollButtonPress := make(chan elevio.ButtonEvent)
 
-	ch_RcvOrderTable := make(chan elev.OrderTable)
-	ch_RcvAliveList := make(chan elev.AliveList)
-	ch_BcastTick := ticker.C
-
-	// Channels for updating local elevators in modules
+	// MODULE UPDATE CHANS
 	ch_UpdateOC := make(chan elev.Elevator)
 	ch_UpdateMV := make(chan elev.Elevator)
 	ch_UpdateRM := make(chan elev.Elevator)
+
+	ch_RcvAliveList := make(chan elev.AliveList)
 
 	// Trigger to Movement
 	ch_FloorArrival := make(chan struct{})
@@ -68,9 +66,12 @@ func main() {
 	ch_RoleUpdateFromRM := make(chan elev.ElevatorRole)
 
 	// Trigger to Network
+	ch_TxOrderTableP := make(chan elev.OrderTablePacket)
+	ch_TxAliveListP := make(chan elev.AliveListPacket)
 
 	// Updates from Network
-	ch_RcvOTPacket := make(chan elev.OrderTablePacket)
+	ch_RxOrderTableP := make(chan elev.OrderTablePacket)
+	ch_RxAliveListP := make(chan elev.AliveListPacket)
 
 	// ============ GO MOVEMENT =======================
 
@@ -85,11 +86,13 @@ func main() {
 	go ordercontrol.OrderControl(ch_UpdateOC, ch_OTPacketToOC, ch_LOTFromOC)
 
 	// ============= GO ROLE MANAGER ===================
+
 	go rolemanager.RoleManager(ch_UpdateRM, ch_RcvAliveList, ch_RoleUpdateFromRM)
 
 	// ============= GO NETWORK ========================
-	go network.RecieveInfo(ch_RcvOrderTable, ch_RcvAliveList)
-	go network.SendInfo(ch_BcastTick, ch_xxxOrderTable, ch_xxxAlivelist)
+
+	go network.Transmitter(port, ch_TxOrderTableP, ch_TxAliveListP)
+	go network.Receiver(port, ch_RxOrderTableP, ch_RxAliveListP)
 
 	// Init stack elevators
 	ch_UpdateOC <- elevator
@@ -101,7 +104,8 @@ func main() {
 		for {
 			select {
 
-			// To Movement cases
+			// ================================ MOVEMENT ============================
+			// TO
 			case obst := <-ch_PollObstruction:
 				elevator.PhysicalInfo.Obstructed = obst
 
@@ -110,7 +114,8 @@ func main() {
 				ch_UpdateMV <- elevator
 				ch_FloorArrival <- struct{}{}
 
-			//From Movement cases
+			// -----------------------------------------------------------------------
+			// FROM
 			case newLOT := <-ch_LOTFromMV:
 				elevator.PhysicalInfo.LocalOrderTable = newLOT
 
@@ -120,30 +125,96 @@ func main() {
 			case newMotorDir := <-ch_MotorDirFromMV:
 				elevator.PhysicalInfo.MotorDir = newMotorDir
 
-			// To OrderControl cases
+			// ================================ ORDERCONTROL ============================
+
+			// TO
 			case btnPress := <-ch_PollButtonPress:
 				elevator.OrderTable[elevator.PhysicalInfo.Id][btnPress.Floor][btnPress.Button] = elev.OS_REQUESTED
 				elevio.PrintButtonpress(btnPress)
-
-			// From OrderControl cases
+			// -----------------------------------------------------------------------
+			// FROM
 			case order := <-ch_ClearOrderFromOC:
 				elevator.OrderTable[elevator.PhysicalInfo.Id][order.Floor][order.Button] = elev.OS_CLEAR
 
-			// To Rolemanager cases
+			// ================================ ROLEMANAGER ============================
 
-			// From Rolemanager cases
+			// TO
+
+			// -----------------------------------------------------------------------
+
+			// FROM
+
 			case newRole := <-ch_RoleUpdateFromRM:
 				elevator.PhysicalInfo.Role = newRole
 
-			// To Network cases
+			// ================================ NETWORK ============================
 
-			// From Network cases
+			// TO
+
+			// -----------------------------------------------------------------------
+
+			// FROM
 
 			//denne her er både From Network case og To OrderControl case
-			case packet := <-ch_RcvOTPacket:
-				elevator.AllOrderTables[packet.Id] = packet.OrderTable
-				ch_UpdateOC <- elevator
-				ch_OTPacketToOC <- packet
+			case packet := <-ch_RxOrderTableP:
+
+				switch elevator.PhysicalInfo.Role {
+
+				case elev.ER_Init:
+
+					// TODO
+
+				case elev.ER_Backup:
+
+					// message not from primary
+					if packet.Id != elevator.PhysicalInfo.PrimaryId {
+						break
+					}
+					elevator.AllOrderTables[packet.Id] = packet.OrderTable
+					ch_UpdateOC <- elevator
+					ch_OTPacketToOC <- packet
+
+				case elev.ER_Primary:
+
+					// message from self
+					if packet.Id == elevator.PhysicalInfo.Id {
+						break
+					}
+					elevator.AllOrderTables[packet.Id] = packet.OrderTable
+					ch_UpdateOC <- elevator
+					ch_OTPacketToOC <- packet
+
+				}
+
+			case packet := <-ch_RxAliveListP:
+
+				switch elevator.PhysicalInfo.Role {
+
+				case elev.ER_Init:
+
+					// TODO
+
+				case elev.ER_Backup:
+
+					// message not from primary
+					if packet.Id != elevator.PhysicalInfo.PrimaryId {
+						break
+					}
+					elevator.AliveList = packet.AliveList
+
+				case elev.ER_Primary:
+
+					// message from self
+					if packet.Id == elevator.PhysicalInfo.Id {
+						break
+					}
+
+				}
+
+				if packet.Id != elevator.PhysicalInfo.Id && packet.Id == elevator.PhysicalInfo.PrimaryId {
+					elevator.AliveList = packet.AliveList
+				}
+
 			}
 
 			// Update all local elevator objects after any case

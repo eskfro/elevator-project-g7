@@ -2,7 +2,6 @@ package elev
 
 import (
 	"elevator-project-g7/internal/elevio"
-	"elevator-project-g7/internal/timer"
 	"fmt"
 	"time"
 )
@@ -58,6 +57,11 @@ type OrderTablePacket struct {
 	OrderTable OrderTable
 }
 
+type AliveListPacket struct {
+	Id        int
+	AliveList AliveList
+}
+
 // ============ ELEVATOR CORE =======================================
 
 // Custom types
@@ -71,11 +75,11 @@ type ElevatorPhysicalInfo struct {
 	Id              int
 	Port            int
 	Floor           int
+	PrimaryId       int
 	Role            ElevatorRole
 	MotorDir        elevio.MotorDirection
 	State           ElevatorMovement
 	Obstructed      bool
-	DoorTimer       *timer.Timer //TODO: maybe remove
 	LocalOrderTable [N_FLOORS][N_BUTTONS]bool
 }
 
@@ -88,7 +92,7 @@ type Elevator struct {
 	NumElevs       uint8
 }
 
-func CreateElevator(_Id uint16, _Port uint16) Elevator {
+func CreateElevator(_Id int, _Port int) Elevator {
 	e := Elevator{
 
 		PhysicalInfo: CreatePhysicalElevator(_Id, _Port),
@@ -99,7 +103,7 @@ func CreateElevator(_Id uint16, _Port uint16) Elevator {
 	return e
 }
 
-func CreatePhysicalElevator(_Id uint16, _Port uint16) ElevatorPhysicalInfo {
+func CreatePhysicalElevator(_Id int, _Port int) ElevatorPhysicalInfo {
 	pe := ElevatorPhysicalInfo{
 		Id:         _Id,
 		Port:       _Port,
@@ -112,7 +116,7 @@ func CreatePhysicalElevator(_Id uint16, _Port uint16) ElevatorPhysicalInfo {
 	return pe
 }
 
-func PrintElevatorInit(id uint16, port uint16) {
+func PrintElevatorInit(id int, port int) {
 	fmt.Printf("elevator starting | id = %d | port = %d\n", id, port)
 
 }
