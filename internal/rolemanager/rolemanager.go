@@ -4,6 +4,7 @@ import (
 	"elevator-project-g7/internal/elev"
 	"elevator-project-g7/internal/timer"
 	"fmt"
+	"log"
 	"time"
 )
 
@@ -77,46 +78,55 @@ func MonitorHeartBeats(ch_HeartBeatId chan int, ch_TimedOutId chan int) {
 	}
 }
 
-func CountPrimaries(List []elev.RoleIdPair) int {
+func CountPrimaries(AliveList elev.AliveList) int {
 	numPrimaries := 0
-	for _, pair := range List {
-		if pair.Role == elev.ER_Primary {
+	for elevId := 0; elevId < elev.N_MAX_ELEVS; elevId++ {
+		if AliveList[elevId].Role == elev.ER_Primary {
 			numPrimaries++
 		}
 	}
 	return numPrimaries
 }
 
-// acceptance test for at det bare er en master i AliveList
-func HasOnePrimary(List []elev.RoleIdPair) bool {
-	return CountPrimaries(List) == 1
+func HasOnePrimary(AliveList elev.AliveList) bool {
+	return CountPrimaries(AliveList) == 1
 }
 
-// acceptance test for at NumElevs == len(AliveList) -> kanskje unødvendig
-func AT_CorrectNumElevs(NumElevs int, List []elev.RoleIdPair) bool {
-	return NumElevs == len(List)
+func CountNumElevs(AliveList elev.AliveList) int {
+	numElevs := 0
+	for elevId := 0; elevId < elev.N_MAX_ELEVS; elevId++ {
+		elevRole := AliveList[elevId].Role
+		if elevRole == elev.ER_Backup || elevRole == elev.ER_Primary {
+			numElevs++
+		}
+	}
+	return numElevs
 }
 
-// lag funksjon som sjekker om en backup skal bli mastyer
-func ShouldBecomePrimary(ElevatorId int, NextMasterId int, AliveList []elev.RoleIdPair) bool {
+func CorrectNumElevs(NumElevs int, AliveList elev.AliveList) bool {
+	return NumElevs == CountNumElevs(AliveList)
+}
+
+func ShouldBecomePrimary(_elevId int, AliveList elev.AliveList) bool {
 
 	if CountPrimaries(AliveList) != 0 {
 		return false
 	}
 
-	return ElevatorId == NextMasterId
+	smallestElevId := elev.N_MAX_ELEVS + 1
+
+	for elevId := 0; elevId < elev.N_MAX_ELEVS; elevId++ {
+		elevRole := AliveList[elevId].Role
+		if elevRole == elev.ER_Backup || elevRole == elev.ER_Primary {
+			if elevId < smallestElevId {
+				smallestElevId = elevId
+			}
+		}
+	}
+
+	if smallestElevId == elev.N_MAX_ELEVS+1 {
+		log.Fatalln("No elevators in AliveList")
+	}
+
+	return _elevId == smallestElevId
 }
-
-//TODO
-
-/*
-======== Notes for primary / backup logikk ======================
-
-Innhold i Packet som sendes:
--> ElevatorPhysicalInfo
--> Role
--> WorldView
--> AliveList
--> Id, Port
-
-*/
