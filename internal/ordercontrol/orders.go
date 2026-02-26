@@ -53,6 +53,8 @@ func OrderControl(
 				}
 
 				newOrderTable := elevator.AllOrderTables[packet.Id]
+				// TODO: skal det være:
+				// newOrderTable := packet.OrderTable ? 
 
 				for elevID := 0; elevID < elev.N_MAX_ELEVS; elevID++ {
 					for floor := 0; floor < elev.N_FLOORS; floor++ {
@@ -67,8 +69,7 @@ func OrderControl(
 							var orderID int
 
 							if isReassignable(elevio.ButtonType(btn), rcvStatus, primaryStatus) {
-								// TODO: fiks variabelnavn OrderID, kan ikke være samme som indeks variabel // Marius: Jo må vere samme, den skal kunne bli overskrevet dersom ordren isReassignable
-								// marius se på denne fordi jeg skjønner ikkje // Skal vere good no😎
+				
 								orderID = CalculateWhichElevator(elevID, floor, btn, newOrderTable, elevator.AliveList, int(elevator.NumElevs))
 
 							} else {

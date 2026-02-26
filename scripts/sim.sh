@@ -32,7 +32,9 @@ gnome-terminal --title="Sim Server $HW_3" -- bash -c "./SimElevatorServer --port
 sleep 2 
 
 gnome-terminal --title="Elevator $E1" -- bash -c "./out $E1 $HW_1 $HB_1 $OT_1 ; exec bash" &
+sleep1
 gnome-terminal --title="Elevator $E2" -- bash -c "./out $E2 $HW_2 $HB_2 $OT_2 ; exec bash" &
+sleep1
 gnome-terminal --title="Elevator $E3" -- bash -c "./out $E3 $HW_3 $HB_3 $OT_3 ; exec bash" &
 
 wait

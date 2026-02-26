@@ -40,6 +40,9 @@ func RoleManager(
 			ch_SetDeadElev <- timedOutID
 
 		case <-ch_AliveListUpdated:
+			// TODO: Sjekk om denne heisen skal bli primary
+			// TODO: oppdater NumElevs
+			// TODO: sikkert andre ting som bør gjøres med denne som trigger
 
 		}
 	}
