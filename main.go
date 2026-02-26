@@ -19,7 +19,7 @@ func WaitForInterrupt() {
 	<-ch_sig
 }
 
-const sim bool = true
+const sim bool = false
 
 func main() {
 	// PARSE ARGS
@@ -67,6 +67,7 @@ func main() {
 	// Updates from RoleManager
 	ch_RoleUpdateFromRM := make(chan elev.ElevatorRole)
 	ch_SetDeadElev := make(chan int)
+	ch_UpdateNumElevsFromRM := make(chan int)
 
 	// Trigger to Network
 	ch_TxOrderTableP := make(chan elev.OrderTablePacket)
@@ -90,7 +91,7 @@ func main() {
 
 	// ============= GO ROLE MANAGER ===================
 
-	go rolemanager.RoleManager(ch_UpdateRM, ch_RcvAliveList, ch_RoleUpdateFromRM, ch_HeartBeatIdToRM, ch_SetDeadElev, ch_AliveListUpdated)
+	go rolemanager.RoleManager(ch_UpdateRM, ch_RcvAliveList, ch_RoleUpdateFromRM, ch_HeartBeatIdToRM, ch_SetDeadElev, ch_AliveListUpdated, ch_UpdateNumElevsFromRM)
 
 	// ============= GO NETWORK ========================
 
@@ -157,6 +158,9 @@ func main() {
 			case newRole := <-ch_RoleUpdateFromRM:
 				elevator.PhysicalInfo.Role = newRole
 
+			case newNumElevs := <-ch_UpdateNumElevsFromRM:
+				elevator.NumElevs = newNumElevs
+
 			// ================================ NETWORK ============================
 
 			// TO
@@ -178,6 +182,7 @@ func main() {
 
 				elevator.AliveList[heartBeat.Id] = heartBeat
 				ch_UpdateRM <- elevator
+				// Send id for starting heartbeat timer
 				ch_HeartBeatIdToRM <- heartBeat.Id
 
 			}

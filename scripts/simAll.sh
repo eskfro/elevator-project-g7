@@ -24,7 +24,7 @@ E1=0
 E2=1
 E3=2
 
-echo "Starting Simulation Servers from $(pwd)..."
+echo "Starting All Simulators from $(pwd)..."
 gnome-terminal --title="Sim Server $HW_1" -- bash -c "./SimElevatorServer --port $HW_1; exec bash" &
 gnome-terminal --title="Sim Server $HW_2" -- bash -c "./SimElevatorServer --port $HW_2; exec bash" &
 gnome-terminal --title="Sim Server $HW_3" -- bash -c "./SimElevatorServer --port $HW_3; exec bash" &

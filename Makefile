@@ -16,10 +16,15 @@ run: build
 test:
 	go test -v -race ./...
 
+# Start single simulator setup
+simone:
+	chmod +x scripts/simOne.sh
+	./scripts/simOne.sh
 
-sim:
-	chmod +x scripts/sim.sh
-	./scripts/sim.sh
+# Start triple simulator setup
+simall:
+	chmod +x scripts/simAll.sh
+	./scripts/simAll.sh
 
 ## Remove generated files
 clean: 

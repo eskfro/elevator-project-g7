@@ -32,8 +32,6 @@ func OrderControl(
 		case packet := <-ch_OTPacket:
 
 			switch elevator.PhysicalInfo.Role {
-			case elev.ER_Init:
-				// TODO
 
 			case elev.ER_Backup:
 				if packet.Id != elevator.PhysicalInfo.PrimaryId {
@@ -54,7 +52,7 @@ func OrderControl(
 
 				newOrderTable := elevator.AllOrderTables[packet.Id]
 				// TODO: skal det være:
-				// newOrderTable := packet.OrderTable ? 
+				// newOrderTable := packet.OrderTable ?
 
 				for elevID := 0; elevID < elev.N_MAX_ELEVS; elevID++ {
 					for floor := 0; floor < elev.N_FLOORS; floor++ {
@@ -69,7 +67,7 @@ func OrderControl(
 							var orderID int
 
 							if isReassignable(elevio.ButtonType(btn), rcvStatus, primaryStatus) {
-				
+
 								orderID = CalculateWhichElevator(elevID, floor, btn, newOrderTable, elevator.AliveList, int(elevator.NumElevs))
 
 							} else {
@@ -80,26 +78,6 @@ func OrderControl(
 						}
 					}
 				}
-
-				//Ny kode lagd av eskil ()
-				// case packet := <-ch_RcvOrderTablePacket:
-
-				// 	// Oppdater AllOrderTables //Marius: Dette er gjort i main no
-				// 	elevator.AllOrderTables[packet.Id] = packet.OrderTable
-
-				// 	for elevId := 0; elevId < elev.N_MAX_ELEVS; elevId++ {
-
-				// 		if elevator.AliveList[elevId].Role == elev.ER_Dead {
-				// 			continue // TODO: Ka skjer her då? Role manager greier eller Acceptance test?
-				// 		}
-
-				// 		for floor := 0; floor < elev.N_FLOORS; floor++ {
-				// 			for btn := 0; btn < elev.N_BUTTONS; btn++ {
-				// 				//TODO: Her skal vel implementerast noke
-				// 			}
-				// 		}
-				// 	}
-
 			}
 		}
 	}
@@ -141,6 +119,8 @@ func CalculateNewStatus(
 
 		case elev.OS_CONFIRMED:
 			//TODO:
+			// Eskil: skrev for å fjerne feilmelding
+			return primaryStatus
 
 		}
 
@@ -156,22 +136,26 @@ func CalculateNewStatus(
 			if isRequestedByAll(AllOrderTables, orderID, floor, btn, AliveList) {
 				return elev.OS_CONFIRMED
 			}
+			return primaryStatus
 
 		case elev.OS_CLEAR:
 			// FAILED ACCEPTANCE TEST
-			log.Fatalln("Kun owner kan cleare. Elev %d => selfkill", senderID)
+			log.Fatalf("Kun owner kan cleare. Elev %d => selfkill\n", senderID)
 			// TODO: kanskje drepe senderen, ikkje seg selv, idk
+			return primaryStatus
 
 		case elev.OS_CONFIRMED:
 			// Acceptance test
 			// Trur ikkje det er noke meir
 			if primaryStatus != elev.OS_CONFIRMED {
-				log.Fatalln("Elev %d tried to confirm before primary confirmed => selfkill", senderID)
+				log.Fatalf("Elev %d tried to confirm before primary confirmed => selfkill\n", senderID)
+				return primaryStatus
 			}
 			return elev.OS_CONFIRMED
 
 		}
 	}
+	return primaryStatus
 }
 
 func isRequestedByAll(AllOrderTables elev.AllOrderTables,

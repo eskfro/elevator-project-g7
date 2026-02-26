@@ -63,7 +63,7 @@ func Movement(
 		case elevator = <-ch_Update:
 
 		case <-ch_PrintTimer:
-			fmt.Println(":) debugging melding :)")
+			elev.PrintElevatorInfo(elevator)
 
 		case <-doorTimer.C:
 			fmt.Println("fsm doortimer event")
@@ -180,7 +180,7 @@ func printElevatorState(state elev.ElevatorMovement) {
 
 // TODO: slett før vi levera
 func GeneratePrintTimerEvents(ch_printTimer chan<- bool) {
-	ticker := time.NewTicker(50000 * time.Millisecond)
+	ticker := time.NewTicker(2000 * time.Millisecond)
 	defer ticker.Stop()
 	for range ticker.C {
 		ch_printTimer <- true

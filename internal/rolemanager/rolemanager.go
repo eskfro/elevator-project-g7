@@ -25,7 +25,8 @@ func RoleManager(
 	ch_RoleUpdateFromRM chan elev.ElevatorRole,
 	ch_HeartBeatIdToRM chan int,
 	ch_SetDeadElev chan int,
-	ch_AliveListUpdated chan struct{}) {
+	ch_AliveListUpdated chan struct{},
+	ch_UpdateNumElevsFromRM chan int) {
 
 	var elevator elev.Elevator
 	ch_TimedOutId := make(chan int)
@@ -42,7 +43,18 @@ func RoleManager(
 		case <-ch_AliveListUpdated:
 			// TODO: Sjekk om denne heisen skal bli primary
 			// TODO: oppdater NumElevs
-			// TODO: sikkert andre ting som bør gjøres med denne som trigger
+			// TODO: Kanskje andre ting som bør gjøres med denne som trigger
+
+			if !CorrectNumElevs(elevator.NumElevs, elevator.AliveList) {
+				updatedNumElevs := CountNumElevs(elevator.AliveList)
+				elevator.NumElevs = updatedNumElevs
+				ch_UpdateNumElevsFromRM <- updatedNumElevs
+			}
+
+			if ShouldBecomePrimary(elevator.PhysicalInfo.Id, elevator.AliveList) {
+				elevator.PhysicalInfo.Role = elev.ER_Primary
+				ch_RoleUpdateFromRM <- elev.ER_Primary
+			}
 
 		}
 	}
@@ -51,33 +63,30 @@ func MonitorHeartBeats(ch_HeartBeatId chan int, ch_TimedOutId chan int) {
 
 	elevTimers := make(map[int]*timer.Timer)
 
-	for {
-		select {
-		case id := <-ch_HeartBeatId:
+	for id := range ch_HeartBeatId {
 
-			t, exists := elevTimers[id]
+		t, exists := elevTimers[id]
 
-			if !exists {
+		if !exists {
 
-				fmt.Printf("Ny heis oppdaget: ID %d. Starter overvåking.\n", id)
-				t = timer.New(elev.HEARTBEAT_TIMEOUT)
-				elevTimers[id] = t
+			fmt.Printf("Ny heis oppdaget: ID %d. Starter overvåking.\n", id)
+			t = timer.New(elev.HEARTBEAT_TIMEOUT)
+			elevTimers[id] = t
 
-				go func(id int, timeoutChan chan<- int, stopChan <-chan struct{}) {
-					for {
-						select {
-						case <-t.C:
-							timeoutChan <- id
-						case <-stopChan:
-							return
-						}
+			// Lager en ny rutine for timeren når det kommer en ny heis
+			go func(id int, timeoutChan chan<- int, stopChan <-chan struct{}) {
+				for {
+					select {
+					case <-t.C:
+						timeoutChan <- id
+					case <-stopChan:
+						return
 					}
-				}(id, ch_TimedOutId, t.C)
-			}
-
-			t.Start()
-
+				}
+			}(id, ch_TimedOutId, t.C)
 		}
+
+		t.Start()
 	}
 }
 

@@ -35,9 +35,8 @@ type ElevatorRole uint8
 
 const (
 	ER_Dead    ElevatorRole = 0
-	ER_Init    ElevatorRole = 1
-	ER_Backup  ElevatorRole = 2
-	ER_Primary ElevatorRole = 3
+	ER_Backup  ElevatorRole = 1
+	ER_Primary ElevatorRole = 2
 )
 
 // ================ Helper Structs ===========================
@@ -89,7 +88,7 @@ type Elevator struct {
 	OrderTable     OrderTable
 	AllOrderTables AllOrderTables //Primary
 	AliveList      AliveList
-	NumElevs       uint8
+	NumElevs       int
 }
 
 func CreateElevator(_Id int, _Port int) Elevator {
@@ -106,7 +105,7 @@ func CreateElevator(_Id int, _Port int) Elevator {
 func CreatePhysicalElevator(_Id int) ElevatorPhysicalInfo {
 	pe := ElevatorPhysicalInfo{
 		Id:         _Id,
-		Role:       ER_Init,
+		Role:       ER_Backup,
 		Floor:      elevio.GetFloor(),
 		MotorDir:   elevio.MD_Stop,
 		State:      EM_Idle,
@@ -117,5 +116,75 @@ func CreatePhysicalElevator(_Id int) ElevatorPhysicalInfo {
 
 func PrintElevatorInit(id int, port int) {
 	fmt.Printf("elevator starting | id = %d | port = %d\n", id, port)
+
+}
+
+func PrintElevatorInfo(elevator Elevator) {
+
+	Active := "  #  "
+	Inactive := "  -  "
+
+	LOT := elevator.PhysicalInfo.LocalOrderTable
+
+	fmt.Printf("--------------------------------\n")
+	fmt.Printf("ELEVATOR %d\n", elevator.PhysicalInfo.Id)
+	fmt.Printf("--------------------------------\n")
+
+	// Print floor row
+	fmt.Printf("Floor     |")
+	for floor := 0; floor < N_FLOORS; floor++ {
+		fmt.Printf("  %d  ", floor)
+	}
+	fmt.Printf("|\n")
+
+	// Hall Up
+	fmt.Printf("Hall Up	  |")
+	for floor := 0; floor < N_FLOORS; floor++ {
+		s := Inactive
+		if LOT[floor][elevio.BT_HallUp] {
+			s = Active
+		}
+		fmt.Printf(s)
+	}
+	fmt.Printf("|\n")
+
+	// Hall Up
+	fmt.Printf("Hall Down |")
+	for floor := 0; floor < N_FLOORS; floor++ {
+		s := Inactive
+		if LOT[floor][elevio.BT_HallDown] {
+			s = Active
+		}
+		fmt.Printf(s)
+	}
+	fmt.Printf("|\n")
+
+	// Hall Up
+	fmt.Printf("Cab       |")
+	for floor := 0; floor < N_FLOORS; floor++ {
+		s := Inactive
+		if LOT[floor][elevio.BT_Cab] {
+			s = Active
+		}
+		fmt.Printf(s)
+	}
+	fmt.Printf("|\n")
+
+	fmt.Printf("--------------------------------\n")
+	fmt.Printf("ALIVELIST\n")
+	fmt.Printf("--------------------------------\n")
+
+	for elevId := 0; elevId < N_MAX_ELEVS; elevId++ {
+		fmt.Printf(" %d ", elevId)
+	}
+	fmt.Printf("\n--------------------------------\n")
+	for elevId := 0; elevId < N_MAX_ELEVS; elevId++ {
+		if elevator.AliveList[elevId].Role != ER_Dead {
+			fmt.Printf(" 1 ")
+		} else {
+			fmt.Printf(" 0 ")
+		}
+	}
+	fmt.Printf("\n--------------------------------\n\n\n")
 
 }
