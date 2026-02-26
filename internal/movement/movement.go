@@ -6,6 +6,7 @@ import (
 	"elevator-project-g7/internal/requests"
 	"elevator-project-g7/internal/timer"
 	"fmt"
+	"log"
 	"time"
 )
 
@@ -185,4 +186,17 @@ func GeneratePrintTimerEvents(ch_printTimer chan<- bool) {
 		ch_printTimer <- true
 	}
 
+}
+
+func AT_IsValidCombination(floor int, movement elev.ElevatorMovement, doorOpen bool) {
+
+	movingWithOpenDoor := movement == elev.EM_Moving && doorOpen
+	betweenFloorsWithOpenDoor := floor == -1 && doorOpen
+
+	if movingWithOpenDoor || betweenFloorsWithOpenDoor {
+		// TODO: bytt til log.Fatalln() når vi vet at systemete fungerer
+		log.Println("AT_IsValidCombination triggered!")
+		log.Printf("floor = %d | movement = %d | doorOpen = %t \n", floor, movement, doorOpen)
+
+	}
 }
