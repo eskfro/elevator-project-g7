@@ -29,6 +29,7 @@ func RoleManager(
 	ch_UpdateNumElevsFromRM chan int) {
 
 	var elevator elev.Elevator
+
 	ch_TimedOutId := make(chan int)
 
 	go MonitorHeartBeats(ch_HeartBeatIdToRM, ch_TimedOutId)
@@ -36,6 +37,17 @@ func RoleManager(
 	for {
 		select {
 		case elevator = <-ch_Update:
+
+			if !CorrectNumElevs(elevator.NumElevs, elevator.AliveList) {
+				updatedNumElevs := CountNumElevs(elevator.AliveList)
+				elevator.NumElevs = updatedNumElevs
+				ch_UpdateNumElevsFromRM <- updatedNumElevs
+			}
+
+			if ShouldBecomePrimary(elevator.PhysicalInfo.Id, elevator.PhysicalInfo.Role, elevator.AliveList) {
+				elevator.PhysicalInfo.Role = elev.ER_Primary
+				ch_RoleUpdateFromRM <- elev.ER_Primary
+			}
 
 		case timedOutID := <-ch_TimedOutId:
 			ch_SetDeadElev <- timedOutID
@@ -51,7 +63,7 @@ func RoleManager(
 				ch_UpdateNumElevsFromRM <- updatedNumElevs
 			}
 
-			if ShouldBecomePrimary(elevator.PhysicalInfo.Id, elevator.AliveList) {
+			if ShouldBecomePrimary(elevator.PhysicalInfo.Id, elevator.PhysicalInfo.Role, elevator.AliveList) {
 				elevator.PhysicalInfo.Role = elev.ER_Primary
 				ch_RoleUpdateFromRM <- elev.ER_Primary
 			}
@@ -119,21 +131,27 @@ func CorrectNumElevs(NumElevs int, AliveList elev.AliveList) bool {
 	return NumElevs == CountNumElevs(AliveList)
 }
 
-func ShouldBecomePrimary(_elevId int, AliveList elev.AliveList) bool {
+func ShouldBecomePrimary(_elevId int, elevRole elev.ElevatorRole, AliveList elev.AliveList) bool {
 
-	if CountPrimaries(AliveList) != 0 {
+	if CountPrimaries(AliveList) != 0 || elevRole == elev.ER_Primary {
 		return false
 	}
 
 	smallestElevId := elev.N_MAX_ELEVS + 1
+	numElevs := 0
 
 	for elevId := 0; elevId < elev.N_MAX_ELEVS; elevId++ {
 		elevRole := AliveList[elevId].Role
 		if elevRole == elev.ER_Backup || elevRole == elev.ER_Primary {
+			numElevs++
 			if elevId < smallestElevId {
 				smallestElevId = elevId
 			}
 		}
+	}
+
+	if numElevs == 1 {
+		return true
 	}
 
 	if smallestElevId == elev.N_MAX_ELEVS+1 {

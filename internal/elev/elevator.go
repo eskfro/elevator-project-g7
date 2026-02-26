@@ -3,6 +3,7 @@ package elev
 import (
 	"elevator-project-g7/internal/elevio"
 	"fmt"
+	"strconv"
 	"time"
 )
 
@@ -121,17 +122,19 @@ func PrintElevatorInit(id int, port int) {
 
 }
 
-func PrintElevatorInfo(elevator Elevator) {
+func PrintElevatorInfo(elevator Elevator, uptime int) {
 
 	Active := "  #  "
 	Inactive := "  -  "
+	uptimeString := strconv.Itoa(uptime)
 
 	LOT := elevator.PhysicalInfo.LocalOrderTable
 
 	fmt.Printf("--------------------------------\n")
 	fmt.Printf("ELEVATOR %d ", elevator.PhysicalInfo.Id)
 	fmt.Printf(" [ " + elevatorRoleToString(elevator.PhysicalInfo.Role) + " ] ")
-	fmt.Printf(" < " + elevator.PhysicalInfo.Ip + " > \n")
+	fmt.Printf(" < " + elevator.PhysicalInfo.Ip + " > |")
+	fmt.Printf(" t = " + uptimeString + "s \n")
 	fmt.Printf("--------------------------------\n")
 
 	// Print floor row
@@ -175,7 +178,7 @@ func PrintElevatorInfo(elevator Elevator) {
 	fmt.Printf("|\n")
 
 	fmt.Printf("--------------------------------\n")
-	fmt.Printf("ALIVELIST\n")
+	fmt.Printf("ALIVELIST | NumElevs = %d\n", elevator.NumElevs)
 	fmt.Printf("--------------------------------\n")
 
 	for elevId := 0; elevId < N_MAX_ELEVS; elevId++ {

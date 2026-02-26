@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 )
 
 func WaitForInterrupt() {
@@ -29,6 +30,11 @@ func main() {
 	elevio.InitPhysicalElevator("localhost", port_HW, elev.N_FLOORS)
 	elevator := elev.CreateElevator(id, port_HW, network.GetLocalIP())
 
+	// Time for debugging
+	ticker := time.NewTicker(2000 * time.Millisecond)
+	timeStart := time.Now()
+	defer ticker.Stop()
+
 	//ticker := time.NewTicker(100 * time.Millisecond)
 	ch_PrintTimer := make(chan bool)
 
@@ -38,9 +44,9 @@ func main() {
 	ch_PollButtonPress := make(chan elevio.ButtonEvent)
 
 	// MODULE UPDATE CHANS
-	ch_UpdateOC := make(chan elev.Elevator)
-	ch_UpdateMV := make(chan elev.Elevator)
-	ch_UpdateRM := make(chan elev.Elevator)
+	ch_UpdateOC := make(chan elev.Elevator, 5)
+	ch_UpdateMV := make(chan elev.Elevator, 5)
+	ch_UpdateRM := make(chan elev.Elevator, 5)
 
 	ch_RcvAliveList := make(chan elev.AliveList)
 
@@ -70,18 +76,18 @@ func main() {
 
 	// Trigger to Network
 	ch_TxOrderTableP := make(chan elev.OrderTablePacket)
-	ch_UpdateTxMessage := make(chan elev.ElevatorPhysicalInfo)
+	ch_UpdateTxMessage := make(chan elev.ElevatorPhysicalInfo, 5)
 
 	// Updates from Network
 	ch_RxOrderTableP := make(chan elev.OrderTablePacket)
-	ch_RxPhysicalInfo := make(chan elev.ElevatorPhysicalInfo)
+	ch_RxPhysicalInfo := make(chan elev.ElevatorPhysicalInfo, 10) //made this buffered
 
 	// ============ GO MOVEMENT =======================
 
 	go elevio.PollObstructionSwitch(ch_PollObstruction)
 	go elevio.PollFloorSensor(ch_PollFloorSensor)
 	go movement.GeneratePrintTimerEvents(ch_PrintTimer)
-	go movement.Movement(ch_UpdateMV, ch_PrintTimer, ch_FloorArrival, ch_LOTFromMV, ch_StateFromMV, ch_MotorDirFromMV)
+	go movement.Movement(ch_UpdateMV, ch_FloorArrival, ch_LOTFromMV, ch_StateFromMV, ch_MotorDirFromMV)
 
 	// ============= GO ORDERCONTROL ===================
 
@@ -97,26 +103,41 @@ func main() {
 	go network.Transmitter(port_OT, ch_TxOrderTableP)
 	go network.Receiver(port_OT, ch_RxOrderTableP)
 	go network.TxHeartBeat(port_HB, ch_UpdateTxMessage)
-	go network.RxHeartBeat(port_HB, ch_RxPhysicalInfo)
+	go network.RxHeartBeat(port_HB, ch_RxPhysicalInfo, elevator.PhysicalInfo.Id)
 
 	// Init stack elevators
 	ch_UpdateOC <- elevator
 	ch_UpdateMV <- elevator
 	ch_UpdateRM <- elevator
+	ch_UpdateTxMessage <- elevator.PhysicalInfo
 
 	go func() {
 
 		for {
 			select {
 
+			case <-ticker.C:
+				uptime := int(time.Since(timeStart).Seconds())
+				elev.PrintElevatorInfo(elevator, uptime)
+
 			// ================================ MOVEMENT ============================
 			// TO
 			case obst := <-ch_PollObstruction:
 				elevator.PhysicalInfo.Obstructed = obst
 
-			case floor := <-ch_PollFloorSensor:
-				elevator.PhysicalInfo.Floor = floor
+				ch_UpdateTxMessage <- elevator.PhysicalInfo
 				ch_UpdateMV <- elevator
+				ch_UpdateOC <- elevator
+				ch_UpdateRM <- elevator
+
+			case floor := <-ch_PollFloorSensor:
+
+				elevator.PhysicalInfo.Floor = floor
+
+				ch_UpdateTxMessage <- elevator.PhysicalInfo
+				ch_UpdateMV <- elevator
+				ch_UpdateOC <- elevator
+				ch_UpdateRM <- elevator
 				ch_FloorArrival <- struct{}{}
 
 			// -----------------------------------------------------------------------
@@ -124,11 +145,26 @@ func main() {
 			case newLOT := <-ch_LOTFromMV:
 				elevator.PhysicalInfo.LocalOrderTable = newLOT
 
+				ch_UpdateTxMessage <- elevator.PhysicalInfo
+				ch_UpdateMV <- elevator
+				ch_UpdateOC <- elevator
+				ch_UpdateRM <- elevator
+
 			case newState := <-ch_StateFromMV:
 				elevator.PhysicalInfo.State = newState
 
+				ch_UpdateTxMessage <- elevator.PhysicalInfo
+				ch_UpdateMV <- elevator
+				ch_UpdateOC <- elevator
+				ch_UpdateRM <- elevator
+
 			case newMotorDir := <-ch_MotorDirFromMV:
 				elevator.PhysicalInfo.MotorDir = newMotorDir
+
+				ch_UpdateTxMessage <- elevator.PhysicalInfo
+				ch_UpdateMV <- elevator
+				ch_UpdateOC <- elevator
+				ch_UpdateRM <- elevator
 
 			// ================================ ORDERCONTROL ============================
 
@@ -136,10 +172,15 @@ func main() {
 			case btnPress := <-ch_PollButtonPress:
 				elevator.OrderTable[elevator.PhysicalInfo.Id][btnPress.Floor][btnPress.Button] = elev.OS_REQUESTED
 				elevio.PrintButtonpress(btnPress)
+
+				ch_UpdateOC <- elevator
+
 			// -----------------------------------------------------------------------
 			// FROM
 			case order := <-ch_ClearOrderFromOC:
 				elevator.OrderTable[elevator.PhysicalInfo.Id][order.Floor][order.Button] = elev.OS_CLEAR
+
+				ch_UpdateOC <- elevator
 
 			// ================================ ROLEMANAGER ============================
 
@@ -150,15 +191,27 @@ func main() {
 			// FROM
 
 			case deadElevId := <-ch_SetDeadElev:
+
 				elevator.AliveList[deadElevId].Role = elev.ER_Dead
+
 				ch_UpdateRM <- elevator
 				ch_AliveListUpdated <- struct{}{}
 
 			case newRole := <-ch_RoleUpdateFromRM:
+
 				elevator.PhysicalInfo.Role = newRole
 
+				ch_UpdateTxMessage <- elevator.PhysicalInfo
+
+				ch_UpdateMV <- elevator
+				ch_UpdateOC <- elevator
+				ch_UpdateRM <- elevator
+
 			case newNumElevs := <-ch_UpdateNumElevsFromRM:
+
 				elevator.NumElevs = newNumElevs
+
+				ch_UpdateRM <- elevator
 
 			// ================================ NETWORK ============================
 
@@ -173,31 +226,26 @@ func main() {
 
 				if elevator.PhysicalInfo.Role == elev.ER_Primary {
 					elevator.AllOrderTables[packet.Id] = packet.OrderTable
+
 					ch_UpdateOC <- elevator
+
 				}
 				ch_OTPacketToOC <- packet
 
 			case heartBeat := <-ch_RxPhysicalInfo:
 
 				elevator.AliveList[heartBeat.Id] = heartBeat
+
 				ch_UpdateRM <- elevator
+
 				// Send id for starting heartbeat timer
 				ch_HeartBeatIdToRM <- heartBeat.Id
 
 			}
 
-			// ================= UPDATE ALL STACK ELEVATORS ==============================
-
-			ch_UpdateOC <- elevator
-			ch_UpdateMV <- elevator
-			ch_UpdateRM <- elevator
-			ch_UpdateTxMessage <- elevator.PhysicalInfo
-
 		}
 	}()
 
 	WaitForInterrupt()
-
-	// TODO: se log.txt
 
 }

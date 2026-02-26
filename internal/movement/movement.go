@@ -47,7 +47,6 @@ func Start(pe *elev.ElevatorPhysicalInfo,
 // [X]
 func Movement(
 	ch_Update chan elev.Elevator,
-	ch_PrintTimer chan bool,
 	ch_FloorArrival chan struct{},
 	ch_LOTFromMV chan elev.LocalOrderTable,
 	ch_StateFromMV chan elev.ElevatorMovement,
@@ -61,9 +60,6 @@ func Movement(
 		select {
 
 		case elevator = <-ch_Update:
-
-		case <-ch_PrintTimer:
-			elev.PrintElevatorInfo(elevator)
 
 		case <-doorTimer.C:
 			fmt.Println("fsm doortimer event")
@@ -184,6 +180,7 @@ func GeneratePrintTimerEvents(ch_printTimer chan<- bool) {
 	defer ticker.Stop()
 	for range ticker.C {
 		ch_printTimer <- true
+		fmt.Printf("timer\n")
 	}
 
 }
