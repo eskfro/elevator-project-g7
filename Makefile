@@ -16,18 +16,33 @@ run: build
 test:
 	go test -v -race ./...
 
-# Start single simulator setup
-simone:
-	chmod +x scripts/simOne.sh
-	./scripts/simOne.sh
-
-# Start triple simulator setup
-simall:
-	chmod +x scripts/simAll.sh
-	./scripts/simAll.sh
-
 ## Remove generated files
 clean: 
 	go clean
 	rm -f $(TARGET)
 
+
+
+
+
+# SIMULATOR THINGS
+sim0:
+	chmod +x scripts/sim0.sh
+	./scripts/sim0.sh
+
+sim1:
+	chmod +x scripts/sim1.sh
+	./scripts/sim1.sh
+
+sim2:
+	chmod +x scripts/sim2.sh
+	./scripts/sim2.sh
+
+
+simall:
+	chmod +x scripts/simAll.sh
+	./scripts/simAll.sh
+
+kill:
+	@echo "Closing all gnome-terminal instances..."
+	-pkill -f gnome-terminal

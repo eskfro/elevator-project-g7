@@ -1,19 +1,26 @@
 package network
 
 import (
+	"context"
 	"elevator-project-g7/internal/elev"
-	"elevator-project-g7/internal/network/localip"
 	"encoding/json"
-	"fmt"
 	"log"
 	"net"
 	"strconv"
+	"syscall"
 	"time"
 )
 
-func PrintMessageFromNetwork() {
-	fmt.Println("This is a message from the Network module")
-	printLocalIP()
+// UDP config, denne har jeg testet før så den skal fungere
+var lc = net.ListenConfig{
+	Control: func(network, address string, c syscall.RawConn) error {
+		return c.Control(func(fd uintptr) {
+			// 1. Allow multiple processes to use the port
+			syscall.SetsockoptInt(int(fd), syscall.SOL_SOCKET, syscall.SO_REUSEADDR, 1)
+			// 2. Explicitly permit broadcasting from this socket
+			syscall.SetsockoptInt(int(fd), syscall.SOL_SOCKET, syscall.SO_BROADCAST, 1)
+		})
+	},
 }
 
 func TxHeartBeat(port_hb int, ch_UpdateTxMessage chan elev.ElevatorPhysicalInfo) {
@@ -21,12 +28,17 @@ func TxHeartBeat(port_hb int, ch_UpdateTxMessage chan elev.ElevatorPhysicalInfo)
 	address := "255.255.255.255" + ":" + strconv.Itoa(port_hb)
 
 	// Establish udp "connection"
-	conn, err := net.Dial("udp", address)
+	conn, err := lc.ListenPacket(context.Background(), "udp4", ":0")
 	if err != nil {
 		log.Printf("TxHeartBeat conn failed! port_hb = %d\n", port_hb)
 		log.Printf("TxHeartBeat failed: %v\n", err)
 	}
 	defer conn.Close()
+
+	dst, err := net.ResolveUDPAddr("udp4", address)
+	if err != nil {
+		log.Printf("Failed to resolve bcast adress: %v \n", err)
+	}
 
 	var message elev.ElevatorPhysicalInfo
 
@@ -45,7 +57,7 @@ func TxHeartBeat(port_hb int, ch_UpdateTxMessage chan elev.ElevatorPhysicalInfo)
 				continue
 			}
 
-			_, err = conn.Write(data)
+			_, err = conn.WriteTo(data, dst)
 			if err != nil {
 				log.Println("Error sending message: ", err)
 				continue
@@ -55,23 +67,20 @@ func TxHeartBeat(port_hb int, ch_UpdateTxMessage chan elev.ElevatorPhysicalInfo)
 }
 
 func RxHeartBeat(port_hb int, ch_RxPhysicalInfo chan elev.ElevatorPhysicalInfo) {
-	addr := net.UDPAddr{
-		IP:   nil,
-		Port: port_hb,
-	}
+	addr := ":" + strconv.Itoa(port_hb)
 
-	var conn *net.UDPConn
+	var conn net.PacketConn
 	var err error
 
 	// Code ensuring the startup logic is patient.
 	// Don't just fail if the port is busy, loop until it's free.
 	for {
-		conn, err = net.ListenUDP("udp", &addr)
+		conn, err = lc.ListenPacket(context.Background(), "udp4", addr)
 		if err == nil {
-			log.Println("Established Connection :)")
+			log.Printf("Established connection on port %d\n", port_hb)
 			break
 		}
-		log.Printf("Port busy")
+		log.Printf("Port %d busy, trying again ...\n", port_hb)
 		time.Sleep(100 * time.Millisecond)
 	}
 	defer conn.Close()
@@ -80,7 +89,7 @@ func RxHeartBeat(port_hb int, ch_RxPhysicalInfo chan elev.ElevatorPhysicalInfo) 
 
 	for {
 
-		n, _, err := conn.ReadFromUDP(buf)
+		n, _, err := conn.ReadFrom(buf)
 		if err != nil {
 			continue
 		}
@@ -97,7 +106,8 @@ func RxHeartBeat(port_hb int, ch_RxPhysicalInfo chan elev.ElevatorPhysicalInfo) 
 	}
 }
 
-func printLocalIP() {
-	addr, _ := localip.LocalIP()
-	fmt.Println(addr)
+func GetLocalIP() string {
+	addr, _ := LocalIP()
+
+	return addr
 }

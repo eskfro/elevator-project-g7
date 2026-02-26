@@ -27,8 +27,7 @@ func main() {
 
 	// INIT
 	elevio.InitPhysicalElevator("localhost", port_HW, elev.N_FLOORS)
-	elevator := elev.CreateElevator(id, port_HW)
-	elev.PrintElevatorInit(id, port_HW)
+	elevator := elev.CreateElevator(id, port_HW, network.GetLocalIP())
 
 	//ticker := time.NewTicker(100 * time.Millisecond)
 	ch_PrintTimer := make(chan bool)

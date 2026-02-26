@@ -6,7 +6,7 @@ cd "$SCRIPT_DIR/.."
 
 # DEFINE PORTS (hardware, RcvPort1, RcvPort2)
 
-HW_1=15657
+HW_1=15659
 
 HB_1=11311
 
@@ -15,10 +15,10 @@ OT_1=10311
 
 # ELEVATOR ID'S
 
-E1=0
+E1=2
 
 echo "Starting One Simulator from $(pwd)..."
-gnome-terminal --title="Sim Server $HW_1" -- bash -c "./SimElevatorServer --port $HW_1; exec bash" &
+gnome-terminal --title="Sim Server $HW_1 [ $E1 ]" -- bash -c "./SimElevatorServer --port $HW_1; exec bash" &
 
 sleep 2 
 

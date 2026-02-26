@@ -75,6 +75,7 @@ type ElevatorPhysicalInfo struct {
 	Id              int
 	Floor           int
 	PrimaryId       int
+	Ip              string
 	Role            ElevatorRole
 	MotorDir        elevio.MotorDirection
 	State           ElevatorMovement
@@ -91,10 +92,10 @@ type Elevator struct {
 	NumElevs       int
 }
 
-func CreateElevator(_Id int, _Port int) Elevator {
+func CreateElevator(_Id int, _Port int, _Ip string) Elevator {
 	e := Elevator{
 
-		PhysicalInfo: CreatePhysicalElevator(_Id),
+		PhysicalInfo: CreatePhysicalElevator(_Id, _Ip),
 	}
 
 	e.AliveList[_Id] = e.PhysicalInfo
@@ -102,10 +103,11 @@ func CreateElevator(_Id int, _Port int) Elevator {
 	return e
 }
 
-func CreatePhysicalElevator(_Id int) ElevatorPhysicalInfo {
+func CreatePhysicalElevator(_Id int, _Ip string) ElevatorPhysicalInfo {
 	pe := ElevatorPhysicalInfo{
 		Id:         _Id,
 		Role:       ER_Backup,
+		Ip:         _Ip,
 		Floor:      elevio.GetFloor(),
 		MotorDir:   elevio.MD_Stop,
 		State:      EM_Idle,
@@ -127,7 +129,9 @@ func PrintElevatorInfo(elevator Elevator) {
 	LOT := elevator.PhysicalInfo.LocalOrderTable
 
 	fmt.Printf("--------------------------------\n")
-	fmt.Printf("ELEVATOR %d\n", elevator.PhysicalInfo.Id)
+	fmt.Printf("ELEVATOR %d ", elevator.PhysicalInfo.Id)
+	fmt.Printf(" [ " + elevatorRoleToString(elevator.PhysicalInfo.Role) + " ] ")
+	fmt.Printf(" < " + elevator.PhysicalInfo.Ip + " > \n")
 	fmt.Printf("--------------------------------\n")
 
 	// Print floor row
@@ -187,4 +191,18 @@ func PrintElevatorInfo(elevator Elevator) {
 	}
 	fmt.Printf("\n--------------------------------\n\n\n")
 
+}
+
+func elevatorRoleToString(elevRole ElevatorRole) string {
+	var roleString string
+
+	switch elevRole {
+	case ER_Backup:
+		roleString = "Backup"
+	case ER_Primary:
+		roleString = "Primary"
+	case ER_Dead:
+		roleString = "Dead"
+	}
+	return roleString
 }
