@@ -38,7 +38,7 @@ sim2:
 	chmod +x scripts/sim2.sh
 	./scripts/sim2.sh
 
-
+# Change to SimAll on lab
 simall:
 	chmod +x scripts/simAll.sh
 	./scripts/simAll.sh

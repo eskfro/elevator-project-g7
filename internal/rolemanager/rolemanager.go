@@ -128,7 +128,7 @@ func CorrectNumElevs(NumElevs int, AliveList elev.AliveList) bool {
 
 func ShouldBecomePrimary(thisId int, thisRole elev.ElevatorRole, AliveList elev.AliveList, timeStart time.Time) bool {
 
-	if time.Since(timeStart) < 2000*time.Millisecond {
+	if time.Since(timeStart) < 450*time.Millisecond {
 		return false
 	}
 
