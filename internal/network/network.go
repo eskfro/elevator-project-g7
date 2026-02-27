@@ -4,7 +4,6 @@ import (
 	"context"
 	"elevator-project-g7/internal/elev"
 	"encoding/json"
-	"fmt"
 	"log"
 	"net"
 	"strconv"
@@ -44,7 +43,7 @@ func TxHeartBeat(port_hb int, ch_UpdateTxMessage chan elev.ElevatorPhysicalInfo)
 	var message elev.ElevatorPhysicalInfo
 
 	// Adjust how often to send message
-	ticker := time.NewTicker(1000 * time.Millisecond)
+	ticker := time.NewTicker(200 * time.Millisecond)
 	defer ticker.Stop()
 
 	for {
@@ -109,7 +108,7 @@ func RxHeartBeat(port_hb int, ch_RxPhysicalInfo chan elev.ElevatorPhysicalInfo, 
 		}
 
 		ch_RxPhysicalInfo <- recievedInfo
-		fmt.Printf("Got a message from id = %d\n", recievedInfo.Id)
+		// fmt.Printf("Got a message from id = %d\n", recievedInfo.Id)
 
 	}
 }

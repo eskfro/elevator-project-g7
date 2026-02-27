@@ -50,7 +50,7 @@ func RoleManager(
 			ch_fromRM_NumElevs <- RM_NumElevs
 
 		case newAliveList := <-ch_updateRM_AliveList:
-			
+
 			RM_AliveList = newAliveList
 			RM_NumElevs = CountNumElevs(RM_AliveList)
 			ch_fromRM_NumElevs <- RM_NumElevs
@@ -63,34 +63,32 @@ func RoleManager(
 				ch_fromRM_Role <- elev.ER_Backup
 
 			}
+		case newPhysicalInfo := <-ch_updateRM_PhysicalInfo:
+			RM_PhysicalInfo = newPhysicalInfo
 
+		case newNumElevs := <-ch_updateRM_NumElevs:
+			RM_NumElevs = newNumElevs
 		}
 	}
 }
-func MonitorHeartBeats(ch_HeartBeatId chan int, ch_TimedOutId chan int) {
 
+func MonitorHeartBeats(ch_HeartBeatId chan int, ch_TimedOutId chan int) {
 	elevTimers := make(map[int]*timer.Timer)
 
 	for id := range ch_HeartBeatId {
-
 		t, exists := elevTimers[id]
 
 		if !exists {
-
-			fmt.Printf("Ny heis oppdaget: ID %d. Starter overvåking.\n", id)
+			fmt.Printf("New elevator detected: ID %d. Starting monitor.\n", id)
 			t = timer.New(elev.HEARTBEAT_TIMEOUT)
 			elevTimers[id] = t
 
-			// Lager en ny rutine for timeren når det kommer en ny heis
-			go func(id int, timeoutChan chan<- int, stopChan <-chan struct{}) {
+			// Start ONE goroutine for this elevator that lasts its lifetime
+			go func(id int, timeoutChan chan<- int, timerC <-chan struct{}) {
 				for {
-					select {
-					case <-t.C:
-						timeoutChan <- id
-						fmt.Printf("Timeout triggered on elev id = %d\n", id)
-					case <-stopChan:
-						return
-					}
+					<-timerC // Wait for the custom timer's tick
+					timeoutChan <- id
+					fmt.Printf("Timeout triggered on elev id = %d\n", id)
 				}
 			}(id, ch_TimedOutId, t.C)
 		}
@@ -130,12 +128,13 @@ func CorrectNumElevs(NumElevs int, AliveList elev.AliveList) bool {
 
 func ShouldBecomePrimary(thisId int, thisRole elev.ElevatorRole, AliveList elev.AliveList, timeStart time.Time) bool {
 
-	if time.Since(timeStart) < 500*time.Millisecond {
+	if time.Since(timeStart) < 2000*time.Millisecond {
 		return false
 	}
 
 	if OnePrimaryExist(AliveList) {
 		if thisRole == elev.ER_Primary {
+			fmt.Printf("Elevator %d should become primary\n", thisId)
 			return true
 		} else {
 			return false
