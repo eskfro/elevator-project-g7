@@ -20,63 +20,48 @@ const POLL_RATE = 1 * time.Second
 //func PollAliveListUpdate(reciever chan<- RoleManager, rcvBcast <-chan elev.WorldView)
 
 func RoleManager(
-	ch_Update chan elev.Elevator,
-	ch_RcvAliveList chan elev.AliveList,
-	ch_RoleUpdateFromRM chan elev.ElevatorRole,
-	ch_HeartBeatIdToRM chan int,
-	ch_SetDeadElev chan int,
-	ch_AliveListUpdated chan elev.AliveList,
-	ch_UpdateNumElevsFromRM chan int) {
+	ch_updateRM_AliveList chan elev.AliveList,
+	ch_updateRM_PhysicalInfo chan elev.ElevatorPhysicalInfo,
+	ch_updateRM_NumElevs chan int,
+	ch_toRM_HeartBeatId chan int,
 
-	var elevator elev.Elevator
+	ch_fromRM_Role chan elev.ElevatorRole,
+	ch_fromRM_DeadElevId chan int,
+	ch_fromRM_NumElevs chan int) {
+
+	var RM_AliveList elev.AliveList
+	var RM_NumElevs int
+	var RM_PhysicalInfo elev.ElevatorPhysicalInfo
+
+	timeStart := time.Now()
 
 	ch_TimedOutId := make(chan int)
 
-	go MonitorHeartBeats(ch_HeartBeatIdToRM, ch_TimedOutId)
+	go MonitorHeartBeats(ch_toRM_HeartBeatId, ch_TimedOutId)
 
 	for {
 		select {
-		case elevator = <-ch_Update:
-
-			if !CorrectNumElevs(elevator.NumElevs, elevator.AliveList) {
-				updatedNumElevs := CountNumElevs(elevator.AliveList)
-				elevator.NumElevs = updatedNumElevs
-			}
-
-			if ShouldBecomePrimary(elevator.PhysicalInfo.Id, elevator.PhysicalInfo.Role, elevator.AliveList) {
-				elevator.PhysicalInfo.Role = elev.ER_Primary
-				ch_RoleUpdateFromRM <- elev.ER_Primary
-				ch_UpdateNumElevsFromRM <- elevator.NumElevs
-			} else {
-				elevator.PhysicalInfo.Role = elev.ER_Backup
-				ch_RoleUpdateFromRM <- elev.ER_Backup
-				ch_UpdateNumElevsFromRM <- elevator.NumElevs
-			}
 
 		case timedOutID := <-ch_TimedOutId:
-			ch_SetDeadElev <- timedOutID
+			RM_AliveList[timedOutID].Role = elev.ER_Dead
+			RM_NumElevs = CountNumElevs(RM_AliveList)
 
-		case newAliveList := <-ch_AliveListUpdated:
+			ch_fromRM_DeadElevId <- timedOutID
+			ch_fromRM_NumElevs <- RM_NumElevs
 
-			// TODO: Sjekk om denne heisen skal bli primary
-			// TODO: oppdater NumElevs
-			// TODO: Kanskje andre ting som bør gjøres med denne som trigger
+		case newAliveList := <-ch_updateRM_AliveList:
+			
+			RM_AliveList = newAliveList
+			RM_NumElevs = CountNumElevs(RM_AliveList)
+			ch_fromRM_NumElevs <- RM_NumElevs
 
-			elevator.AliveList = newAliveList
-
-			if !CorrectNumElevs(elevator.NumElevs, elevator.AliveList) {
-				updatedNumElevs := CountNumElevs(elevator.AliveList)
-				elevator.NumElevs = updatedNumElevs
-			}
-
-			if ShouldBecomePrimary(elevator.PhysicalInfo.Id, elevator.PhysicalInfo.Role, elevator.AliveList) {
-				elevator.PhysicalInfo.Role = elev.ER_Primary
-				ch_RoleUpdateFromRM <- elev.ER_Primary
-				ch_UpdateNumElevsFromRM <- elevator.NumElevs
+			if ShouldBecomePrimary(RM_PhysicalInfo.Id, RM_PhysicalInfo.Role, RM_AliveList, timeStart) {
+				RM_PhysicalInfo.Role = elev.ER_Primary
+				ch_fromRM_Role <- elev.ER_Primary
 			} else {
-				elevator.PhysicalInfo.Role = elev.ER_Backup
-				ch_RoleUpdateFromRM <- elev.ER_Backup
-				ch_UpdateNumElevsFromRM <- elevator.NumElevs
+				RM_PhysicalInfo.Role = elev.ER_Backup
+				ch_fromRM_Role <- elev.ER_Backup
+
 			}
 
 		}
@@ -102,6 +87,7 @@ func MonitorHeartBeats(ch_HeartBeatId chan int, ch_TimedOutId chan int) {
 					select {
 					case <-t.C:
 						timeoutChan <- id
+						fmt.Printf("Timeout triggered on elev id = %d\n", id)
 					case <-stopChan:
 						return
 					}
@@ -123,7 +109,7 @@ func CountPrimaries(AliveList elev.AliveList) int {
 	return numPrimaries
 }
 
-func HasOnePrimary(AliveList elev.AliveList) bool {
+func OnePrimaryExist(AliveList elev.AliveList) bool {
 	return CountPrimaries(AliveList) == 1
 }
 
@@ -142,16 +128,23 @@ func CorrectNumElevs(NumElevs int, AliveList elev.AliveList) bool {
 	return NumElevs == CountNumElevs(AliveList)
 }
 
-func ShouldBecomePrimary(thisId int, elevRole elev.ElevatorRole, AliveList elev.AliveList) bool {
+func ShouldBecomePrimary(thisId int, thisRole elev.ElevatorRole, AliveList elev.AliveList, timeStart time.Time) bool {
 
-	numPrimaries := CountPrimaries(AliveList)
-
-	if numPrimaries > 0 {
+	if time.Since(timeStart) < 500*time.Millisecond {
 		return false
+	}
+
+	if OnePrimaryExist(AliveList) {
+		if thisRole == elev.ER_Primary {
+			return true
+		} else {
+			return false
+		}
 	}
 
 	smallestBackupId := elev.N_MAX_ELEVS + 1
 	numBackups := 0
+	numElevs := CountNumElevs(AliveList)
 
 	for elevId := 0; elevId < elev.N_MAX_ELEVS; elevId++ {
 		elevRole := AliveList[elevId].Role
@@ -163,7 +156,7 @@ func ShouldBecomePrimary(thisId int, elevRole elev.ElevatorRole, AliveList elev.
 		}
 	}
 
-	if numBackups == 0 {
+	if numElevs == 1 {
 		return true
 	}
 

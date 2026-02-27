@@ -100,6 +100,7 @@ func CreateElevator(_Id int, _Port int, _Ip string) Elevator {
 	}
 
 	e.AliveList[_Id] = e.PhysicalInfo
+	e.NumElevs = 1
 
 	return e
 }
