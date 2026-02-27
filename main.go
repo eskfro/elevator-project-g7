@@ -67,7 +67,7 @@ func main() {
 
 	// Trigger to RoleManager
 	ch_HeartBeatIdToRM := make(chan int)
-	ch_AliveListUpdated := make(chan struct{})
+	ch_AliveListUpdated := make(chan elev.AliveList)
 
 	// Updates from RoleManager
 	ch_RoleUpdateFromRM := make(chan elev.ElevatorRole)
@@ -194,18 +194,12 @@ func main() {
 
 				elevator.AliveList[deadElevId].Role = elev.ER_Dead
 
-				ch_UpdateRM <- elevator
-				ch_AliveListUpdated <- struct{}{}
+				ch_AliveListUpdated <- elevator.AliveList
 
 			case newRole := <-ch_RoleUpdateFromRM:
 
 				elevator.PhysicalInfo.Role = newRole
-
 				ch_UpdateTxMessage <- elevator.PhysicalInfo
-
-				ch_UpdateMV <- elevator
-				ch_UpdateOC <- elevator
-				ch_UpdateRM <- elevator
 
 			case newNumElevs := <-ch_UpdateNumElevsFromRM:
 

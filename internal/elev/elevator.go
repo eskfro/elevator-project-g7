@@ -132,7 +132,7 @@ func PrintElevatorInfo(elevator Elevator, uptime int) {
 
 	fmt.Printf("--------------------------------\n")
 	fmt.Printf("ELEVATOR %d ", elevator.PhysicalInfo.Id)
-	fmt.Printf(" [ " + elevatorRoleToString(elevator.PhysicalInfo.Role) + " ] ")
+	fmt.Printf(" [ " + ElevatorRoleToString(elevator.PhysicalInfo.Role) + " ] ")
 	fmt.Printf(" < " + elevator.PhysicalInfo.Ip + " > |")
 	fmt.Printf(" t = " + uptimeString + "s \n")
 	fmt.Printf("--------------------------------\n")
@@ -196,7 +196,7 @@ func PrintElevatorInfo(elevator Elevator, uptime int) {
 
 }
 
-func elevatorRoleToString(elevRole ElevatorRole) string {
+func ElevatorRoleToString(elevRole ElevatorRole) string {
 	var roleString string
 
 	switch elevRole {

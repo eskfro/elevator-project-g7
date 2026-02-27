@@ -64,7 +64,8 @@ func TxHeartBeat(port_hb int, ch_UpdateTxMessage chan elev.ElevatorPhysicalInfo)
 				log.Println("Error sending message: ", err)
 				continue
 			}
-			fmt.Printf("TxHeartBeat: hey \n")
+			fmt.Printf("TxHeartBeat")
+			fmt.Printf("| role = " + elev.ElevatorRoleToString(message.Role) + "\n")
 		}
 	}
 }
