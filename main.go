@@ -45,7 +45,6 @@ func main() {
 	ch_PollButtonPress := make(chan elevio.ButtonEvent)
 
 	// MODULE UPDATE CHANS
-	ch_UpdateOC := make(chan elev.Elevator, 5)
 	ch_UpdateMV := make(chan elev.Elevator, 5)
 
 	// Trigger to Movement
@@ -57,11 +56,17 @@ func main() {
 	ch_MotorDirFromMV := make(chan elevio.MotorDirection)
 
 	// Trigger to OrderControl
-	ch_OTPacketToOC := make(chan elev.OrderTablePacket)
+	ch_toOC_OTPacket := make(chan elev.OrderTablePacket, 4)
+	ch_updateOC_OrderTable := make(chan elev.OrderTable, 4)
+	ch_updateOC_AllOrderTables := make(chan elev.AllOrderTables, 4)
+	ch_updateOC_PhysicalInfo := make(chan elev.ElevatorPhysicalInfo, 4)
+	ch_updateOC_AliveList := make(chan elev.AliveList, 4)
+	ch_updateOC_NumElevs := make(chan int, 4)
 
 	// Updates from OrderControl
-	ch_ClearOrderFromOC := make(chan elevio.ButtonEvent)
-	ch_LOTFromOC := make(chan elev.LocalOrderTable)
+	ch_fromOC_ClearOrder := make(chan elevio.ButtonEvent, 4)
+	ch_fromOC_LOT := make(chan elev.LocalOrderTable, 4)
+	ch_fromOC_OrderTable := make(chan elev.OrderTable, 4)
 
 	// Trigger to RoleManager
 	ch_toRM_HeartBeatId := make(chan int, 4)
@@ -92,7 +97,7 @@ func main() {
 	// ============= GO ORDERCONTROL ===================
 
 	go elevio.PollButtons(ch_PollButtonPress)
-	go ordercontrol.OrderControl(ch_UpdateOC, ch_OTPacketToOC, ch_LOTFromOC)
+	go ordercontrol.OrderControl(ch_updateOC_OrderTable, ch_updateOC_AllOrderTables, ch_updateOC_PhysicalInfo, ch_updateOC_AliveList, ch_updateOC_NumElevs, ch_toOC_OTPacket, ch_fromOC_LOT, ch_fromOC_OrderTable)
 
 	// ============= GO NETWORK ========================
 
@@ -105,8 +110,12 @@ func main() {
 
 	go rolemanager.RoleManager(ch_updateRM_AliveList, ch_updateRM_PhysicalInfo, ch_updateRM_NumElevs, ch_toRM_HeartBeatId, ch_fromRM_Role, ch_fromRM_DeadElevId, ch_fromRM_NumElevs)
 
-	// Init stack elevators
-	ch_UpdateOC <- elevator // TODO: defactor this channel
+	// Init stack variables [LOL]
+	ch_updateOC_AliveList <- elevator.AliveList
+	ch_updateOC_AllOrderTables <- elevator.AllOrderTables
+	ch_updateOC_NumElevs <- elevator.NumElevs
+	ch_updateOC_OrderTable <- elevator.OrderTable
+	ch_updateOC_PhysicalInfo <- elevator.PhysicalInfo
 	ch_UpdateMV <- elevator // TODO: defactor this channel
 	ch_updateRM_AliveList <- elevator.AliveList
 	ch_updateRM_NumElevs <- elevator.NumElevs
@@ -135,9 +144,9 @@ func main() {
 				elevator.PhysicalInfo.Floor = floor
 
 				ch_UpdateTxMessage <- elevator.PhysicalInfo
+				ch_updateOC_PhysicalInfo <- elevator.PhysicalInfo
 				ch_UpdateMV <- elevator
-				ch_UpdateOC <- elevator
-				ch_FloorArrival <- struct{}{}
+				ch_FloorArrival <- struct{}{} //TODO: sjekk om vi trenger slike channels fordi oppdatering av data er en trigger
 
 			// -----------------------------------------------------------------------
 			// FROM
@@ -151,31 +160,37 @@ func main() {
 				elevator.PhysicalInfo.State = newState
 
 				ch_UpdateTxMessage <- elevator.PhysicalInfo
+				ch_updateOC_PhysicalInfo <- elevator.PhysicalInfo
 				ch_UpdateMV <- elevator
-				ch_UpdateOC <- elevator
 
 			case newMotorDir := <-ch_MotorDirFromMV:
 				elevator.PhysicalInfo.MotorDir = newMotorDir
 
 				ch_UpdateTxMessage <- elevator.PhysicalInfo
+				ch_updateOC_PhysicalInfo <- elevator.PhysicalInfo
+
 				ch_UpdateMV <- elevator
-				ch_UpdateOC <- elevator
 
 			// ================================ ORDERCONTROL ============================
 
 			// TO
 			case btnPress := <-ch_PollButtonPress:
-				elevator.OrderTable[elevator.PhysicalInfo.Id][btnPress.Floor][btnPress.Button] = elev.OS_REQUESTED
+				elevator.OrderTable[elevator.PhysicalInfo.Id][btnPress.Floor][btnPress.Button] = elev.OS_CONFIRMED //For testing i put this OS_CONFIRMED
 				elevio.PrintButtonpress(btnPress)
 
-				ch_UpdateOC <- elevator // TODO: make it such that only ordertable is updated here
+				ch_updateOC_OrderTable <- elevator.OrderTable
 
 			// -----------------------------------------------------------------------
 			// FROM
-			case order := <-ch_ClearOrderFromOC:
+			case order := <-ch_fromOC_ClearOrder:
 				elevator.OrderTable[elevator.PhysicalInfo.Id][order.Floor][order.Button] = elev.OS_CLEAR
 
-				ch_UpdateOC <- elevator
+			case newOrderTable := <-ch_fromOC_OrderTable:
+				elevator.OrderTable = newOrderTable
+
+			case newLocalOrderTable := <-ch_fromOC_LOT:
+				elevator.PhysicalInfo.LocalOrderTable = newLocalOrderTable
+				ch_UpdateMV <- elevator
 
 			// ================================ ROLEMANAGER ============================
 
@@ -216,10 +231,10 @@ func main() {
 				if elevator.PhysicalInfo.Role == elev.ER_Primary {
 					elevator.AllOrderTables[packet.Id] = packet.OrderTable
 
-					ch_UpdateOC <- elevator
+					ch_updateOC_AllOrderTables <- elevator.AllOrderTables
 
 				}
-				ch_OTPacketToOC <- packet
+				ch_toOC_OTPacket <- packet
 
 			case heartBeat := <-ch_RxPhysicalInfo:
 

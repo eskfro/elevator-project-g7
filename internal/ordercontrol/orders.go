@@ -18,39 +18,66 @@ import (
 )
 
 func OrderControl(
-	ch_Update chan elev.Elevator,
+	ch_updateOC_OrderTable chan elev.OrderTable,
+	ch_updateOC_AllOrderTables chan elev.AllOrderTables,
+	ch_updateOC_PhysicalInfo chan elev.ElevatorPhysicalInfo,
+	ch_updateOC_AliveList chan elev.AliveList,
+	ch_updateOC_NumElevs chan int,
 	ch_OTPacket chan elev.OrderTablePacket,
-	ch_LOTFromOC chan elev.LocalOrderTable) {
+	ch_fromOC_LOT chan elev.LocalOrderTable,
+	ch_fromOC_OrderTable chan elev.OrderTable) {
 
-	var elevator elev.Elevator
+	// TODO: Replace elevator with these variables:
+	var OC_OrderTable elev.OrderTable
+	var OC_AllOrderTables elev.AllOrderTables
+	var OC_PhysicalInfo elev.ElevatorPhysicalInfo
+	var OC_AliveList elev.AliveList
+	var OC_NumElevs int
 
 	for {
 
 		select {
-		case elevator = <-ch_Update:
+		case newOrderTable := <-ch_updateOC_OrderTable:
+			OC_OrderTable = newOrderTable
+
+			// Testing code
+			OC_PhysicalInfo.LocalOrderTable = orderTableToLOT(OC_OrderTable, OC_PhysicalInfo.Id)
+			ch_fromOC_LOT <- OC_PhysicalInfo.LocalOrderTable
+
+		case newAllOrderTables := <-ch_updateOC_AllOrderTables:
+			OC_AllOrderTables = newAllOrderTables
+
+		case newPhysicalInfo := <-ch_updateOC_PhysicalInfo:
+			OC_PhysicalInfo = newPhysicalInfo
+
+		case newAliveList := <-ch_updateOC_AliveList:
+			OC_AliveList = newAliveList
+
+		case newNumElevs := <-ch_updateOC_NumElevs:
+			OC_NumElevs = newNumElevs
 
 		case packet := <-ch_OTPacket:
 
-			switch elevator.PhysicalInfo.Role {
+			switch OC_PhysicalInfo.Role {
 
 			case elev.ER_Backup:
-				if packet.Id != elevator.PhysicalInfo.PrimaryId {
+				if packet.Id != OC_PhysicalInfo.PrimaryId {
 					break //message not from primary
 				}
 
-				newLOT := orderTableToLOT(packet.OrderTable, elevator.PhysicalInfo.Id)
+				newLOT := orderTableToLOT(packet.OrderTable, OC_PhysicalInfo.Id)
 
-				elevator.PhysicalInfo.LocalOrderTable = newLOT
+				OC_PhysicalInfo.LocalOrderTable = newLOT
 
-				ch_LOTFromOC <- elevator.PhysicalInfo.LocalOrderTable
+				ch_fromOC_LOT <- OC_PhysicalInfo.LocalOrderTable
 
 			case elev.ER_Primary:
 
-				if packet.Id == elevator.PhysicalInfo.Id {
+				if packet.Id == OC_PhysicalInfo.Id {
 					break //message from self
 				}
 
-				newOrderTable := elevator.AllOrderTables[packet.Id]
+				newOrderTable := OC_AllOrderTables[packet.Id]
 				// TODO: skal det være:
 				// newOrderTable := packet.OrderTable ?
 
@@ -58,7 +85,7 @@ func OrderControl(
 					for floor := 0; floor < elev.N_FLOORS; floor++ {
 						for btn := 0; btn < elev.N_BUTTONS; btn++ {
 
-							primaryStatus := elevator.OrderTable[elevID][floor][btn]
+							primaryStatus := OC_OrderTable[elevID][floor][btn]
 							rcvStatus := newOrderTable[elevID][floor][btn]
 
 							if rcvStatus == primaryStatus {
@@ -67,17 +94,20 @@ func OrderControl(
 							var orderID int
 
 							if isReassignable(elevio.ButtonType(btn), rcvStatus, primaryStatus) {
-
-								orderID = CalculateWhichElevator(elevID, floor, btn, newOrderTable, elevator.AliveList, int(elevator.NumElevs))
-
+								orderID = CalculateWhichElevator(elevID, floor, btn, newOrderTable, OC_AliveList, int(OC_NumElevs))
 							} else {
 								orderID = elevID
 							}
+							OC_OrderTable[orderID][floor][btn] = CalculateNewStatus(orderID, floor, btn, rcvStatus, primaryStatus, packet.Id, OC_AllOrderTables, OC_AliveList)
 
-							elevator.OrderTable[orderID][floor][btn] = CalculateNewStatus(orderID, floor, btn, rcvStatus, primaryStatus, packet.Id, elevator.AllOrderTables, elevator.AliveList)
 						}
 					}
 				}
+
+				// TODO: Sjekk dettan
+				OC_PhysicalInfo.LocalOrderTable = orderTableToLOT(OC_OrderTable, OC_PhysicalInfo.Id)
+				ch_fromOC_OrderTable <- OC_OrderTable
+				ch_fromOC_LOT <- OC_PhysicalInfo.LocalOrderTable
 			}
 		}
 	}
