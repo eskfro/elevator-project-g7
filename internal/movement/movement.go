@@ -46,31 +46,97 @@ func Start(pe *elev.ElevatorPhysicalInfo,
 
 // [X]
 func Movement(
-	ch_Update chan elev.Elevator,
-	ch_FloorArrival chan struct{},
-	ch_LOTFromMV chan elev.LocalOrderTable,
-	ch_StateFromMV chan elev.ElevatorMovement,
-	ch_MotorDirFromMV chan elevio.MotorDirection) {
+	ch_updateMV_Physicalnfo chan elev.ElevatorPhysicalInfo,
+	ch_FloorArrival chan int,
+	ch_fromMV_LOT chan elev.LocalOrderTable,
+	ch_fromMV_State chan elev.ElevatorMovement,
+	ch_fromMV_MotorDir chan elevio.MotorDirection) {
 
-	var elevator elev.Elevator
+	var MV_PhysicalInfo elev.ElevatorPhysicalInfo
 
 	doorTimer := timer.New(elev.DOOR_OPEN_TIME)
 
 	for {
 		select {
 
-		case elevator = <-ch_Update:
+		case MV_PhysicalInfo = <-ch_updateMV_Physicalnfo:
+
+			MV_PhysicalInfo = FSM_OnTableUpdate(MV_PhysicalInfo, doorTimer, ch_fromMV_LOT, ch_fromMV_State, ch_fromMV_MotorDir)
 
 		case <-doorTimer.C:
 			fmt.Println("fsm doortimer event")
-			FSM_OnDoorTimeout(elevator.PhysicalInfo, doorTimer, ch_LOTFromMV, ch_StateFromMV, ch_MotorDirFromMV)
+			MV_PhysicalInfo = FSM_OnDoorTimeout(MV_PhysicalInfo, doorTimer, ch_fromMV_LOT, ch_fromMV_State, ch_fromMV_MotorDir)
 
-		case <-ch_FloorArrival:
+		case newFloor := <-ch_FloorArrival:
+			MV_PhysicalInfo.Floor = newFloor
 
-			FSM_OnFloorArrival(elevator.PhysicalInfo, doorTimer, ch_LOTFromMV, ch_StateFromMV)
+			MV_PhysicalInfo = FSM_OnFloorArrival(MV_PhysicalInfo, doorTimer, ch_fromMV_LOT, ch_fromMV_State)
 
 		}
 	}
+}
+func FSM_OnTableUpdate(PhysicalInfo elev.ElevatorPhysicalInfo,
+	doorTimer *timer.Timer,
+	ch_fromMV_LOT chan elev.LocalOrderTable,
+	ch_fromMV_State chan elev.ElevatorMovement,
+	ch_fromMV_MotorDir chan elevio.MotorDirection) elev.ElevatorPhysicalInfo {
+
+	switch PhysicalInfo.State {
+
+	case elev.EM_DoorOpen:
+		if requests.ShouldStop(PhysicalInfo.LocalOrderTable, PhysicalInfo.Floor, PhysicalInfo.MotorDir) {
+
+			doorTimer.Start()
+			fmt.Println("timer set 2")
+			updated_LOT := requests.ClearCurrentFloor(PhysicalInfo.LocalOrderTable, PhysicalInfo.Floor, PhysicalInfo.MotorDir)
+			ch_fromMV_LOT <- updated_LOT
+			PhysicalInfo.LocalOrderTable = updated_LOT
+		}
+
+	case elev.EM_Moving:
+		// will be handled at floor when idle or something
+
+	case elev.EM_Idle:
+
+		pair := requests.ChooseDirection(PhysicalInfo.LocalOrderTable, PhysicalInfo.Floor, PhysicalInfo.MotorDir)
+
+		PhysicalInfo.MotorDir = pair.Direction
+		PhysicalInfo.State = pair.Movement
+		ch_fromMV_MotorDir <- pair.Direction
+		ch_fromMV_State <- pair.Movement
+
+		// Stay idle
+		if pair.Movement == elev.EM_Idle {
+			setAllLights(PhysicalInfo.LocalOrderTable)
+			return PhysicalInfo
+		}
+
+		switch pair.Movement {
+
+		case elev.EM_DoorOpen:
+			elevio.SetDoorOpenLamp(true)
+			doorTimer.Start()
+			fmt.Println("timer set 1")
+
+			updated_LOT := requests.ClearCurrentFloor(PhysicalInfo.LocalOrderTable, PhysicalInfo.Floor, PhysicalInfo.MotorDir)
+			PhysicalInfo.LocalOrderTable = updated_LOT
+			ch_fromMV_LOT <- updated_LOT
+
+		case elev.EM_Moving:
+			elevio.SetDoorOpenLamp(false)
+			elevio.SetMotorDirection(PhysicalInfo.MotorDir)
+
+		default:
+			fmt.Println("OnButtonPress case default")
+
+		}
+
+	}
+
+	setAllLights(PhysicalInfo.LocalOrderTable)
+	printElevatorState(PhysicalInfo.State)
+	return PhysicalInfo
+
 }
 
 // [X]
@@ -84,15 +150,15 @@ func SetAllLights(localOrderTable [elev.N_FLOORS][elev.N_BUTTONS]bool) {
 
 // [X]
 func FSM_OnFloorArrival(
-	pe elev.ElevatorPhysicalInfo,
+	PhysicalInfo elev.ElevatorPhysicalInfo,
 	doorTimer *timer.Timer, // Maybe shit [X]
 	ch_LOTFromMV chan elev.LocalOrderTable,
-	ch_StateFromMV chan elev.ElevatorMovement) {
+	ch_StateFromMV chan elev.ElevatorMovement) elev.ElevatorPhysicalInfo {
 
-	elevio.SetFloorIndicator(pe.Floor)
+	elevio.SetFloorIndicator(PhysicalInfo.Floor)
 
-	if pe.State != elev.EM_Moving || !requests.ShouldStop(pe.LocalOrderTable, pe.Floor, pe.MotorDir) {
-		return
+	if PhysicalInfo.State != elev.EM_Moving || !requests.ShouldStop(PhysicalInfo.LocalOrderTable, PhysicalInfo.Floor, PhysicalInfo.MotorDir) {
+		return PhysicalInfo
 	}
 
 	elevio.SetMotorDirection(elevio.MD_Stop)
@@ -100,63 +166,72 @@ func FSM_OnFloorArrival(
 	doorTimer.Start()
 	fmt.Println("timer set 3")
 
-	updated_LOT := requests.ClearCurrentFloor(pe.LocalOrderTable, pe.Floor, pe.MotorDir)
+	updated_LOT := requests.ClearCurrentFloor(PhysicalInfo.LocalOrderTable, PhysicalInfo.Floor, PhysicalInfo.MotorDir)
+	PhysicalInfo.LocalOrderTable = updated_LOT
 	ch_LOTFromMV <- updated_LOT
 
 	SetAllLights(updated_LOT)
 
+	PhysicalInfo.State = elev.EM_DoorOpen
 	ch_StateFromMV <- elev.EM_DoorOpen
+
+	return PhysicalInfo
 
 }
 
 // [X]
-func FSM_OnDoorTimeout(pe elev.ElevatorPhysicalInfo,
+func FSM_OnDoorTimeout(PhysicalInfo elev.ElevatorPhysicalInfo,
 	doorTimer *timer.Timer,
 	ch_LOTFromMV chan elev.LocalOrderTable,
 	ch_StateFromMV chan elev.ElevatorMovement,
-	ch_MotorDirFromMV chan elevio.MotorDirection) {
+	ch_MotorDirFromMV chan elevio.MotorDirection) elev.ElevatorPhysicalInfo {
 
-	if pe.Obstructed {
+	if PhysicalInfo.Obstructed {
 
 		doorTimer.Start()
 
-		return
+		return PhysicalInfo
 	}
 
-	switch pe.State {
+	switch PhysicalInfo.State {
 
 	case elev.EM_DoorOpen:
-		pair := requests.ChooseDirection(pe.LocalOrderTable, pe.Floor, pe.MotorDir)
+		pair := requests.ChooseDirection(PhysicalInfo.LocalOrderTable, PhysicalInfo.Floor, PhysicalInfo.MotorDir)
 
+		PhysicalInfo.State = pair.Movement
+		PhysicalInfo.MotorDir = pair.Direction
 		ch_StateFromMV <- pair.Movement
 		ch_MotorDirFromMV <- pair.Direction
 
-		switch pe.State {
+		switch PhysicalInfo.State {
 
 		case elev.EM_DoorOpen:
 
 			doorTimer.Start()
 
 			fmt.Println("timer set 4")
-			updated_LOT := requests.ClearCurrentFloor(pe.LocalOrderTable, pe.Floor, pe.MotorDir)
+			updated_LOT := requests.ClearCurrentFloor(PhysicalInfo.LocalOrderTable, PhysicalInfo.Floor, PhysicalInfo.MotorDir)
+			PhysicalInfo.LocalOrderTable = updated_LOT
 			ch_LOTFromMV <- updated_LOT
 
 			setAllLights(updated_LOT)
 
 		case elev.EM_Idle:
 			elevio.SetDoorOpenLamp(false)
-			elevio.SetMotorDirection(pe.MotorDir)
+			elevio.SetMotorDirection(PhysicalInfo.MotorDir)
 
 		case elev.EM_Moving:
 			elevio.SetDoorOpenLamp(false)
-			elevio.SetMotorDirection(pe.MotorDir)
+			elevio.SetMotorDirection(PhysicalInfo.MotorDir)
 
 		default:
 			fmt.Println("OnDoorTimeout case default")
+
 		}
 	}
 
-	printElevatorState(pe.State)
+	printElevatorState(PhysicalInfo.State)
+	return PhysicalInfo
 }
 
 // [X]

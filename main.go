@@ -45,15 +45,15 @@ func main() {
 	ch_PollButtonPress := make(chan elevio.ButtonEvent)
 
 	// MODULE UPDATE CHANS
-	ch_UpdateMV := make(chan elev.Elevator, 5)
 
 	// Trigger to Movement
-	ch_FloorArrival := make(chan struct{})
+	ch_updateMV_Physicalnfo := make(chan elev.ElevatorPhysicalInfo, 5)
+	ch_toMV_FloorArrival := make(chan int, 5)
 
 	// Updates from Movement
-	ch_LOTFromMV := make(chan elev.LocalOrderTable)
-	ch_StateFromMV := make(chan elev.ElevatorMovement)
-	ch_MotorDirFromMV := make(chan elevio.MotorDirection)
+	ch_fromMV_LOT := make(chan elev.LocalOrderTable, 2)
+	ch_fromMV_State := make(chan elev.ElevatorMovement, 2)
+	ch_fromMV_MotorDir := make(chan elevio.MotorDirection, 2)
 
 	// Trigger to OrderControl
 	ch_toOC_OTPacket := make(chan elev.OrderTablePacket, 4)
@@ -92,7 +92,7 @@ func main() {
 	go elevio.PollObstructionSwitch(ch_PollObstruction)
 	go elevio.PollFloorSensor(ch_PollFloorSensor)
 	go movement.GeneratePrintTimerEvents(ch_PrintTimer)
-	go movement.Movement(ch_UpdateMV, ch_FloorArrival, ch_LOTFromMV, ch_StateFromMV, ch_MotorDirFromMV)
+	go movement.Movement(ch_updateMV_Physicalnfo, ch_toMV_FloorArrival, ch_fromMV_LOT, ch_fromMV_State, ch_fromMV_MotorDir)
 
 	// ============= GO ORDERCONTROL ===================
 
@@ -116,7 +116,7 @@ func main() {
 	ch_updateOC_NumElevs <- elevator.NumElevs
 	ch_updateOC_OrderTable <- elevator.OrderTable
 	ch_updateOC_PhysicalInfo <- elevator.PhysicalInfo
-	ch_UpdateMV <- elevator // TODO: defactor this channel
+	ch_updateMV_Physicalnfo <- elevator.PhysicalInfo
 	ch_updateRM_AliveList <- elevator.AliveList
 	ch_updateRM_NumElevs <- elevator.NumElevs
 	ch_updateRM_PhysicalInfo <- elevator.PhysicalInfo
@@ -137,39 +137,33 @@ func main() {
 				elevator.PhysicalInfo.Obstructed = obst
 
 				ch_UpdateTxMessage <- elevator.PhysicalInfo
-				ch_UpdateMV <- elevator
+				ch_updateMV_Physicalnfo <- elevator.PhysicalInfo
 
 			case floor := <-ch_PollFloorSensor:
-
 				elevator.PhysicalInfo.Floor = floor
 
+				ch_toMV_FloorArrival <- floor
 				ch_UpdateTxMessage <- elevator.PhysicalInfo
 				ch_updateOC_PhysicalInfo <- elevator.PhysicalInfo
-				ch_UpdateMV <- elevator
-				ch_FloorArrival <- struct{}{} //TODO: sjekk om vi trenger slike channels fordi oppdatering av data er en trigger
 
 			// -----------------------------------------------------------------------
 			// FROM
-			case newLOT := <-ch_LOTFromMV:
+			case newLOT := <-ch_fromMV_LOT:
 				elevator.PhysicalInfo.LocalOrderTable = newLOT
 
 				ch_UpdateTxMessage <- elevator.PhysicalInfo
-				ch_UpdateMV <- elevator
 
-			case newState := <-ch_StateFromMV:
+			case newState := <-ch_fromMV_State:
 				elevator.PhysicalInfo.State = newState
 
 				ch_UpdateTxMessage <- elevator.PhysicalInfo
 				ch_updateOC_PhysicalInfo <- elevator.PhysicalInfo
-				ch_UpdateMV <- elevator
 
-			case newMotorDir := <-ch_MotorDirFromMV:
+			case newMotorDir := <-ch_fromMV_MotorDir:
 				elevator.PhysicalInfo.MotorDir = newMotorDir
 
 				ch_UpdateTxMessage <- elevator.PhysicalInfo
 				ch_updateOC_PhysicalInfo <- elevator.PhysicalInfo
-
-				ch_UpdateMV <- elevator
 
 			// ================================ ORDERCONTROL ============================
 
@@ -190,7 +184,7 @@ func main() {
 
 			case newLocalOrderTable := <-ch_fromOC_LOT:
 				elevator.PhysicalInfo.LocalOrderTable = newLocalOrderTable
-				ch_UpdateMV <- elevator
+				ch_updateMV_Physicalnfo <- elevator.PhysicalInfo
 
 			// ================================ ROLEMANAGER ============================
 

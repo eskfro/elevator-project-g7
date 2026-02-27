@@ -122,7 +122,7 @@ func ChooseDirection(LocalOrderTable [elev.N_FLOORS][elev.N_BUTTONS]bool, curren
 	}
 }
 
-func ShouldStop(LocalOrderTable [elev.N_FLOORS][elev.N_BUTTONS]bool, currentFloor int, dir elevio.MotorDirection) bool {
+func ShouldStop(LocalOrderTable elev.LocalOrderTable, currentFloor int, dir elevio.MotorDirection) bool {
 	switch dir {
 	case elevio.MD_Down:
 		return LocalOrderTable[currentFloor][elevio.BT_HallDown] ||
@@ -149,9 +149,9 @@ func ShouldClearImmediately(currentFloor int, dir elevio.MotorDirection, btnFloo
 	return sameFloor && btnTypeMatchDir
 }
 
-func ClearCurrentFloor(LocalOrderTable [elev.N_FLOORS][elev.N_BUTTONS]bool,
+func ClearCurrentFloor(LocalOrderTable elev.LocalOrderTable,
 	currentFloor int,
-	dir elevio.MotorDirection) [elev.N_FLOORS][elev.N_BUTTONS]bool {
+	dir elevio.MotorDirection) elev.LocalOrderTable {
 	// Shorter name for clarity
 	LOT := LocalOrderTable
 	cf := currentFloor
