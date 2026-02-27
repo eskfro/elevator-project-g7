@@ -106,8 +106,8 @@ func main() {
 	go rolemanager.RoleManager(ch_updateRM_AliveList, ch_updateRM_PhysicalInfo, ch_updateRM_NumElevs, ch_toRM_HeartBeatId, ch_fromRM_Role, ch_fromRM_DeadElevId, ch_fromRM_NumElevs)
 
 	// Init stack elevators
-	ch_UpdateOC <- elevator
-	ch_UpdateMV <- elevator
+	ch_UpdateOC <- elevator // TODO: defactor this channel
+	ch_UpdateMV <- elevator // TODO: defactor this channel
 	ch_updateRM_AliveList <- elevator.AliveList
 	ch_updateRM_NumElevs <- elevator.NumElevs
 	ch_updateRM_PhysicalInfo <- elevator.PhysicalInfo
