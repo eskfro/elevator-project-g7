@@ -3,7 +3,6 @@ package elev
 import (
 	"elevator-project-g7/internal/elevio"
 	"fmt"
-	"strconv"
 	"time"
 )
 
@@ -123,11 +122,11 @@ func PrintElevatorInit(id int, port int) {
 
 }
 
-func PrintElevatorInfo(elevator Elevator, uptime int) {
+func PrintElevatorInfo(elevator Elevator, uptime float64) {
 
 	Active := "  #  "
 	Inactive := "  -  "
-	uptimeString := strconv.Itoa(uptime)
+	uptimeString := fmt.Sprintf("%.1f", uptime)
 
 	LOT := elevator.PhysicalInfo.LocalOrderTable
 

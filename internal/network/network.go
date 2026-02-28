@@ -43,7 +43,7 @@ func TxHeartBeat(port_hb int, ch_UpdateTxMessage chan elev.ElevatorPhysicalInfo)
 	var message elev.ElevatorPhysicalInfo
 
 	// Adjust how often to send message
-	ticker := time.NewTicker(200 * time.Millisecond)
+	ticker := time.NewTicker(50 * time.Millisecond)
 	defer ticker.Stop()
 
 	for {
@@ -82,7 +82,7 @@ func RxHeartBeat(port_hb int, ch_RxPhysicalInfo chan elev.ElevatorPhysicalInfo, 
 			break
 		}
 		log.Printf("Port %d busy, trying again ...\n", port_hb)
-		time.Sleep(100 * time.Millisecond)
+		time.Sleep(10 * time.Millisecond)
 	}
 	defer conn.Close()
 

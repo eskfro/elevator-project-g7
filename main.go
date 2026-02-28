@@ -31,7 +31,7 @@ func main() {
 	elevator := elev.CreateElevator(id, port_HW, network.GetLocalIP())
 
 	// Time for debugging
-	ticker := time.NewTicker(2000 * time.Millisecond)
+	ticker := time.NewTicker(500 * time.Millisecond)
 	ticker_AliveList := time.NewTicker(500 * time.Millisecond)
 	timeStart := time.Now()
 	defer ticker.Stop()
@@ -128,7 +128,7 @@ func main() {
 			select {
 
 			case <-ticker.C:
-				uptime := int(time.Since(timeStart).Seconds())
+				uptime := time.Since(timeStart).Seconds()
 				elev.PrintElevatorInfo(elevator, uptime)
 
 			// ================================ MOVEMENT ============================
