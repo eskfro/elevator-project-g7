@@ -53,6 +53,7 @@ func Movement(
 	ch_fromMV_MotorDir chan elevio.MotorDirection) {
 
 	var MV_PhysicalInfo elev.ElevatorPhysicalInfo
+	var MV_prevLOT elev.LocalOrderTable
 
 	doorTimer := timer.New(elev.DOOR_OPEN_TIME)
 
@@ -60,7 +61,9 @@ func Movement(
 		select {
 
 		case MV_PhysicalInfo = <-ch_updateMV_Physicalnfo:
-
+			if MV_PhysicalInfo.LocalOrderTable == MV_prevLOT {
+				continue
+			}
 			MV_PhysicalInfo = FSM_OnTableUpdate(MV_PhysicalInfo, doorTimer, ch_fromMV_LOT, ch_fromMV_State, ch_fromMV_MotorDir)
 
 		case <-doorTimer.C:
