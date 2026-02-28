@@ -120,9 +120,6 @@ func CountPrimaries(AliveList elev.AliveList) int {
 	return numPrimaries
 }
 
-func OnePrimaryExist(AliveList elev.AliveList) bool {
-	return CountPrimaries(AliveList) == 1
-}
 
 func CountNumElevs(AliveList elev.AliveList) int {
 	numElevs := 0
@@ -133,10 +130,6 @@ func CountNumElevs(AliveList elev.AliveList) int {
 		}
 	}
 	return numElevs
-}
-
-func CorrectNumElevs(NumElevs int, AliveList elev.AliveList) bool {
-	return NumElevs == CountNumElevs(AliveList)
 }
 
 func ShouldBecomePrimary(thisId int, thisRole elev.ElevatorRole, NumElevs int, AliveList elev.AliveList, timeStart time.Time) bool {

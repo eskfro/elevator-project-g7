@@ -31,10 +31,11 @@ func main() {
 	elevator := elev.CreateElevator(id, port_HW, network.GetLocalIP())
 
 	// Time for debugging
-	ticker := time.NewTicker(500 * time.Millisecond)
+	ticker_printElevator := time.NewTicker(500 * time.Millisecond)
 	ticker_AliveList := time.NewTicker(500 * time.Millisecond)
 	timeStart := time.Now()
-	defer ticker.Stop()
+	defer ticker_printElevator.Stop()
+	defer ticker_AliveList.Stop()
 
 	//ticker := time.NewTicker(100 * time.Millisecond)
 	ch_PrintTimer := make(chan bool)
@@ -127,7 +128,7 @@ func main() {
 		for {
 			select {
 
-			case <-ticker.C:
+			case <-ticker_printElevator.C:
 				uptime := time.Since(timeStart).Seconds()
 				elev.PrintElevatorInfo(elevator, uptime)
 

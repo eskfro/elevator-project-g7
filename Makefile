@@ -27,16 +27,16 @@ clean:
 
 # SIMULATOR THINGS
 sim0:
-	chmod +x scripts/sim0.sh
-	./scripts/sim0.sh
+	chmod +x scripts/sim.sh
+	./scripts/sim.sh 0
 
 sim1:
-	chmod +x scripts/sim1.sh
-	./scripts/sim1.sh
+	chmod +x scripts/sim.sh
+	./scripts/sim.sh 1
 
 sim2:
-	chmod +x scripts/sim2.sh
-	./scripts/sim2.sh
+	chmod +x scripts/sim.sh
+	./scripts/sim.sh 2
 
 # Change to SimAll on lab
 simall:
@@ -44,5 +44,5 @@ simall:
 	./scripts/simAll.sh
 
 kill:
-	@echo "Closing all gnome-terminal instances..."
-	-pkill -f gnome-terminal
+	chmod +x scripts/kill.sh
+	./scripts/kill.sh
