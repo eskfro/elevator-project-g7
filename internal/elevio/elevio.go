@@ -43,5 +43,4 @@ func InitPhysicalElevator(ip string, port int, numFloors int) {
 	}
 	SetDoorOpenLamp(false)
 	SetFloorIndicator(GetFloor())
-
 }

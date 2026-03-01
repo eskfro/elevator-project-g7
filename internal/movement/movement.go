@@ -46,13 +46,14 @@ func Start(pe *elev.ElevatorPhysicalInfo,
 
 // [X]
 func Movement(
+	elevator elev.Elevator,
 	ch_updateMV_Physicalnfo chan elev.ElevatorPhysicalInfo,
 	ch_FloorArrival chan int,
 	ch_fromMV_LOT chan elev.LocalOrderTable,
 	ch_fromMV_State chan elev.ElevatorMovement,
 	ch_fromMV_MotorDir chan elevio.MotorDirection) {
 
-	var MV_PhysicalInfo elev.ElevatorPhysicalInfo
+	MV_PhysicalInfo := elevator.PhysicalInfo
 	var MV_prevLOT elev.LocalOrderTable
 
 	doorTimer := timer.New(elev.DOOR_OPEN_TIME)

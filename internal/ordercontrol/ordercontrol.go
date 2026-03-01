@@ -23,7 +23,7 @@ func OrderControl(
 	ch_updateOC_PhysicalInfo chan elev.ElevatorPhysicalInfo,
 	ch_updateOC_AliveList chan elev.AliveList,
 	ch_updateOC_NumElevs chan int,
-	ch_OTPacket chan elev.OrderTablePacket,
+	ch_toOC_OrderTableP chan elev.OrderTablePacket,
 	ch_fromOC_LOT chan elev.LocalOrderTable,
 	ch_fromOC_OrderTable chan elev.OrderTable) {
 
@@ -38,38 +38,41 @@ func OrderControl(
 
 		select {
 		case newOrderTable := <-ch_updateOC_OrderTable:
-			OC_OrderTable = newOrderTable
 
+			OC_OrderTable = newOrderTable
 			// Testing code
 			OC_PhysicalInfo.LocalOrderTable = orderTableToLOT(OC_OrderTable, OC_PhysicalInfo.Id)
-
 			ch_fromOC_LOT <- OC_PhysicalInfo.LocalOrderTable
 
 		case newAllOrderTables := <-ch_updateOC_AllOrderTables:
+
 			OC_AllOrderTables = newAllOrderTables
 
+			// TODO: sjekk om man can confirme requested ordre hvis alle har tilstand OS_Requested
+
 		case newPhysicalInfo := <-ch_updateOC_PhysicalInfo:
+
 			OC_PhysicalInfo = newPhysicalInfo
 
 		case newAliveList := <-ch_updateOC_AliveList:
+
 			OC_AliveList = newAliveList
 
 		case newNumElevs := <-ch_updateOC_NumElevs:
+
 			OC_NumElevs = newNumElevs
 
-		case packet := <-ch_OTPacket:
+		case packet := <-ch_toOC_OrderTableP:
 
 			switch OC_PhysicalInfo.Role {
 
 			case elev.ER_Backup:
+
 				if packet.Id != OC_PhysicalInfo.PrimaryId {
 					break //message not from primary
 				}
-
 				newLOT := orderTableToLOT(packet.OrderTable, OC_PhysicalInfo.Id)
-
 				OC_PhysicalInfo.LocalOrderTable = newLOT
-
 				ch_fromOC_LOT <- OC_PhysicalInfo.LocalOrderTable
 
 			case elev.ER_Primary:
@@ -77,7 +80,6 @@ func OrderControl(
 				if packet.Id == OC_PhysicalInfo.Id {
 					break //message from self
 				}
-
 				newOrderTable := OC_AllOrderTables[packet.Id]
 				// TODO: skal det være:
 				// newOrderTable := packet.OrderTable ?
@@ -105,12 +107,11 @@ func OrderControl(
 					}
 				}
 
-				/*
-					// TODO: Sjekk dettan
-					OC_PhysicalInfo.LocalOrderTable = orderTableToLOT(OC_OrderTable, OC_PhysicalInfo.Id)
-					ch_fromOC_OrderTable <- OC_OrderTable
-					ch_fromOC_LOT <- OC_PhysicalInfo.LocalOrderTable
-				*/
+				// TODO: Sjekk dettan
+				OC_PhysicalInfo.LocalOrderTable = orderTableToLOT(OC_OrderTable, OC_PhysicalInfo.Id)
+				ch_fromOC_OrderTable <- OC_OrderTable
+				ch_fromOC_LOT <- OC_PhysicalInfo.LocalOrderTable
+
 			}
 		}
 	}

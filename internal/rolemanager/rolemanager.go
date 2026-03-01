@@ -43,9 +43,9 @@ func RoleManager(
 		select {
 
 		case timedOutID := <-ch_TimedOutId:
+
 			RM_AliveList[timedOutID].Role = elev.ER_Dead
 			RM_NumElevs = CountNumElevs(RM_AliveList)
-
 			ch_fromRM_DeadElevId <- timedOutID
 			ch_fromRM_NumElevs <- RM_NumElevs
 
@@ -60,6 +60,7 @@ func RoleManager(
 			case elev.ER_Dead:
 
 			case elev.ER_Backup:
+
 				if ShouldBecomePrimary(RM_PhysicalInfo.Id, RM_PhysicalInfo.Role, RM_NumElevs, RM_AliveList, timeStart) {
 					RM_PhysicalInfo.PrimaryId = RM_PhysicalInfo.Id
 					RM_PhysicalInfo.Role = elev.ER_Primary
@@ -67,7 +68,9 @@ func RoleManager(
 
 					ch_fromRM_Role <- elev.ER_Primary
 				}
+
 			case elev.ER_Primary:
+
 				if ShouldBecomeBackup(RM_PhysicalInfo.Id, RM_PhysicalInfo.Role, RM_NumElevs, RM_AliveList) {
 					RM_PhysicalInfo.Role = elev.ER_Backup
 					RM_AliveList[RM_PhysicalInfo.Id] = RM_PhysicalInfo
@@ -76,11 +79,15 @@ func RoleManager(
 
 				}
 			}
+
 		case newPhysicalInfo := <-ch_updateRM_PhysicalInfo:
+
 			RM_PhysicalInfo = newPhysicalInfo
 
 		case newNumElevs := <-ch_updateRM_NumElevs:
+
 			RM_NumElevs = newNumElevs
+
 		}
 	}
 }
@@ -119,7 +126,6 @@ func CountPrimaries(AliveList elev.AliveList) int {
 	}
 	return numPrimaries
 }
-
 
 func CountNumElevs(AliveList elev.AliveList) int {
 	numElevs := 0
