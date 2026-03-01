@@ -31,7 +31,7 @@ func main() {
 	elevator := elev.CreateElevator(id, port_HW, network.GetLocalIP())
 
 	// Time for debugging
-	ticker_printElevator := time.NewTicker(500 * time.Millisecond)
+	ticker_printElevator := time.NewTicker(2000 * time.Millisecond)
 	ticker_AliveList := time.NewTicker(500 * time.Millisecond)
 	timeStart := time.Now()
 	defer ticker_printElevator.Stop()

@@ -37,6 +37,8 @@ else
     sleep 1 
 fi
 
+sleep 1
+
 # --- ELEVATOR CLIENT ---
 echo "Starting Elevator $E_ID (HW: $HW_PORT, HB: $HB_PORT, OT: $OT_PORT)..."
 gnome-terminal --geometry="${W}x${H}+${X0}+${Y_BOT}" --title="Elevator $E_ID" -- bash -c "./out $E_ID $HW_PORT $HB_PORT $OT_PORT; exec bash" &

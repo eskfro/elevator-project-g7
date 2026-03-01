@@ -42,6 +42,7 @@ func OrderControl(
 
 			// Testing code
 			OC_PhysicalInfo.LocalOrderTable = orderTableToLOT(OC_OrderTable, OC_PhysicalInfo.Id)
+
 			ch_fromOC_LOT <- OC_PhysicalInfo.LocalOrderTable
 
 		case newAllOrderTables := <-ch_updateOC_AllOrderTables:
@@ -104,10 +105,12 @@ func OrderControl(
 					}
 				}
 
-				// TODO: Sjekk dettan
-				OC_PhysicalInfo.LocalOrderTable = orderTableToLOT(OC_OrderTable, OC_PhysicalInfo.Id)
-				ch_fromOC_OrderTable <- OC_OrderTable
-				ch_fromOC_LOT <- OC_PhysicalInfo.LocalOrderTable
+				/*
+					// TODO: Sjekk dettan
+					OC_PhysicalInfo.LocalOrderTable = orderTableToLOT(OC_OrderTable, OC_PhysicalInfo.Id)
+					ch_fromOC_OrderTable <- OC_OrderTable
+					ch_fromOC_LOT <- OC_PhysicalInfo.LocalOrderTable
+				*/
 			}
 		}
 	}

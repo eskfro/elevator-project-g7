@@ -60,10 +60,16 @@ func Movement(
 	for {
 		select {
 
-		case MV_PhysicalInfo = <-ch_updateMV_Physicalnfo:
+		case newPhysicalInfo := <-ch_updateMV_Physicalnfo:
+			MV_PhysicalInfo = newPhysicalInfo
+
+			// Maybe dont need this
 			if MV_PhysicalInfo.LocalOrderTable == MV_prevLOT {
 				continue
+			} else {
+				MV_prevLOT = MV_PhysicalInfo.LocalOrderTable
 			}
+
 			MV_PhysicalInfo = FSM_OnTableUpdate(MV_PhysicalInfo, doorTimer, ch_fromMV_LOT, ch_fromMV_State, ch_fromMV_MotorDir)
 
 		case <-doorTimer.C:
