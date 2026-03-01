@@ -23,8 +23,9 @@ var lc = net.ListenConfig{
 	},
 }
 
-func TxHeartBeat(port_hb int, ch_UpdateTxMessage chan elev.ElevatorPhysicalInfo) {
+func TxHeartBeat(elevator elev.Elevator, port_hb int, ch_UpdateTxMessage chan elev.ElevatorPhysicalInfo) {
 
+	message := elevator.PhysicalInfo
 	address := "255.255.255.255" + ":" + strconv.Itoa(port_hb)
 
 	// Establish udp "connection"
@@ -39,8 +40,6 @@ func TxHeartBeat(port_hb int, ch_UpdateTxMessage chan elev.ElevatorPhysicalInfo)
 	if err != nil {
 		log.Printf("Failed to resolve bcast adress: %v \n", err)
 	}
-
-	var message elev.ElevatorPhysicalInfo
 
 	// Adjust how often to send message
 	ticker := time.NewTicker(50 * time.Millisecond)

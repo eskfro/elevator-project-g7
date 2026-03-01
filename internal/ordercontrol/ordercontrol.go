@@ -18,6 +18,7 @@ import (
 )
 
 func OrderControl(
+	elevator elev.Elevator,
 	ch_updateOC_OrderTable chan elev.OrderTable,
 	ch_updateOC_AllOrderTables chan elev.AllOrderTables,
 	ch_updateOC_PhysicalInfo chan elev.ElevatorPhysicalInfo,
@@ -27,12 +28,11 @@ func OrderControl(
 	ch_fromOC_LOT chan elev.LocalOrderTable,
 	ch_fromOC_OrderTable chan elev.OrderTable) {
 
-	// TODO: Replace elevator with these variables:
-	var OC_OrderTable elev.OrderTable
-	var OC_AllOrderTables elev.AllOrderTables
-	var OC_PhysicalInfo elev.ElevatorPhysicalInfo
-	var OC_AliveList elev.AliveList
-	var OC_NumElevs int
+	OC_OrderTable := elevator.OrderTable
+	OC_AllOrderTables := elevator.AllOrderTables
+	OC_PhysicalInfo := elevator.PhysicalInfo
+	OC_AliveList := elevator.AliveList
+	OC_NumElevs := elevator.NumElevs
 
 	for {
 
@@ -108,9 +108,9 @@ func OrderControl(
 				}
 
 				// TODO: Sjekk dettan
-				OC_PhysicalInfo.LocalOrderTable = orderTableToLOT(OC_OrderTable, OC_PhysicalInfo.Id)
-				ch_fromOC_OrderTable <- OC_OrderTable
-				ch_fromOC_LOT <- OC_PhysicalInfo.LocalOrderTable
+				//OC_PhysicalInfo.LocalOrderTable = orderTableToLOT(OC_OrderTable, OC_PhysicalInfo.Id)
+				//ch_fromOC_OrderTable <- OC_OrderTable
+				//ch_fromOC_LOT <- OC_PhysicalInfo.LocalOrderTable
 
 			}
 		}

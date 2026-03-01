@@ -91,34 +91,22 @@ func main() {
 
 	// ============ GO MOVEMENT ========================
 
-	go movement.Movement(ch_updateMV_Physicalnfo, ch_toMV_FloorArrival, ch_fromMV_LOT, ch_fromMV_State, ch_fromMV_MotorDir)
+	go movement.Movement(elevator, ch_updateMV_Physicalnfo, ch_toMV_FloorArrival, ch_fromMV_LOT, ch_fromMV_State, ch_fromMV_MotorDir)
 
 	// ============= GO ORDERCONTROL ===================
 
-	go ordercontrol.OrderControl(ch_updateOC_OrderTable, ch_updateOC_AllOrderTables, ch_updateOC_PhysicalInfo, ch_updateOC_AliveList, ch_updateOC_NumElevs, ch_toOC_OrderTableP, ch_fromOC_LOT, ch_fromOC_OrderTable)
+	go ordercontrol.OrderControl(elevator, ch_updateOC_OrderTable, ch_updateOC_AllOrderTables, ch_updateOC_PhysicalInfo, ch_updateOC_AliveList, ch_updateOC_NumElevs, ch_toOC_OrderTableP, ch_fromOC_LOT, ch_fromOC_OrderTable)
 
 	// ============= GO NETWORK ========================
 
 	go network.Transmitter(port_OT, ch_TxOrderTableP) // TODO: change function name
 	go network.Receiver(port_OT, ch_RxOrderTableP)    // TODO: change function name
-	go network.TxHeartBeat(port_HB, ch_UpdateTxMessage)
+	go network.TxHeartBeat(elevator, port_HB, ch_UpdateTxMessage)
 	go network.RxHeartBeat(port_HB, ch_RxPhysicalInfo, elevator.PhysicalInfo.Id)
 
 	// ============= GO ROLE MANAGER ===================
 
-	go rolemanager.RoleManager(ch_updateRM_AliveList, ch_updateRM_PhysicalInfo, ch_updateRM_NumElevs, ch_toRM_HeartBeatId, ch_fromRM_Role, ch_fromRM_DeadElevId, ch_fromRM_NumElevs)
-
-	// TODO: init these some other way
-	ch_updateOC_AliveList <- elevator.AliveList
-	ch_updateOC_AllOrderTables <- elevator.AllOrderTables
-	ch_updateOC_NumElevs <- elevator.NumElevs
-	ch_updateOC_OrderTable <- elevator.OrderTable
-	ch_updateOC_PhysicalInfo <- elevator.PhysicalInfo
-	ch_updateMV_Physicalnfo <- elevator.PhysicalInfo
-	ch_updateRM_AliveList <- elevator.AliveList
-	ch_updateRM_NumElevs <- elevator.NumElevs
-	ch_updateRM_PhysicalInfo <- elevator.PhysicalInfo
-	ch_UpdateTxMessage <- elevator.PhysicalInfo
+	go rolemanager.RoleManager(elevator, ch_updateRM_AliveList, ch_updateRM_PhysicalInfo, ch_updateRM_NumElevs, ch_toRM_HeartBeatId, ch_fromRM_Role, ch_fromRM_DeadElevId, ch_fromRM_NumElevs)
 
 	go func() {
 
@@ -167,7 +155,7 @@ func main() {
 			// TO
 			case btnPress := <-ch_PollButtonPress:
 
-				elevator.OrderTable[elevator.PhysicalInfo.Id][btnPress.Floor][btnPress.Button] = elev.OS_CONFIRMED //For testing i put this OS_CONFIRMED
+				elevator.OrderTable[elevator.PhysicalInfo.Id][btnPress.Floor][btnPress.Button] = elev.OS_CONFIRMED //For testing I put this OS_CONFIRMED
 				elevio.PrintButtonpress(btnPress)
 				ch_updateOC_OrderTable <- elevator.OrderTable
 

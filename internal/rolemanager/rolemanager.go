@@ -20,21 +20,20 @@ const POLL_RATE = 1 * time.Second
 //func PollAliveListUpdate(reciever chan<- RoleManager, rcvBcast <-chan elev.WorldView)
 
 func RoleManager(
+	elevator elev.Elevator,
 	ch_updateRM_AliveList chan elev.AliveList,
 	ch_updateRM_PhysicalInfo chan elev.ElevatorPhysicalInfo,
 	ch_updateRM_NumElevs chan int,
 	ch_toRM_HeartBeatId chan int,
-
 	ch_fromRM_Role chan elev.ElevatorRole,
 	ch_fromRM_DeadElevId chan int,
 	ch_fromRM_NumElevs chan int) {
 
-	var RM_AliveList elev.AliveList
-	var RM_NumElevs int
-	var RM_PhysicalInfo elev.ElevatorPhysicalInfo
-
+	RM_AliveList := elevator.AliveList
+	RM_NumElevs := elevator.NumElevs
+	RM_PhysicalInfo := elevator.PhysicalInfo
 	timeStart := time.Now()
-
+	
 	ch_TimedOutId := make(chan int)
 
 	go MonitorHeartBeats(ch_toRM_HeartBeatId, ch_TimedOutId)
