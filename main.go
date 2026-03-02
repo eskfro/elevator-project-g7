@@ -24,23 +24,25 @@ const sim bool = false
 
 func main() {
 	// PARSE ARGS
-	id, port_HW, port_HB, port_OT := parser.ParseOsArgs(os.Args, sim)
+	id, ports := parser.ParseOsArgs(os.Args, sim)
 
 	// INIT
-	elevio.InitPhysicalElevator("localhost", port_HW, elev.N_FLOORS)
-	elevator := elev.CreateElevator(id, port_HW, network.GetLocalIP())
+	elevio.InitPhysicalElevator("localhost", ports.Hardware, elev.N_FLOORS)
+	elevator := elev.CreateElevator(id, ports.Hardware, network.GetLocalIP())
+	elev.PrintElevatorInit(id, ports.Hardware)
+	elev.PrintElevatorInfo(elevator, 0)
 
 	// Time for debugging
+	timeStart := time.Now()
 	ticker_printElevator := time.NewTicker(2000 * time.Millisecond)
 	ticker_AliveList := time.NewTicker(500 * time.Millisecond)
-	timeStart := time.Now()
 	defer ticker_printElevator.Stop()
 	defer ticker_AliveList.Stop()
 
 	// POLLING
-	ch_PollObstruction := make(chan bool)
-	ch_PollFloorSensor := make(chan int)
-	ch_PollButtonPress := make(chan elevio.ButtonEvent)
+	ch_PollObstruction := make(chan bool, 10)
+	ch_PollFloorSensor := make(chan int, 10)
+	ch_PollButtonPress := make(chan elevio.ButtonEvent, 10)
 
 	// To Movement
 	ch_updateMV_Physicalnfo := make(chan elev.ElevatorPhysicalInfo, 5)
@@ -74,39 +76,26 @@ func main() {
 	ch_fromRM_Role := make(chan elev.ElevatorRole, 4)
 	ch_fromRM_DeadElevId := make(chan int, 4)
 	ch_fromRM_NumElevs := make(chan int, 4)
+	ch_fromRM_PrimaryId := make(chan int, 4)
 
 	// To Network
 	ch_TxOrderTableP := make(chan elev.OrderTablePacket, 4)
-	ch_UpdateTxMessage := make(chan elev.ElevatorPhysicalInfo, 4)
+	ch_UpdateTxMessage := make(chan elev.ElevatorPhysicalInfo, 20)
 
 	// From Network
 	ch_RxOrderTableP := make(chan elev.OrderTablePacket, 4)
-	ch_RxPhysicalInfo := make(chan elev.ElevatorPhysicalInfo, 4) //made this buffered
-
-	// ============ GO SENSOR POLLING ==================
+	ch_RxPhysicalInfo := make(chan elev.ElevatorPhysicalInfo, 20)
 
 	go elevio.PollObstructionSwitch(ch_PollObstruction)
 	go elevio.PollFloorSensor(ch_PollFloorSensor)
 	go elevio.PollButtons(ch_PollButtonPress)
-
-	// ============ GO MOVEMENT ========================
-
 	go movement.Movement(elevator, ch_updateMV_Physicalnfo, ch_toMV_FloorArrival, ch_fromMV_LOT, ch_fromMV_State, ch_fromMV_MotorDir)
-
-	// ============= GO ORDERCONTROL ===================
-
 	go ordercontrol.OrderControl(elevator, ch_updateOC_OrderTable, ch_updateOC_AllOrderTables, ch_updateOC_PhysicalInfo, ch_updateOC_AliveList, ch_updateOC_NumElevs, ch_toOC_OrderTableP, ch_fromOC_LOT, ch_fromOC_OrderTable)
-
-	// ============= GO NETWORK ========================
-
-	go network.Transmitter(port_OT, ch_TxOrderTableP) // TODO: change function name
-	go network.Receiver(port_OT, ch_RxOrderTableP)    // TODO: change function name
-	go network.TxHeartBeat(elevator, port_HB, ch_UpdateTxMessage)
-	go network.RxHeartBeat(port_HB, ch_RxPhysicalInfo, elevator.PhysicalInfo.Id)
-
-	// ============= GO ROLE MANAGER ===================
-
-	go rolemanager.RoleManager(elevator, ch_updateRM_AliveList, ch_updateRM_PhysicalInfo, ch_updateRM_NumElevs, ch_toRM_HeartBeatId, ch_fromRM_Role, ch_fromRM_DeadElevId, ch_fromRM_NumElevs)
+	go network.Transmitter(ports.OrderTableP, ch_TxOrderTableP) // TODO: change function name
+	go network.Receiver(ports.OrderTableP, ch_RxOrderTableP)    // TODO: change function name
+	go network.TxHeartBeat(elevator, ports.HeartBeat, ch_UpdateTxMessage)
+	go network.RxHeartBeat(ports.HeartBeat, ch_RxPhysicalInfo, elevator.PhysicalInfo.Id)
+	go rolemanager.RoleManager(elevator, ch_updateRM_AliveList, ch_updateRM_PhysicalInfo, ch_updateRM_NumElevs, ch_toRM_HeartBeatId, ch_fromRM_Role, ch_fromRM_DeadElevId, ch_fromRM_NumElevs, ch_fromRM_PrimaryId)
 
 	go func() {
 
@@ -140,7 +129,7 @@ func main() {
 
 			case newState := <-ch_fromMV_State:
 
-				elevator.PhysicalInfo.State = newState
+				elevator.PhysicalInfo.Movement = newState
 				ch_UpdateTxMessage <- elevator.PhysicalInfo
 				ch_updateOC_PhysicalInfo <- elevator.PhysicalInfo
 
@@ -191,14 +180,15 @@ func main() {
 			case newRole := <-ch_fromRM_Role:
 
 				elevator.PhysicalInfo.Role = newRole
-				if newRole == elev.ER_Primary {
-					elevator.PhysicalInfo.PrimaryId = elevator.PhysicalInfo.Id
-				}
 				ch_UpdateTxMessage <- elevator.PhysicalInfo
 
 			case newNumElevs := <-ch_fromRM_NumElevs:
 
 				elevator.NumElevs = newNumElevs
+
+			case newPrimaryId := <-ch_fromRM_PrimaryId:
+
+				elevator.PhysicalInfo.PrimaryId = newPrimaryId
 
 			// ================================ NETWORK ============================
 
@@ -209,12 +199,6 @@ func main() {
 			// Denne her er både From Network og To OrderControl
 			case packet := <-ch_RxOrderTableP:
 
-				if elevator.PhysicalInfo.Role == elev.ER_Primary {
-
-					elevator.AllOrderTables[packet.Id] = packet.OrderTable
-					ch_updateOC_AllOrderTables <- elevator.AllOrderTables
-
-				}
 				ch_toOC_OrderTableP <- packet
 
 			case heartBeat := <-ch_RxPhysicalInfo:

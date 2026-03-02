@@ -1,18 +1,19 @@
 package parser
 
 import (
+	"elevator-project-g7/internal/network"
 	"log"
 	"strconv"
 )
 
-func ParseOsArgs(args []string, sim bool) (int, int, int, int) {
+func ParseOsArgs(args []string, sim bool) (int, network.Ports) {
 	/*
 		Parser for OS-args when running program from cmd line
 		Returns Id, HardwarePort, HeartBeatPort, OrderTablePort
 	*/
 
 	if sim {
-		return 0, 15657, 16767, 16668
+		return 0, network.Ports{Hardware: 15657, OrderTableP: 16767, HeartBeat: 16668}
 	}
 	if len(args) < 5 {
 		log.Fatalln("OS args missing! (1)")
@@ -27,6 +28,6 @@ func ParseOsArgs(args []string, sim bool) (int, int, int, int) {
 		log.Fatalln("OS args missing! (2)")
 	}
 
-	return id, port_HW, port_HB, port_OT
+	return id, network.Ports{Hardware: port_HW, OrderTableP: port_OT, HeartBeat: port_HB}
 
 }

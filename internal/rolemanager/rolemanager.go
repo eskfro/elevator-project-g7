@@ -27,13 +27,14 @@ func RoleManager(
 	ch_toRM_HeartBeatId chan int,
 	ch_fromRM_Role chan elev.ElevatorRole,
 	ch_fromRM_DeadElevId chan int,
-	ch_fromRM_NumElevs chan int) {
+	ch_fromRM_NumElevs chan int,
+	ch_fromRM_PrimaryId chan int) {
 
 	RM_AliveList := elevator.AliveList
 	RM_NumElevs := elevator.NumElevs
 	RM_PhysicalInfo := elevator.PhysicalInfo
 	timeStart := time.Now()
-	
+
 	ch_TimedOutId := make(chan int)
 
 	go MonitorHeartBeats(ch_toRM_HeartBeatId, ch_TimedOutId)
@@ -61,20 +62,33 @@ func RoleManager(
 			case elev.ER_Backup:
 
 				if ShouldBecomePrimary(RM_PhysicalInfo.Id, RM_PhysicalInfo.Role, RM_NumElevs, RM_AliveList, timeStart) {
-					RM_PhysicalInfo.PrimaryId = RM_PhysicalInfo.Id
-					RM_PhysicalInfo.Role = elev.ER_Primary
-					RM_AliveList[RM_PhysicalInfo.Id] = RM_PhysicalInfo
 
-					ch_fromRM_Role <- elev.ER_Primary
+					RM_PhysicalInfo.Role = elev.ER_Primary
+					RM_PhysicalInfo.PrimaryId = RM_PhysicalInfo.Id
+					RM_AliveList[RM_PhysicalInfo.Id] = RM_PhysicalInfo
+					ch_fromRM_Role <- RM_PhysicalInfo.Role
+					ch_fromRM_PrimaryId <- RM_PhysicalInfo.PrimaryId
+				}
+
+				// Update PrimaryId when we know this elevator will be a backup
+				if ShouldUpdatePrimaryId(RM_PhysicalInfo.PrimaryId, timeStart) {
+
+					newPrimaryId := GetPrimaryId(RM_AliveList)
+					RM_PhysicalInfo.PrimaryId = newPrimaryId
+					ch_fromRM_PrimaryId <- RM_PhysicalInfo.PrimaryId
+
 				}
 
 			case elev.ER_Primary:
 
 				if ShouldBecomeBackup(RM_PhysicalInfo.Id, RM_PhysicalInfo.Role, RM_NumElevs, RM_AliveList) {
+
 					RM_PhysicalInfo.Role = elev.ER_Backup
 					RM_AliveList[RM_PhysicalInfo.Id] = RM_PhysicalInfo
-
-					ch_fromRM_Role <- elev.ER_Backup
+					newPrimaryId := GetPrimaryId(RM_AliveList)
+					RM_PhysicalInfo.PrimaryId = newPrimaryId
+					ch_fromRM_PrimaryId <- RM_PhysicalInfo.PrimaryId
+					ch_fromRM_Role <- RM_PhysicalInfo.Role
 
 				}
 			}
@@ -116,6 +130,25 @@ func MonitorHeartBeats(ch_HeartBeatId chan int, ch_TimedOutId chan int) {
 	}
 }
 
+func GetPrimaryId(AliveList elev.AliveList) int {
+
+	primaryId := elev.INVALID_ELEVID
+
+	for elevId := 0; elevId < elev.N_MAX_ELEVS; elevId++ {
+		if AliveList[elevId].Role == elev.ER_Primary {
+			primaryId = elevId
+			break
+		}
+	}
+
+	if primaryId == elev.INVALID_ELEVID {
+		log.Fatalf("GetPrimaryId failed: No primary in AliveList\n")
+	}
+
+	return primaryId
+
+}
+
 func CountPrimaries(AliveList elev.AliveList) int {
 	numPrimaries := 0
 	for elevId := 0; elevId < elev.N_MAX_ELEVS; elevId++ {
@@ -139,30 +172,25 @@ func CountNumElevs(AliveList elev.AliveList) int {
 
 func ShouldBecomePrimary(thisId int, thisRole elev.ElevatorRole, NumElevs int, AliveList elev.AliveList, timeStart time.Time) bool {
 
-	// Wait so that it can update its AliveList. Maybe dont need this
-	if time.Since(timeStart) < 200*time.Millisecond {
+	if time.Since(timeStart) < elev.PRIMARY_ELECTION_DELAY ||
+		CountPrimaries(AliveList) != 0 {
 		return false
 	}
-	if CountPrimaries(AliveList) != 0 {
-		return false
-	}
+
 	if NumElevs == 1 {
 		return true
 	}
 
-	smallestBackupId := elev.N_MAX_ELEVS + 1
+	smallestBackupId := elev.INVALID_ELEVID
 
 	for elevId := 0; elevId < elev.N_MAX_ELEVS; elevId++ {
-		elevRole := AliveList[elevId].Role
-		if elevRole == elev.ER_Backup {
-			if elevId < smallestBackupId {
-				smallestBackupId = elevId
-			}
+		if AliveList[elevId].Role == elev.ER_Backup && elevId < smallestBackupId {
+			smallestBackupId = elevId
 		}
 	}
 
-	if smallestBackupId == elev.N_MAX_ELEVS+1 {
-		log.Fatalln("No elevators in AliveList")
+	if smallestBackupId == elev.INVALID_ELEVID {
+		log.Fatalln("No elevators in AliveList (Primary)")
 	}
 
 	return thisId == smallestBackupId
@@ -178,19 +206,22 @@ func ShouldBecomeBackup(thisId int, thisRole elev.ElevatorRole, NumElevs int, Al
 		return false
 	}
 
-	smallestPrimaryId := elev.N_MAX_ELEVS + 1
+	smallestPrimaryId := elev.INVALID_ELEVID
 
 	for elevId := 0; elevId < elev.N_MAX_ELEVS; elevId++ {
-		if AliveList[elevId].Role == elev.ER_Primary {
-			if elevId < smallestPrimaryId {
-				smallestPrimaryId = elevId
-			}
+		if AliveList[elevId].Role == elev.ER_Primary && elevId < smallestPrimaryId {
+			smallestPrimaryId = elevId
+
 		}
 	}
 
-	if smallestPrimaryId == elev.N_MAX_ELEVS+1 {
-		log.Fatalln("No elevators in AliveList")
+	if smallestPrimaryId == elev.INVALID_ELEVID {
+		log.Fatalln("No elevators in AliveList (Backup)")
 	}
 
 	return thisId != smallestPrimaryId
+}
+
+func ShouldUpdatePrimaryId(primaryId int, timeStart time.Time) bool {
+	return primaryId == elev.INVALID_ELEVID && time.Since(timeStart) > elev.PRIMARY_ELECTION_DELAY
 }

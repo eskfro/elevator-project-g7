@@ -7,8 +7,8 @@ import (
 )
 
 type DirnMovementPair struct {
-	Direction elevio.MotorDirection
-	Movement  elev.ElevatorMovement
+	MotorDir elevio.MotorDirection
+	Movement elev.ElevatorMovement
 }
 
 func RequestAbove(LocalOrderTable [elev.N_FLOORS][elev.N_BUTTONS]bool, currentFloor int) bool {
@@ -50,73 +50,73 @@ func ChooseDirection(LocalOrderTable [elev.N_FLOORS][elev.N_BUTTONS]bool, curren
 	case elevio.MD_Up:
 		if RequestAbove(LocalOrderTable, currentFloor) {
 			return DirnMovementPair{
-				Direction: elevio.MD_Up,
+				MotorDir: elevio.MD_Up,
 				Movement:  elev.EM_Moving,
 			}
 		} else if RequestHere(LocalOrderTable, currentFloor) {
 			return DirnMovementPair{
-				Direction: elevio.MD_Down,
+				MotorDir: elevio.MD_Down,
 				Movement:  elev.EM_DoorOpen,
 			}
 		} else if RequestBelow(LocalOrderTable, currentFloor) {
 			return DirnMovementPair{
-				Direction: elevio.MD_Down,
+				MotorDir: elevio.MD_Down,
 				Movement:  elev.EM_Moving,
 			}
 		} else {
 			return DirnMovementPair{
-				Direction: elevio.MD_Stop,
+				MotorDir: elevio.MD_Stop,
 				Movement:  elev.EM_Idle,
 			}
 		}
 	case elevio.MD_Down:
 		if RequestBelow(LocalOrderTable, currentFloor) {
 			return DirnMovementPair{
-				Direction: elevio.MD_Down,
+				MotorDir: elevio.MD_Down,
 				Movement:  elev.EM_Moving,
 			}
 		} else if RequestHere(LocalOrderTable, currentFloor) {
 			return DirnMovementPair{
-				Direction: elevio.MD_Up,
+				MotorDir: elevio.MD_Up,
 				Movement:  elev.EM_DoorOpen,
 			}
 		} else if RequestAbove(LocalOrderTable, currentFloor) {
 			return DirnMovementPair{
-				Direction: elevio.MD_Up,
+				MotorDir: elevio.MD_Up,
 				Movement:  elev.EM_Moving,
 			}
 		} else {
 			return DirnMovementPair{
-				Direction: elevio.MD_Stop,
+				MotorDir: elevio.MD_Stop,
 				Movement:  elev.EM_Idle,
 			}
 		}
 	case elevio.MD_Stop:
 		if RequestHere(LocalOrderTable, currentFloor) {
 			return DirnMovementPair{
-				Direction: elevio.MD_Stop,
+				MotorDir: elevio.MD_Stop,
 				Movement:  elev.EM_DoorOpen,
 			}
 		} else if RequestAbove(LocalOrderTable, currentFloor) {
 			return DirnMovementPair{
-				Direction: elevio.MD_Up,
+				MotorDir: elevio.MD_Up,
 				Movement:  elev.EM_Moving,
 			}
 		} else if RequestBelow(LocalOrderTable, currentFloor) {
 			return DirnMovementPair{
-				Direction: elevio.MD_Down,
+				MotorDir: elevio.MD_Down,
 				Movement:  elev.EM_Moving,
 			}
 		} else {
 			return DirnMovementPair{
-				Direction: elevio.MD_Stop,
+				MotorDir: elevio.MD_Stop,
 				Movement:  elev.EM_Idle,
 			}
 		}
 
 	default:
 		return DirnMovementPair{
-			Direction: elevio.MD_Stop,
+			MotorDir: elevio.MD_Stop,
 			Movement:  elev.EM_Idle,
 		}
 	}

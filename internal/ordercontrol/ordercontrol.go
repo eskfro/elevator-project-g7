@@ -37,6 +37,32 @@ func OrderControl(
 	for {
 
 		select {
+
+		case rcvPacket := <-ch_toOC_OrderTableP:
+
+			switch OC_PhysicalInfo.Role {
+
+			case elev.ER_Backup:
+
+				// When backup, only update when OrderTable is from Primary
+				if rcvPacket.Id == OC_PhysicalInfo.PrimaryId {
+					OC_OrderTable = rcvPacket.OrderTable
+					ch_fromOC_OrderTable <- OC_OrderTable
+				}
+
+			case elev.ER_Primary:
+
+				// Ignore if message from self
+				if rcvPacket.Id == OC_PhysicalInfo.Id {
+					break
+				}
+
+				OC_AllOrderTables[rcvPacket.Id] = rcvPacket.OrderTable
+
+				// TODO: update OC_OrderTable according to the change in AllOrderTables
+
+			}
+
 		case newOrderTable := <-ch_updateOC_OrderTable:
 
 			OC_OrderTable = newOrderTable

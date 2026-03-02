@@ -11,6 +11,12 @@ import (
 	"time"
 )
 
+type Ports struct {
+	Hardware    int
+	OrderTableP int
+	HeartBeat   int
+}
+
 // UDP config, denne har jeg testet før så den skal fungere
 var lc = net.ListenConfig{
 	Control: func(network, address string, c syscall.RawConn) error {

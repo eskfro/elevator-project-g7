@@ -8,9 +8,11 @@ import (
 
 const N_FLOORS = 4
 const N_BUTTONS = 3
+const N_MAX_ELEVS = 4
 const DOOR_OPEN_TIME = 3 * time.Second
 const HEARTBEAT_TIMEOUT = 3 * time.Second
-const N_MAX_ELEVS = 4
+const PRIMARY_ELECTION_DELAY = 350 * time.Millisecond
+const INVALID_ELEVID = N_MAX_ELEVS + 1
 
 // ================= ENUM TYPES ===============================
 
@@ -78,7 +80,7 @@ type ElevatorPhysicalInfo struct {
 	Ip              string
 	Role            ElevatorRole
 	MotorDir        elevio.MotorDirection
-	State           ElevatorMovement
+	Movement        ElevatorMovement
 	Obstructed      bool
 	LocalOrderTable [N_FLOORS][N_BUTTONS]bool
 }
@@ -109,16 +111,17 @@ func CreatePhysicalElevator(_Id int, _Ip string) ElevatorPhysicalInfo {
 		Id:         _Id,
 		Role:       ER_Backup,
 		Ip:         _Ip,
+		PrimaryId:  INVALID_ELEVID,
 		Floor:      elevio.GetFloor(),
 		MotorDir:   elevio.MD_Stop,
-		State:      EM_Idle,
+		Movement:   EM_Idle,
 		Obstructed: false,
 	}
 	return pe
 }
 
-func PrintElevatorInit(id int, port int) {
-	fmt.Printf("elevator starting | id = %d | port = %d\n", id, port)
+func PrintElevatorInit(id int, port_HW int) {
+	fmt.Printf("\nelevator starting | id = %d | port.Hardware = %d\n\n", id, port_HW)
 
 }
 
@@ -134,7 +137,8 @@ func PrintElevatorInfo(elevator Elevator, uptime float64) {
 	fmt.Printf("ELEVATOR %d ", elevator.PhysicalInfo.Id)
 	fmt.Printf(" [ " + ElevatorRoleToString(elevator.PhysicalInfo.Role) + " ] ")
 	fmt.Printf(" < " + elevator.PhysicalInfo.Ip + " > |")
-	fmt.Printf(" t = " + uptimeString + "s \n")
+	fmt.Printf(" t = " + uptimeString + "s |")
+	fmt.Printf(" primary = %d\n", elevator.PhysicalInfo.PrimaryId)
 	fmt.Printf("--------------------------------\n")
 
 	// Print floor row
