@@ -38,31 +38,6 @@ func OrderControl(
 
 		select {
 
-		case rcvPacket := <-ch_toOC_OrderTableP:
-
-			switch OC_PhysicalInfo.Role {
-
-			case elev.ER_Backup:
-
-				// When backup, only update when OrderTable is from Primary
-				if rcvPacket.Id == OC_PhysicalInfo.PrimaryId {
-					OC_OrderTable = rcvPacket.OrderTable
-					ch_fromOC_OrderTable <- OC_OrderTable
-				}
-
-			case elev.ER_Primary:
-
-				// Ignore if message from self
-				if rcvPacket.Id == OC_PhysicalInfo.Id {
-					break
-				}
-
-				OC_AllOrderTables[rcvPacket.Id] = rcvPacket.OrderTable
-
-				// TODO: update OC_OrderTable according to the change in AllOrderTables
-
-			}
-
 		case newOrderTable := <-ch_updateOC_OrderTable:
 
 			OC_OrderTable = newOrderTable
@@ -90,6 +65,11 @@ func OrderControl(
 
 		case packet := <-ch_toOC_OrderTableP:
 
+			// Ignorer per nå
+			if true {
+				break
+			}
+
 			switch OC_PhysicalInfo.Role {
 
 			case elev.ER_Backup:
@@ -97,18 +77,19 @@ func OrderControl(
 				if packet.Id != OC_PhysicalInfo.PrimaryId {
 					break //message not from primary
 				}
-				newLOT := orderTableToLOT(packet.OrderTable, OC_PhysicalInfo.Id)
-				OC_PhysicalInfo.LocalOrderTable = newLOT
-				ch_fromOC_LOT <- OC_PhysicalInfo.LocalOrderTable
+
+				OC_OrderTable = packet.OrderTable
+				ch_fromOC_OrderTable <- OC_OrderTable
 
 			case elev.ER_Primary:
 
 				if packet.Id == OC_PhysicalInfo.Id {
 					break //message from self
 				}
-				newOrderTable := OC_AllOrderTables[packet.Id]
-				// TODO: skal det være:
-				// newOrderTable := packet.OrderTable ?
+
+				// TODO sjekk at Eskil tenker riktig (Heh)
+				newOrderTable := packet.OrderTable
+				OC_AllOrderTables[packet.Id] = newOrderTable
 
 				for elevID := 0; elevID < elev.N_MAX_ELEVS; elevID++ {
 					for floor := 0; floor < elev.N_FLOORS; floor++ {

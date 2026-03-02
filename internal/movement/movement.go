@@ -13,10 +13,10 @@ import (
 // [X]
 func Movement(
 	elevator elev.Elevator,
-	ch_updateMV_Physicalnfo chan elev.ElevatorPhysicalInfo,
+	ch_updateMV_PhysicalInfo chan elev.ElevatorPhysicalInfo,
 	ch_FloorArrival chan int,
 	ch_fromMV_LOT chan elev.LocalOrderTable,
-	ch_fromMV_State chan elev.ElevatorMovement,
+	ch_fromMV_Movement chan elev.ElevatorMovement,
 	ch_fromMV_MotorDir chan elevio.MotorDirection) {
 
 	MV_PhysicalInfo := elevator.PhysicalInfo
@@ -25,20 +25,20 @@ func Movement(
 	for {
 		select {
 
-		case newPhysicalInfo := <-ch_updateMV_Physicalnfo:
+		case newPhysicalInfo := <-ch_updateMV_PhysicalInfo:
 
 			MV_PhysicalInfo = newPhysicalInfo
-			MV_PhysicalInfo = FSM_OnTableUpdate(MV_PhysicalInfo, doorTimer, ch_fromMV_LOT, ch_fromMV_State, ch_fromMV_MotorDir)
+			MV_PhysicalInfo = FSM_OnTableUpdate(MV_PhysicalInfo, doorTimer, ch_fromMV_LOT, ch_fromMV_Movement, ch_fromMV_MotorDir)
 
 		case <-doorTimer.C:
 
 			fmt.Println("fsm doortimer event")
-			MV_PhysicalInfo = FSM_OnDoorTimeout(MV_PhysicalInfo, doorTimer, ch_fromMV_LOT, ch_fromMV_State, ch_fromMV_MotorDir)
+			MV_PhysicalInfo = FSM_OnDoorTimeout(MV_PhysicalInfo, doorTimer, ch_fromMV_LOT, ch_fromMV_Movement, ch_fromMV_MotorDir)
 
 		case newFloor := <-ch_FloorArrival:
 
 			MV_PhysicalInfo.Floor = newFloor
-			MV_PhysicalInfo = FSM_OnFloorArrival(MV_PhysicalInfo, doorTimer, ch_fromMV_LOT, ch_fromMV_State)
+			MV_PhysicalInfo = FSM_OnFloorArrival(MV_PhysicalInfo, doorTimer, ch_fromMV_LOT, ch_fromMV_Movement)
 
 		}
 	}
@@ -48,7 +48,7 @@ func FSM_OnTableUpdate(
 	PhysicalInfo elev.ElevatorPhysicalInfo,
 	doorTimer *timer.Timer,
 	ch_fromMV_LOT chan elev.LocalOrderTable,
-	ch_fromMV_State chan elev.ElevatorMovement,
+	ch_fromMV_Movement chan elev.ElevatorMovement,
 	ch_fromMV_MotorDir chan elevio.MotorDirection) elev.ElevatorPhysicalInfo {
 
 	switch PhysicalInfo.Movement {
@@ -61,11 +61,12 @@ func FSM_OnTableUpdate(
 			fmt.Println("timer set 2")
 			updated_LOT := requests.ClearCurrentFloor(PhysicalInfo.LocalOrderTable, PhysicalInfo.Floor, PhysicalInfo.MotorDir)
 			PhysicalInfo.LocalOrderTable = updated_LOT
+			PhysicalInfo.Movement = elev.EM_DoorOpen
 			ch_fromMV_LOT <- PhysicalInfo.LocalOrderTable
+			ch_fromMV_Movement <- PhysicalInfo.Movement
 		}
 
 	case elev.EM_Moving:
-		// will be handled at floor when idle or something
 
 	case elev.EM_Idle:
 
@@ -74,7 +75,7 @@ func FSM_OnTableUpdate(
 		PhysicalInfo.MotorDir = pair.MotorDir
 		PhysicalInfo.Movement = pair.Movement
 		ch_fromMV_MotorDir <- PhysicalInfo.MotorDir
-		ch_fromMV_State <- PhysicalInfo.Movement
+		ch_fromMV_Movement <- PhysicalInfo.Movement
 
 		// Stay idle
 		if PhysicalInfo.Movement == elev.EM_Idle {
@@ -82,7 +83,7 @@ func FSM_OnTableUpdate(
 			return PhysicalInfo
 		}
 
-		//
+		// Switch on the newly chosen Movement-type
 		switch PhysicalInfo.Movement {
 
 		case elev.EM_DoorOpen:
@@ -108,17 +109,16 @@ func FSM_OnTableUpdate(
 	}
 
 	SetAllLights(PhysicalInfo.LocalOrderTable)
-	printElevatorState(PhysicalInfo.Movement)
+	printElevatorMovement(PhysicalInfo.Movement)
 	return PhysicalInfo
 
 }
 
-// [X]
 func FSM_OnFloorArrival(
 	PhysicalInfo elev.ElevatorPhysicalInfo,
-	doorTimer *timer.Timer, // Maybe shit [X]
-	ch_LOTFromMV chan elev.LocalOrderTable,
-	ch_StateFromMV chan elev.ElevatorMovement) elev.ElevatorPhysicalInfo {
+	doorTimer *timer.Timer,
+	ch_fromMV_LOT chan elev.LocalOrderTable,
+	ch_fromMV_Movement chan elev.ElevatorMovement) elev.ElevatorPhysicalInfo {
 
 	elevio.SetFloorIndicator(PhysicalInfo.Floor)
 
@@ -133,24 +133,23 @@ func FSM_OnFloorArrival(
 
 	updated_LOT := requests.ClearCurrentFloor(PhysicalInfo.LocalOrderTable, PhysicalInfo.Floor, PhysicalInfo.MotorDir)
 	PhysicalInfo.LocalOrderTable = updated_LOT
-	ch_LOTFromMV <- updated_LOT
+	ch_fromMV_LOT <- updated_LOT
 
 	SetAllLights(updated_LOT)
 
 	PhysicalInfo.Movement = elev.EM_DoorOpen
-	ch_StateFromMV <- elev.EM_DoorOpen
+	ch_fromMV_Movement <- elev.EM_DoorOpen
 
 	return PhysicalInfo
 
 }
 
-// [X]
 func FSM_OnDoorTimeout(
 	PhysicalInfo elev.ElevatorPhysicalInfo,
 	doorTimer *timer.Timer,
-	ch_LOTFromMV chan elev.LocalOrderTable,
-	ch_StateFromMV chan elev.ElevatorMovement,
-	ch_MotorDirFromMV chan elevio.MotorDirection) elev.ElevatorPhysicalInfo {
+	ch_fromMV_LOT chan elev.LocalOrderTable,
+	ch_fromMV_Movement chan elev.ElevatorMovement,
+	ch_fromMV_MotorDir chan elevio.MotorDirection) elev.ElevatorPhysicalInfo {
 
 	if PhysicalInfo.Obstructed {
 
@@ -166,8 +165,8 @@ func FSM_OnDoorTimeout(
 		pair := requests.ChooseDirection(PhysicalInfo.LocalOrderTable, PhysicalInfo.Floor, PhysicalInfo.MotorDir)
 		PhysicalInfo.Movement = pair.Movement
 		PhysicalInfo.MotorDir = pair.MotorDir
-		ch_StateFromMV <- PhysicalInfo.Movement
-		ch_MotorDirFromMV <- PhysicalInfo.MotorDir
+		ch_fromMV_Movement <- PhysicalInfo.Movement
+		ch_fromMV_MotorDir <- PhysicalInfo.MotorDir
 
 		switch PhysicalInfo.Movement {
 
@@ -177,7 +176,7 @@ func FSM_OnDoorTimeout(
 			fmt.Println("timer set 4")
 			updated_LOT := requests.ClearCurrentFloor(PhysicalInfo.LocalOrderTable, PhysicalInfo.Floor, PhysicalInfo.MotorDir)
 			PhysicalInfo.LocalOrderTable = updated_LOT
-			ch_LOTFromMV <- PhysicalInfo.LocalOrderTable
+			ch_fromMV_LOT <- PhysicalInfo.LocalOrderTable
 			SetAllLights(updated_LOT)
 
 		case elev.EM_Idle:
@@ -196,7 +195,7 @@ func FSM_OnDoorTimeout(
 		}
 	}
 
-	printElevatorState(PhysicalInfo.Movement)
+	printElevatorMovement(PhysicalInfo.Movement)
 	return PhysicalInfo
 }
 
@@ -210,7 +209,7 @@ func SetAllLights(localOrderTable elev.LocalOrderTable) {
 }
 
 // [X]
-func printElevatorState(state elev.ElevatorMovement) {
+func printElevatorMovement(state elev.ElevatorMovement) {
 
 	switch state {
 	case elev.EM_Idle:

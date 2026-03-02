@@ -45,12 +45,12 @@ func main() {
 	ch_PollButtonPress := make(chan elevio.ButtonEvent, 10)
 
 	// To Movement
-	ch_updateMV_Physicalnfo := make(chan elev.ElevatorPhysicalInfo, 5)
+	ch_updateMV_PhysicalInfo := make(chan elev.ElevatorPhysicalInfo, 5)
 	ch_toMV_FloorArrival := make(chan int, 5)
 
 	// From Movement
 	ch_fromMV_LOT := make(chan elev.LocalOrderTable, 2)
-	ch_fromMV_State := make(chan elev.ElevatorMovement, 2)
+	ch_fromMV_Movement := make(chan elev.ElevatorMovement, 2)
 	ch_fromMV_MotorDir := make(chan elevio.MotorDirection, 2)
 
 	// To OrderControl
@@ -89,7 +89,7 @@ func main() {
 	go elevio.PollObstructionSwitch(ch_PollObstruction)
 	go elevio.PollFloorSensor(ch_PollFloorSensor)
 	go elevio.PollButtons(ch_PollButtonPress)
-	go movement.Movement(elevator, ch_updateMV_Physicalnfo, ch_toMV_FloorArrival, ch_fromMV_LOT, ch_fromMV_State, ch_fromMV_MotorDir)
+	go movement.Movement(elevator, ch_updateMV_PhysicalInfo, ch_toMV_FloorArrival, ch_fromMV_LOT, ch_fromMV_Movement, ch_fromMV_MotorDir)
 	go ordercontrol.OrderControl(elevator, ch_updateOC_OrderTable, ch_updateOC_AllOrderTables, ch_updateOC_PhysicalInfo, ch_updateOC_AliveList, ch_updateOC_NumElevs, ch_toOC_OrderTableP, ch_fromOC_LOT, ch_fromOC_OrderTable)
 	go network.Transmitter(ports.OrderTableP, ch_TxOrderTableP) // TODO: change function name
 	go network.Receiver(ports.OrderTableP, ch_RxOrderTableP)    // TODO: change function name
@@ -112,7 +112,7 @@ func main() {
 
 				elevator.PhysicalInfo.Obstructed = obst
 				ch_UpdateTxMessage <- elevator.PhysicalInfo
-				ch_updateMV_Physicalnfo <- elevator.PhysicalInfo
+				ch_updateMV_PhysicalInfo <- elevator.PhysicalInfo
 
 			case floor := <-ch_PollFloorSensor:
 
@@ -125,9 +125,15 @@ func main() {
 			case newLOT := <-ch_fromMV_LOT:
 
 				elevator.PhysicalInfo.LocalOrderTable = newLOT
+				f := elevator.PhysicalInfo.Floor
+				for b := 0; b < elev.N_BUTTONS; b++ {
+					if !newLOT[f][b] {
+						elevator.OrderTable[elevator.PhysicalInfo.Id][f][b] = elev.OS_NO_ORDER
+					}
+				}
 				ch_UpdateTxMessage <- elevator.PhysicalInfo
 
-			case newState := <-ch_fromMV_State:
+			case newState := <-ch_fromMV_Movement:
 
 				elevator.PhysicalInfo.Movement = newState
 				ch_UpdateTxMessage <- elevator.PhysicalInfo
@@ -160,7 +166,8 @@ func main() {
 			case newLocalOrderTable := <-ch_fromOC_LOT:
 
 				elevator.PhysicalInfo.LocalOrderTable = newLocalOrderTable
-				ch_updateMV_Physicalnfo <- elevator.PhysicalInfo
+				ch_updateMV_PhysicalInfo <- elevator.PhysicalInfo
+				ch_updateRM_PhysicalInfo <- elevator.PhysicalInfo
 
 			// ================================ ROLEMANAGER ============================
 
@@ -181,6 +188,8 @@ func main() {
 
 				elevator.PhysicalInfo.Role = newRole
 				ch_UpdateTxMessage <- elevator.PhysicalInfo
+				ch_updateMV_PhysicalInfo <- elevator.PhysicalInfo
+				ch_updateOC_PhysicalInfo <- elevator.PhysicalInfo
 
 			case newNumElevs := <-ch_fromRM_NumElevs:
 
@@ -189,6 +198,8 @@ func main() {
 			case newPrimaryId := <-ch_fromRM_PrimaryId:
 
 				elevator.PhysicalInfo.PrimaryId = newPrimaryId
+				ch_updateMV_PhysicalInfo <- elevator.PhysicalInfo
+				ch_updateOC_PhysicalInfo <- elevator.PhysicalInfo
 
 			// ================================ NETWORK ============================
 

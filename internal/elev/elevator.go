@@ -140,6 +140,8 @@ func PrintElevatorInfo(elevator Elevator, uptime float64) {
 	fmt.Printf(" t = " + uptimeString + "s |")
 	fmt.Printf(" primary = %d\n", elevator.PhysicalInfo.PrimaryId)
 	fmt.Printf("--------------------------------\n")
+	fmt.Printf("STATE = " + ElevatorMovementToString(elevator.PhysicalInfo.Movement) + "\n")
+	fmt.Printf("--------------------------------\n")
 
 	// Print floor row
 	fmt.Printf("Floor     |")
@@ -212,4 +214,19 @@ func ElevatorRoleToString(elevRole ElevatorRole) string {
 		roleString = "Dead"
 	}
 	return roleString
+}
+
+func ElevatorMovementToString(movement ElevatorMovement) string {
+	var movementString string
+
+	switch movement {
+	case EM_DoorOpen:
+		movementString = "DoorOpen"
+	case EM_Moving:
+		movementString = "Moving"
+	case EM_Idle:
+		movementString = "Idle"
+	}
+	return movementString
+
 }
