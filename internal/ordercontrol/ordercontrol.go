@@ -13,6 +13,7 @@ import (
 	"elevator-project-g7/internal/elev"
 	"elevator-project-g7/internal/elevio"
 	"elevator-project-g7/internal/requests"
+	"fmt"
 	"log"
 	"math"
 )
@@ -24,7 +25,7 @@ func OrderControl(
 	ch_updateOC_PhysicalInfo chan elev.ElevatorPhysicalInfo,
 	ch_updateOC_AliveList chan elev.AliveList,
 	ch_updateOC_NumElevs chan int,
-	ch_toOC_OrderTableP chan elev.OrderTablePacket,
+	ch_RxOrderTableP chan elev.OrderTablePacket,
 	ch_fromOC_LOT chan elev.LocalOrderTable,
 	ch_fromOC_OrderTable chan elev.OrderTable) {
 
@@ -41,9 +42,12 @@ func OrderControl(
 		case newOrderTable := <-ch_updateOC_OrderTable:
 
 			OC_OrderTable = newOrderTable
-			// Testing code
-			OC_PhysicalInfo.LocalOrderTable = orderTableToLOT(OC_OrderTable, OC_PhysicalInfo.Id)
-			ch_fromOC_LOT <- OC_PhysicalInfo.LocalOrderTable
+
+			/*
+				CODE FOR SINGLE ELEVATOR
+				OC_PhysicalInfo.LocalOrderTable = orderTableToLOT(OC_OrderTable, OC_PhysicalInfo.Id)
+				ch_fromOC_LOT <- OC_PhysicalInfo.LocalOrderTable
+			*/
 
 		case newAllOrderTables := <-ch_updateOC_AllOrderTables:
 
@@ -63,29 +67,23 @@ func OrderControl(
 
 			OC_NumElevs = newNumElevs
 
-		case packet := <-ch_toOC_OrderTableP:
-
-			// Ignorer per nå
-			if true {
-				break
-			}
+		case packet := <-ch_RxOrderTableP:
 
 			switch OC_PhysicalInfo.Role {
 
 			case elev.ER_Backup:
 
+				// Break if backup and message not from primary
 				if packet.Id != OC_PhysicalInfo.PrimaryId {
-					break //message not from primary
+					break
 				}
 
+				// Oppdater backup sine verdier ihht primary
 				OC_OrderTable = packet.OrderTable
 				ch_fromOC_OrderTable <- OC_OrderTable
+				ch_fromOC_LOT <- orderTableToLOT(OC_OrderTable, OC_PhysicalInfo.Id)
 
 			case elev.ER_Primary:
-
-				if packet.Id == OC_PhysicalInfo.Id {
-					break //message from self
-				}
 
 				// TODO sjekk at Eskil tenker riktig (Heh)
 				newOrderTable := packet.OrderTable
@@ -109,15 +107,16 @@ func OrderControl(
 								orderID = elevID
 							}
 							OC_OrderTable[orderID][floor][btn] = CalculateNewStatus(orderID, floor, btn, rcvStatus, primaryStatus, packet.Id, OC_AllOrderTables, OC_AliveList)
+							fmt.Printf("... calculating a new status ...\n")
 
 						}
 					}
 				}
 
-				// TODO: Sjekk dettan
-				//OC_PhysicalInfo.LocalOrderTable = orderTableToLOT(OC_OrderTable, OC_PhysicalInfo.Id)
-				//ch_fromOC_OrderTable <- OC_OrderTable
-				//ch_fromOC_LOT <- OC_PhysicalInfo.LocalOrderTable
+				// TODO: Sjekk om Eskil tenker riktig igjen :) Noe som går igjen det
+				OC_PhysicalInfo.LocalOrderTable = orderTableToLOT(OC_OrderTable, OC_PhysicalInfo.Id)
+				ch_fromOC_OrderTable <- OC_OrderTable
+				ch_fromOC_LOT <- OC_PhysicalInfo.LocalOrderTable
 
 			}
 		}
@@ -172,7 +171,7 @@ func CalculateNewStatus(
 			if AllOrderTables[orderID][orderID][floor][btn] != elev.OS_REQUESTED {
 				// FAILED ACCEPTANCE TEST
 				log.Printf("Heis %d påstår at %d har en request i etasje %d, men det stemmer ikke i min matrise!\n", senderID, orderID, floor)
-				log.Fatalln("Du kan ikkje sei at ei he requesta når ei ikkje he requesta sjølv!")
+				log.Printf("Du kan ikkje sei at ei he requesta når ei ikkje he requesta sjølv!\n")
 			}
 			if isRequestedByAll(AllOrderTables, orderID, floor, btn, AliveList) {
 				return elev.OS_CONFIRMED

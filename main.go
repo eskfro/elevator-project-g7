@@ -54,7 +54,6 @@ func main() {
 	ch_fromMV_MotorDir := make(chan elevio.MotorDirection, 2)
 
 	// To OrderControl
-	ch_toOC_OrderTableP := make(chan elev.OrderTablePacket, 4)
 	ch_updateOC_OrderTable := make(chan elev.OrderTable, 4)
 	ch_updateOC_AllOrderTables := make(chan elev.AllOrderTables, 4)
 	ch_updateOC_PhysicalInfo := make(chan elev.ElevatorPhysicalInfo, 4)
@@ -90,7 +89,7 @@ func main() {
 	go elevio.PollFloorSensor(ch_PollFloorSensor)
 	go elevio.PollButtons(ch_PollButtonPress)
 	go movement.Movement(elevator, ch_updateMV_PhysicalInfo, ch_toMV_FloorArrival, ch_fromMV_LOT, ch_fromMV_Movement, ch_fromMV_MotorDir)
-	go ordercontrol.OrderControl(elevator, ch_updateOC_OrderTable, ch_updateOC_AllOrderTables, ch_updateOC_PhysicalInfo, ch_updateOC_AliveList, ch_updateOC_NumElevs, ch_toOC_OrderTableP, ch_fromOC_LOT, ch_fromOC_OrderTable)
+	go ordercontrol.OrderControl(elevator, ch_updateOC_OrderTable, ch_updateOC_AllOrderTables, ch_updateOC_PhysicalInfo, ch_updateOC_AliveList, ch_updateOC_NumElevs, ch_RxOrderTableP, ch_fromOC_LOT, ch_fromOC_OrderTable)
 	go network.Transmitter(ports.OrderTableP, ch_TxOrderTableP) // TODO: change function name
 	go network.Receiver(ports.OrderTableP, ch_RxOrderTableP)    // TODO: change function name
 	go network.TxHeartBeat(elevator, ports.HeartBeat, ch_UpdateTxMessage)
@@ -106,8 +105,21 @@ func main() {
 				uptime := time.Since(timeStart).Seconds()
 				elev.PrintElevatorInfo(elevator, uptime)
 
-			// ================================ MOVEMENT ============================
-			// TO
+			// ========================== FROM HARDWARE =========================
+
+			case btnPress := <-ch_PollButtonPress:
+
+				elevio.PrintButtonpress(btnPress)
+				elevator.OrderTable[elevator.PhysicalInfo.Id][btnPress.Floor][btnPress.Button] = elev.OS_REQUESTED
+				packet := elev.OrderTablePacket{Id: elevator.PhysicalInfo.Id, OrderTable: elevator.OrderTable}
+				ch_TxOrderTableP <- packet
+
+				/*
+					CODE FOR SINGLE ELEVATOR
+					ch_updateOC_OrderTable <- elevator.OrderTable
+					-> Also, it was hardcoded to elev.OS_CONFIRMED
+				*/
+
 			case obst := <-ch_PollObstruction:
 
 				elevator.PhysicalInfo.Obstructed = obst
@@ -121,7 +133,8 @@ func main() {
 				ch_UpdateTxMessage <- elevator.PhysicalInfo
 				ch_updateOC_PhysicalInfo <- elevator.PhysicalInfo
 
-			// FROM
+			// =========================== FROM MOVEMENT ============================
+
 			case newLOT := <-ch_fromMV_LOT:
 
 				elevator.PhysicalInfo.LocalOrderTable = newLOT
@@ -145,16 +158,8 @@ func main() {
 				ch_UpdateTxMessage <- elevator.PhysicalInfo
 				ch_updateOC_PhysicalInfo <- elevator.PhysicalInfo
 
-			// ================================ ORDERCONTROL ============================
+			// ========================== FROM ORDERCONTROL ============================
 
-			// TO
-			case btnPress := <-ch_PollButtonPress:
-
-				elevator.OrderTable[elevator.PhysicalInfo.Id][btnPress.Floor][btnPress.Button] = elev.OS_CONFIRMED //For testing I put this OS_CONFIRMED
-				elevio.PrintButtonpress(btnPress)
-				ch_updateOC_OrderTable <- elevator.OrderTable
-
-			// FROM
 			case order := <-ch_fromOC_ClearOrder:
 
 				elevator.OrderTable[elevator.PhysicalInfo.Id][order.Floor][order.Button] = elev.OS_CLEAR
@@ -169,11 +174,7 @@ func main() {
 				ch_updateMV_PhysicalInfo <- elevator.PhysicalInfo
 				ch_updateRM_PhysicalInfo <- elevator.PhysicalInfo
 
-			// ================================ ROLEMANAGER ============================
-
-			// TO
-
-			// FROM
+			// ========================== FROM ROLEMANAGER ============================
 
 			case <-ticker_AliveList.C:
 
@@ -201,16 +202,7 @@ func main() {
 				ch_updateMV_PhysicalInfo <- elevator.PhysicalInfo
 				ch_updateOC_PhysicalInfo <- elevator.PhysicalInfo
 
-			// ================================ NETWORK ============================
-
-			// TO
-
-			// FROM
-
-			// Denne her er både From Network og To OrderControl
-			case packet := <-ch_RxOrderTableP:
-
-				ch_toOC_OrderTableP <- packet
+			// ========================= FROM NETWORK ============================
 
 			case heartBeat := <-ch_RxPhysicalInfo:
 
@@ -220,7 +212,6 @@ func main() {
 				ch_toRM_HeartBeatId <- heartBeat.Id
 
 			}
-
 		}
 	}()
 
