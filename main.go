@@ -156,18 +156,17 @@ func main() {
 			case order := <-ch_fromOC_ClearOrder:
 
 				elevator.OrderTable[elevator.PhysicalInfo.Id][order.Floor][order.Button] = elev.OS_CLEAR
+				ch_updateTxOT <- elevator.OrderTable
 
 			case newOrderTable := <-ch_fromOC_OrderTable:
 
 				elevator.OrderTable = newOrderTable
-
 				ch_updateTxOT <- elevator.OrderTable
 
 			case newLocalOrderTable := <-ch_fromOC_LOT:
 
 				elevator.PhysicalInfo.LocalOrderTable = newLocalOrderTable
 				ch_updateMV_PhysicalInfo <- elevator.PhysicalInfo
-
 				ch_updateRM_PhysicalInfo <- elevator.PhysicalInfo
 
 			// ========================== FROM ROLEMANAGER ============================

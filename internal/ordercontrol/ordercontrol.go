@@ -13,12 +13,12 @@ import (
 	"elevator-project-g7/internal/elev"
 	"elevator-project-g7/internal/elevio"
 	"elevator-project-g7/internal/requests"
-	"log"
+	"fmt"
 	"math"
 )
 
 func OrderControl(
-	elevator elev.Elevator,
+	initElev elev.Elevator,
 	ch_updateOC_OrderTable chan elev.OrderTable,
 	ch_updateOC_AllOrderTables chan elev.AllOrderTables,
 	ch_updateOC_PhysicalInfo chan elev.ElevatorPhysicalInfo,
@@ -28,11 +28,12 @@ func OrderControl(
 	ch_fromOC_LOT chan elev.LocalOrderTable,
 	ch_fromOC_OrderTable chan elev.OrderTable) {
 
-	OC_OrderTable := elevator.OrderTable
-	OC_AllOrderTables := elevator.AllOrderTables
-	OC_PhysicalInfo := elevator.PhysicalInfo
-	OC_AliveList := elevator.AliveList
-	OC_NumElevs := elevator.NumElevs
+	OC_OrderTable := initElev.OrderTable
+	OC_PrevOrderTable := initElev.OrderTable
+	OC_AllOrderTables := initElev.AllOrderTables
+	OC_PhysicalInfo := initElev.PhysicalInfo
+	OC_AliveList := initElev.AliveList
+	OC_NumElevs := initElev.NumElevs
 
 	for {
 
@@ -68,6 +69,12 @@ func OrderControl(
 
 		case packet := <-ch_RxOrderTableP:
 
+			if packet.OrderTable == OC_PrevOrderTable {
+				fmt.Printf("no change dude\n")
+				break
+			}
+			OC_PrevOrderTable = packet.OrderTable
+
 			switch OC_PhysicalInfo.Role {
 
 			case elev.ER_Backup:
@@ -88,37 +95,38 @@ func OrderControl(
 				newOrderTable := packet.OrderTable
 				OC_AllOrderTables[packet.Id] = newOrderTable
 
-				//isOrderTableDifferent := false
-
-				for elevID := 0; elevID < elev.N_MAX_ELEVS; elevID++ {
+				for elevIndex := 0; elevIndex < elev.N_MAX_ELEVS; elevIndex++ {
 					for floor := 0; floor < elev.N_FLOORS; floor++ {
 						for btn := 0; btn < elev.N_BUTTONS; btn++ {
 
-							primaryStatus := OC_OrderTable[elevID][floor][btn]
-							rcvStatus := newOrderTable[elevID][floor][btn]
+							primaryStatus := OC_OrderTable[elevIndex][floor][btn]
+							rcvStatus := newOrderTable[elevIndex][floor][btn]
 
-							if rcvStatus == primaryStatus {
-								continue
-							}
-							//isOrderTableDifferent = true
 							var orderID int
 
 							if isReassignable(elevio.ButtonType(btn), rcvStatus, primaryStatus) {
-								orderID = CalculateWhichElevator(elevID, floor, btn, newOrderTable, OC_AliveList, int(OC_NumElevs))
+								orderID = CalculateWhichElevator(elevIndex, floor, btn, newOrderTable, OC_AliveList, int(OC_NumElevs))
 							} else {
-								orderID = elevID
+								orderID = elevIndex
 							}
-							OC_OrderTable[orderID][floor][btn] = CalculateNewStatus(orderID, floor, btn, rcvStatus, primaryStatus, packet.Id, OC_AllOrderTables, OC_AliveList)
+
+							if isRequestedByAll(OC_AllOrderTables, orderID, floor, btn, OC_AliveList) {
+								OC_OrderTable[orderID][floor][btn] = elev.OS_CONFIRMED
+
+							} else if isClearedByAll(OC_AllOrderTables, orderID, floor, btn, OC_AliveList) {
+								OC_OrderTable[orderID][floor][btn] = elev.OS_NO_ORDER
+
+							} else {
+								OC_OrderTable[orderID][floor][btn] = CalculateNewStatus(elevIndex, floor, btn, rcvStatus, primaryStatus, orderID, packet.Id, OC_AllOrderTables, OC_AliveList, OC_PhysicalInfo.Id)
+							}
+
 						}
 					}
 				}
-
-				//if isOrderTableDifferent {
-
 				OC_PhysicalInfo.LocalOrderTable = orderTableToLOT(OC_OrderTable, OC_PhysicalInfo.Id)
 				ch_fromOC_OrderTable <- OC_OrderTable
 				ch_fromOC_LOT <- OC_PhysicalInfo.LocalOrderTable
-				//}
+
 			}
 		}
 	}
@@ -132,79 +140,61 @@ func isReassignable(buttonType elevio.ButtonType, rcvStatus elev.OrderStatus, cu
 
 // Foreløpig ikkje ferdig funksjon
 func CalculateNewStatus(
-	orderID int,
+	elevIndex int,
 	floor int,
 	btn int,
 	rcvStatus elev.OrderStatus,
 	primaryStatus elev.OrderStatus,
-	senderID int,
+	orderID int,
+	packetID int,
 	AllOrderTables elev.AllOrderTables,
-	AliveList elev.AliveList) elev.OrderStatus {
+	AliveList elev.AliveList,
+	thisID int) elev.OrderStatus {
 
-	isOwner := orderID == senderID
+	switch rcvStatus {
 
-	if isRequestedByAll(AllOrderTables, orderID, floor, btn, AliveList) {
-		return elev.OS_CONFIRMED
-	}
+	case elev.OS_NO_ORDER:
 
-	if isOwner {
-		switch rcvStatus {
-
-		case elev.OS_REQUESTED:
-			if primaryStatus == elev.OS_NO_ORDER {
-				return elev.OS_REQUESTED
-			}
-
-			return primaryStatus
-
-		case elev.OS_CLEAR:
-			//TODO: Make acceptance test
-			// Lag kode som sjekker om vi kan fjerne ordre
-
+		if primaryStatus == elev.OS_NO_ORDER {
 			return elev.OS_NO_ORDER
-
-		case elev.OS_CONFIRMED:
-			//TODO:
-			// Eskil: skrev for å fjerne feilmelding
-			return primaryStatus
-
+		} else if primaryStatus == elev.OS_CLEAR && packetID == thisID {
+			return elev.OS_CLEAR
+		} else {
+			fmt.Println("Bindestrek 1")
 		}
 
-	} else { // senderID not owner of order -> only for acks
-		switch rcvStatus {
+	case elev.OS_REQUESTED:
 
-		case elev.OS_REQUESTED:
-			if AllOrderTables[orderID][orderID][floor][btn] != elev.OS_REQUESTED {
-				// FAILED ACCEPTANCE TEST
-				log.Printf("Heis %d påstår at %d har en request i etasje %d, men det stemmer ikke i min matrise!\n", senderID, orderID, floor)
-				log.Printf("Du kan ikkje sei at ei he requesta når ei ikkje he requesta sjølv!\n")
-			}
-			if isRequestedByAll(AllOrderTables, orderID, floor, btn, AliveList) {
-				return elev.OS_CONFIRMED
-			}
-			return primaryStatus
+		if primaryStatus == elev.OS_NO_ORDER && packetID == elevIndex {
+			return elev.OS_REQUESTED
+		} else {
+			fmt.Println("Bindestrek 2")
+		}
 
-		case elev.OS_CLEAR:
-			// FAILED ACCEPTANCE TEST
-			log.Fatalf("Kun owner kan cleare. Elev %d => selfkill\n", senderID)
-			// TODO: kanskje drepe senderen, ikkje seg selv, idk
-			return primaryStatus
+	case elev.OS_CONFIRMED:
 
-		case elev.OS_CONFIRMED:
-			// Acceptance test
-			// Trur ikkje det er noke meir
-			if primaryStatus != elev.OS_CONFIRMED {
-				log.Fatalf("Elev %d tried to confirm before primary confirmed => selfkill\n", senderID)
-				return primaryStatus
-			}
+		if primaryStatus == elev.OS_REQUESTED && packetID == thisID || primaryStatus == elev.OS_CONFIRMED {
 			return elev.OS_CONFIRMED
-
+		} else {
+			fmt.Println("Bindestrek 3")
 		}
+
+	case elev.OS_CLEAR:
+
+		if primaryStatus == elev.OS_CONFIRMED && packetID == orderID {
+			return elev.OS_CLEAR
+		} else {
+			fmt.Println("Bindestrek 4")
+		}
+
 	}
-	return primaryStatus
+	fmt.Println("CalculateNewStatus failed: Kraftig Bindestrek")
+	return elev.OS_NO_ORDER
+
 }
 
-func isRequestedByAll(AllOrderTables elev.AllOrderTables,
+func isRequestedByAll(
+	AllOrderTables elev.AllOrderTables,
 	orderID int,
 	floor int,
 	btn int,
@@ -216,6 +206,25 @@ func isRequestedByAll(AllOrderTables elev.AllOrderTables,
 		}
 
 		if AllOrderTables[i][orderID][floor][btn] != elev.OS_REQUESTED {
+			return false
+		}
+	}
+	return true
+}
+
+func isClearedByAll(
+	AllOrderTables elev.AllOrderTables,
+	orderID int,
+	floor int,
+	btn int,
+	AliveList elev.AliveList) bool {
+	for i := 0; i < elev.N_MAX_ELEVS; i++ {
+
+		if AliveList[i].Role == elev.ER_Dead {
+			continue
+		}
+
+		if AllOrderTables[i][orderID][floor][btn] != elev.OS_CLEAR {
 			return false
 		}
 	}
