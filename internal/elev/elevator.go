@@ -12,6 +12,7 @@ const N_MAX_ELEVS = 4
 const DOOR_OPEN_TIME = 3 * time.Second
 const HEARTBEAT_TIMEOUT = 3 * time.Second
 const PRIMARY_ELECTION_DELAY = 350 * time.Millisecond
+const BCAST_INTERVAL = 50 * time.Millisecond
 const INVALID_ELEVID = N_MAX_ELEVS + 1
 
 // ================= ENUM TYPES ===============================
@@ -59,9 +60,9 @@ type OrderTablePacket struct {
 	OrderTable OrderTable
 }
 
-type AliveListPacket struct {
-	Id        int
-	AliveList AliveList
+type NetworkPacket struct {
+	OrderTableP  OrderTablePacket
+	PhysicalInfo ElevatorPhysicalInfo
 }
 
 // ============ ELEVATOR CORE =======================================

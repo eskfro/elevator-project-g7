@@ -29,9 +29,15 @@ var lc = net.ListenConfig{
 	},
 }
 
-func TxHeartBeat(elevator elev.Elevator, port_hb int, ch_UpdateTxMessage chan elev.ElevatorPhysicalInfo) {
+func TxHeartBeat(
+	initElev elev.Elevator,
+	port_hb int,
+	ch_updateTxOT chan elev.OrderTable,
+	ch_updateTxPhysicalInfo chan elev.ElevatorPhysicalInfo) {
 
-	message := elevator.PhysicalInfo
+	initOTP := elev.OrderTablePacket{Id: initElev.PhysicalInfo.Id, OrderTable: initElev.OrderTable}
+	message := elev.NetworkPacket{OrderTableP: initOTP, PhysicalInfo: initElev.PhysicalInfo}
+
 	address := "255.255.255.255" + ":" + strconv.Itoa(port_hb)
 
 	// Establish udp "connection"
@@ -47,13 +53,14 @@ func TxHeartBeat(elevator elev.Elevator, port_hb int, ch_UpdateTxMessage chan el
 		log.Printf("Failed to resolve bcast adress: %v \n", err)
 	}
 
-	// Adjust how often to send message
-	ticker := time.NewTicker(50 * time.Millisecond)
+	ticker := time.NewTicker(elev.BCAST_INTERVAL)
 	defer ticker.Stop()
 
 	for {
 		select {
-		case message = <-ch_UpdateTxMessage:
+		case message.OrderTableP.OrderTable = <-ch_updateTxOT:
+
+		case message.PhysicalInfo = <-ch_updateTxPhysicalInfo:
 
 		case <-ticker.C:
 
@@ -72,7 +79,12 @@ func TxHeartBeat(elevator elev.Elevator, port_hb int, ch_UpdateTxMessage chan el
 	}
 }
 
-func RxHeartBeat(port_hb int, ch_RxPhysicalInfo chan elev.ElevatorPhysicalInfo, thisElevId int) {
+func RxHeartBeat(
+	port_hb int,
+	ch_RxOrderTableP chan elev.OrderTablePacket,
+	ch_RxPhysicalInfo chan elev.ElevatorPhysicalInfo,
+	thisElevId int) {
+
 	addr := ":" + strconv.Itoa(port_hb)
 
 	var conn net.PacketConn
@@ -100,7 +112,7 @@ func RxHeartBeat(port_hb int, ch_RxPhysicalInfo chan elev.ElevatorPhysicalInfo, 
 			continue
 		}
 
-		var recievedInfo elev.ElevatorPhysicalInfo
+		var recievedInfo elev.NetworkPacket
 
 		err = json.Unmarshal(buf[:n], &recievedInfo)
 		if err != nil {
@@ -108,13 +120,13 @@ func RxHeartBeat(port_hb int, ch_RxPhysicalInfo chan elev.ElevatorPhysicalInfo, 
 			continue
 		}
 
-		if recievedInfo.Id == thisElevId {
+		ch_RxOrderTableP <- recievedInfo.OrderTableP
+
+		if recievedInfo.PhysicalInfo.Id == thisElevId {
 			continue
+		} else {
+			ch_RxPhysicalInfo <- recievedInfo.PhysicalInfo
 		}
-
-		ch_RxPhysicalInfo <- recievedInfo
-		// fmt.Printf("Got a message from id = %d\n", recievedInfo.Id)
-
 	}
 }
 

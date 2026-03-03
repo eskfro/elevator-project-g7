@@ -13,7 +13,6 @@ import (
 	"elevator-project-g7/internal/elev"
 	"elevator-project-g7/internal/elevio"
 	"elevator-project-g7/internal/requests"
-	"fmt"
 	"log"
 	"math"
 )
@@ -89,6 +88,8 @@ func OrderControl(
 				newOrderTable := packet.OrderTable
 				OC_AllOrderTables[packet.Id] = newOrderTable
 
+				//isOrderTableDifferent := false
+
 				for elevID := 0; elevID < elev.N_MAX_ELEVS; elevID++ {
 					for floor := 0; floor < elev.N_FLOORS; floor++ {
 						for btn := 0; btn < elev.N_BUTTONS; btn++ {
@@ -99,6 +100,7 @@ func OrderControl(
 							if rcvStatus == primaryStatus {
 								continue
 							}
+							//isOrderTableDifferent = true
 							var orderID int
 
 							if isReassignable(elevio.ButtonType(btn), rcvStatus, primaryStatus) {
@@ -107,17 +109,16 @@ func OrderControl(
 								orderID = elevID
 							}
 							OC_OrderTable[orderID][floor][btn] = CalculateNewStatus(orderID, floor, btn, rcvStatus, primaryStatus, packet.Id, OC_AllOrderTables, OC_AliveList)
-							fmt.Printf("... calculating a new status ...\n")
-
 						}
 					}
 				}
 
-				// TODO: Sjekk om Eskil tenker riktig igjen :) Noe som går igjen det
+				//if isOrderTableDifferent {
+
 				OC_PhysicalInfo.LocalOrderTable = orderTableToLOT(OC_OrderTable, OC_PhysicalInfo.Id)
 				ch_fromOC_OrderTable <- OC_OrderTable
 				ch_fromOC_LOT <- OC_PhysicalInfo.LocalOrderTable
-
+				//}
 			}
 		}
 	}
@@ -142,6 +143,10 @@ func CalculateNewStatus(
 
 	isOwner := orderID == senderID
 
+	if isRequestedByAll(AllOrderTables, orderID, floor, btn, AliveList) {
+		return elev.OS_CONFIRMED
+	}
+
 	if isOwner {
 		switch rcvStatus {
 
@@ -149,6 +154,7 @@ func CalculateNewStatus(
 			if primaryStatus == elev.OS_NO_ORDER {
 				return elev.OS_REQUESTED
 			}
+
 			return primaryStatus
 
 		case elev.OS_CLEAR:

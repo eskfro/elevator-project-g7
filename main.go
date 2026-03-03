@@ -78,8 +78,8 @@ func main() {
 	ch_fromRM_PrimaryId := make(chan int, 4)
 
 	// To Network
-	ch_TxOrderTableP := make(chan elev.OrderTablePacket, 4)
-	ch_UpdateTxMessage := make(chan elev.ElevatorPhysicalInfo, 20)
+	ch_updateTxOT := make(chan elev.OrderTable, 4)
+	ch_updateTxPhysicalInfo := make(chan elev.ElevatorPhysicalInfo, 4)
 
 	// From Network
 	ch_RxOrderTableP := make(chan elev.OrderTablePacket, 4)
@@ -90,10 +90,8 @@ func main() {
 	go elevio.PollButtons(ch_PollButtonPress)
 	go movement.Movement(elevator, ch_updateMV_PhysicalInfo, ch_toMV_FloorArrival, ch_fromMV_LOT, ch_fromMV_Movement, ch_fromMV_MotorDir)
 	go ordercontrol.OrderControl(elevator, ch_updateOC_OrderTable, ch_updateOC_AllOrderTables, ch_updateOC_PhysicalInfo, ch_updateOC_AliveList, ch_updateOC_NumElevs, ch_RxOrderTableP, ch_fromOC_LOT, ch_fromOC_OrderTable)
-	go network.Transmitter(ports.OrderTableP, ch_TxOrderTableP) // TODO: change function name
-	go network.Receiver(ports.OrderTableP, ch_RxOrderTableP)    // TODO: change function name
-	go network.TxHeartBeat(elevator, ports.HeartBeat, ch_UpdateTxMessage)
-	go network.RxHeartBeat(ports.HeartBeat, ch_RxPhysicalInfo, elevator.PhysicalInfo.Id)
+	go network.TxHeartBeat(elevator, ports.HeartBeat, ch_updateTxOT, ch_updateTxPhysicalInfo)
+	go network.RxHeartBeat(ports.HeartBeat, ch_RxOrderTableP, ch_RxPhysicalInfo, elevator.PhysicalInfo.Id)
 	go rolemanager.RoleManager(elevator, ch_updateRM_AliveList, ch_updateRM_PhysicalInfo, ch_updateRM_NumElevs, ch_toRM_HeartBeatId, ch_fromRM_Role, ch_fromRM_DeadElevId, ch_fromRM_NumElevs, ch_fromRM_PrimaryId)
 
 	go func() {
@@ -110,27 +108,22 @@ func main() {
 			case btnPress := <-ch_PollButtonPress:
 
 				elevio.PrintButtonpress(btnPress)
-				elevator.OrderTable[elevator.PhysicalInfo.Id][btnPress.Floor][btnPress.Button] = elev.OS_REQUESTED
-				packet := elev.OrderTablePacket{Id: elevator.PhysicalInfo.Id, OrderTable: elevator.OrderTable}
-				ch_TxOrderTableP <- packet
+				newOrderTable := elevator.OrderTable
+				newOrderTable[elevator.PhysicalInfo.Id][btnPress.Floor][btnPress.Button] = elev.OS_REQUESTED
 
-				/*
-					CODE FOR SINGLE ELEVATOR
-					ch_updateOC_OrderTable <- elevator.OrderTable
-					-> Also, it was hardcoded to elev.OS_CONFIRMED
-				*/
+				ch_updateTxOT <- newOrderTable
 
 			case obst := <-ch_PollObstruction:
 
 				elevator.PhysicalInfo.Obstructed = obst
-				ch_UpdateTxMessage <- elevator.PhysicalInfo
+				ch_updateTxPhysicalInfo <- elevator.PhysicalInfo
 				ch_updateMV_PhysicalInfo <- elevator.PhysicalInfo
 
 			case floor := <-ch_PollFloorSensor:
 
 				elevator.PhysicalInfo.Floor = floor
 				ch_toMV_FloorArrival <- floor
-				ch_UpdateTxMessage <- elevator.PhysicalInfo
+				ch_updateTxPhysicalInfo <- elevator.PhysicalInfo
 				ch_updateOC_PhysicalInfo <- elevator.PhysicalInfo
 
 			// =========================== FROM MOVEMENT ============================
@@ -144,18 +137,18 @@ func main() {
 						elevator.OrderTable[elevator.PhysicalInfo.Id][f][b] = elev.OS_NO_ORDER
 					}
 				}
-				ch_UpdateTxMessage <- elevator.PhysicalInfo
+				ch_updateTxPhysicalInfo <- elevator.PhysicalInfo
 
 			case newState := <-ch_fromMV_Movement:
 
 				elevator.PhysicalInfo.Movement = newState
-				ch_UpdateTxMessage <- elevator.PhysicalInfo
+				ch_updateTxPhysicalInfo <- elevator.PhysicalInfo
 				ch_updateOC_PhysicalInfo <- elevator.PhysicalInfo
 
 			case newMotorDir := <-ch_fromMV_MotorDir:
 
 				elevator.PhysicalInfo.MotorDir = newMotorDir
-				ch_UpdateTxMessage <- elevator.PhysicalInfo
+				ch_updateTxPhysicalInfo <- elevator.PhysicalInfo
 				ch_updateOC_PhysicalInfo <- elevator.PhysicalInfo
 
 			// ========================== FROM ORDERCONTROL ============================
@@ -168,10 +161,13 @@ func main() {
 
 				elevator.OrderTable = newOrderTable
 
+				ch_updateTxOT <- elevator.OrderTable
+
 			case newLocalOrderTable := <-ch_fromOC_LOT:
 
 				elevator.PhysicalInfo.LocalOrderTable = newLocalOrderTable
 				ch_updateMV_PhysicalInfo <- elevator.PhysicalInfo
+
 				ch_updateRM_PhysicalInfo <- elevator.PhysicalInfo
 
 			// ========================== FROM ROLEMANAGER ============================
@@ -188,7 +184,7 @@ func main() {
 			case newRole := <-ch_fromRM_Role:
 
 				elevator.PhysicalInfo.Role = newRole
-				ch_UpdateTxMessage <- elevator.PhysicalInfo
+				ch_updateTxPhysicalInfo <- elevator.PhysicalInfo
 				ch_updateMV_PhysicalInfo <- elevator.PhysicalInfo
 				ch_updateOC_PhysicalInfo <- elevator.PhysicalInfo
 

@@ -16,7 +16,7 @@ SCRIPT_DIR=$(dirname "$0")
 cd "$SCRIPT_DIR/.."
 
 # Port Calculation
-HW_PORT=$((15657 + E_ID))
+HW_PORT=$((16657 + E_ID))
 HB_PORT=11311
 OT_PORT=10311
 
