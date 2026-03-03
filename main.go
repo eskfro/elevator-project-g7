@@ -52,6 +52,7 @@ func main() {
 	ch_fromMV_LOT := make(chan elev.LocalOrderTable, 2)
 	ch_fromMV_Movement := make(chan elev.ElevatorMovement, 2)
 	ch_fromMV_MotorDir := make(chan elevio.MotorDirection, 2)
+	ch_fromMV_ClearOrder := make(chan elev.Order, 4)
 
 	// To OrderControl
 	ch_updateOC_OrderTable := make(chan elev.OrderTable, 4)
@@ -88,7 +89,7 @@ func main() {
 	go elevio.PollObstructionSwitch(ch_PollObstruction)
 	go elevio.PollFloorSensor(ch_PollFloorSensor)
 	go elevio.PollButtons(ch_PollButtonPress)
-	go movement.Movement(elevator, ch_updateMV_PhysicalInfo, ch_toMV_FloorArrival, ch_fromMV_LOT, ch_fromMV_Movement, ch_fromMV_MotorDir)
+	go movement.Movement(elevator, ch_updateMV_PhysicalInfo, ch_toMV_FloorArrival, ch_fromMV_LOT, ch_fromMV_Movement, ch_fromMV_MotorDir, ch_fromMV_ClearOrder)
 	go ordercontrol.OrderControl(elevator, ch_updateOC_OrderTable, ch_updateOC_AllOrderTables, ch_updateOC_PhysicalInfo, ch_updateOC_AliveList, ch_updateOC_NumElevs, ch_RxOrderTableP, ch_fromOC_LOT, ch_fromOC_OrderTable)
 	go network.TxHeartBeat(elevator, ports.HeartBeat, ch_updateTxOT, ch_updateTxPhysicalInfo)
 	go network.RxHeartBeat(ports.HeartBeat, ch_RxOrderTableP, ch_RxPhysicalInfo, elevator.PhysicalInfo.Id)
@@ -128,15 +129,14 @@ func main() {
 
 			// =========================== FROM MOVEMENT ============================
 
+			case clearOrder := <-ch_fromMV_ClearOrder:
+
+				elevator.OrderTable[clearOrder.ElevatorNumber][clearOrder.Floor][clearOrder.ButtonType] = elev.OS_CLEAR
+				ch_updateTxOT <- elevator.OrderTable
+
 			case newLOT := <-ch_fromMV_LOT:
 
 				elevator.PhysicalInfo.LocalOrderTable = newLOT
-				f := elevator.PhysicalInfo.Floor
-				for b := 0; b < elev.N_BUTTONS; b++ {
-					if !newLOT[f][b] {
-						elevator.OrderTable[elevator.PhysicalInfo.Id][f][b] = elev.OS_NO_ORDER
-					}
-				}
 				ch_updateTxPhysicalInfo <- elevator.PhysicalInfo
 
 			case newState := <-ch_fromMV_Movement:

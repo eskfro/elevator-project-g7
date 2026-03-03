@@ -124,6 +124,7 @@ func RxHeartBeat(
 
 		if recievedInfo.PhysicalInfo.Id == thisElevId {
 			continue
+			
 		} else {
 			ch_RxPhysicalInfo <- recievedInfo.PhysicalInfo
 		}

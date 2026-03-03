@@ -51,73 +51,73 @@ func ChooseDirection(LocalOrderTable [elev.N_FLOORS][elev.N_BUTTONS]bool, curren
 		if RequestAbove(LocalOrderTable, currentFloor) {
 			return DirnMovementPair{
 				MotorDir: elevio.MD_Up,
-				Movement:  elev.EM_Moving,
+				Movement: elev.EM_Moving,
 			}
 		} else if RequestHere(LocalOrderTable, currentFloor) {
 			return DirnMovementPair{
 				MotorDir: elevio.MD_Down,
-				Movement:  elev.EM_DoorOpen,
+				Movement: elev.EM_DoorOpen,
 			}
 		} else if RequestBelow(LocalOrderTable, currentFloor) {
 			return DirnMovementPair{
 				MotorDir: elevio.MD_Down,
-				Movement:  elev.EM_Moving,
+				Movement: elev.EM_Moving,
 			}
 		} else {
 			return DirnMovementPair{
 				MotorDir: elevio.MD_Stop,
-				Movement:  elev.EM_Idle,
+				Movement: elev.EM_Idle,
 			}
 		}
 	case elevio.MD_Down:
 		if RequestBelow(LocalOrderTable, currentFloor) {
 			return DirnMovementPair{
 				MotorDir: elevio.MD_Down,
-				Movement:  elev.EM_Moving,
+				Movement: elev.EM_Moving,
 			}
 		} else if RequestHere(LocalOrderTable, currentFloor) {
 			return DirnMovementPair{
 				MotorDir: elevio.MD_Up,
-				Movement:  elev.EM_DoorOpen,
+				Movement: elev.EM_DoorOpen,
 			}
 		} else if RequestAbove(LocalOrderTable, currentFloor) {
 			return DirnMovementPair{
 				MotorDir: elevio.MD_Up,
-				Movement:  elev.EM_Moving,
+				Movement: elev.EM_Moving,
 			}
 		} else {
 			return DirnMovementPair{
 				MotorDir: elevio.MD_Stop,
-				Movement:  elev.EM_Idle,
+				Movement: elev.EM_Idle,
 			}
 		}
 	case elevio.MD_Stop:
 		if RequestHere(LocalOrderTable, currentFloor) {
 			return DirnMovementPair{
 				MotorDir: elevio.MD_Stop,
-				Movement:  elev.EM_DoorOpen,
+				Movement: elev.EM_DoorOpen,
 			}
 		} else if RequestAbove(LocalOrderTable, currentFloor) {
 			return DirnMovementPair{
 				MotorDir: elevio.MD_Up,
-				Movement:  elev.EM_Moving,
+				Movement: elev.EM_Moving,
 			}
 		} else if RequestBelow(LocalOrderTable, currentFloor) {
 			return DirnMovementPair{
 				MotorDir: elevio.MD_Down,
-				Movement:  elev.EM_Moving,
+				Movement: elev.EM_Moving,
 			}
 		} else {
 			return DirnMovementPair{
 				MotorDir: elevio.MD_Stop,
-				Movement:  elev.EM_Idle,
+				Movement: elev.EM_Idle,
 			}
 		}
 
 	default:
 		return DirnMovementPair{
 			MotorDir: elevio.MD_Stop,
-			Movement:  elev.EM_Idle,
+			Movement: elev.EM_Idle,
 		}
 	}
 }
@@ -151,35 +151,44 @@ func ShouldClearImmediately(currentFloor int, dir elevio.MotorDirection, btnFloo
 
 func ClearCurrentFloor(LocalOrderTable elev.LocalOrderTable,
 	currentFloor int,
-	dir elevio.MotorDirection) elev.LocalOrderTable {
-	// Shorter name for clarity
+	dir elevio.MotorDirection) (elev.LocalOrderTable, [elev.N_BUTTONS]bool) {
+
+	var buttonsToClear [elev.N_BUTTONS]bool
+
 	LOT := LocalOrderTable
 	cf := currentFloor
 
 	// Clear the cab order
 	LOT[cf][elevio.BT_Cab] = false
+	buttonsToClear[elevio.BT_Cab] = true
 
 	switch dir {
 
 	case elevio.MD_Up:
 		if !RequestAbove(LOT, cf) && !LOT[cf][elevio.BT_HallUp] {
 			LOT[cf][elevio.BT_HallDown] = false
+			buttonsToClear[elevio.BT_HallDown] = true
 		}
 		LOT[cf][elevio.BT_HallUp] = false
+		buttonsToClear[elevio.BT_HallUp] = true
 
 	case elevio.MD_Down:
 		if !RequestBelow(LOT, cf) && !LOT[cf][elevio.BT_HallDown] {
 			LOT[cf][elevio.BT_HallUp] = false
+			buttonsToClear[elevio.BT_HallUp] = true
+
 		}
 		LOT[cf][elevio.BT_HallDown] = false
+		buttonsToClear[elevio.BT_HallDown] = true
 
 	default:
 		LOT[cf][elevio.BT_HallUp] = false
 		LOT[cf][elevio.BT_HallDown] = false
+		buttonsToClear[elevio.BT_HallUp] = true
+		buttonsToClear[elevio.BT_HallDown] = true
+
 	}
-	// New Local Order Table after change
-	// Set it in the movement.go logic?
-	return LOT
+	return LOT, buttonsToClear
 }
 
 func PrintLOT(LocalOrderTable [elev.N_FLOORS][elev.N_BUTTONS]bool) {

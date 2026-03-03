@@ -70,7 +70,6 @@ func OrderControl(
 		case packet := <-ch_RxOrderTableP:
 
 			if packet.OrderTable == OC_PrevOrderTable {
-				fmt.Printf("no change dude\n")
 				break
 			}
 			OC_PrevOrderTable = packet.OrderTable
@@ -91,7 +90,6 @@ func OrderControl(
 
 			case elev.ER_Primary:
 
-				// TODO sjekk at Eskil tenker riktig (Heh)
 				newOrderTable := packet.OrderTable
 				OC_AllOrderTables[packet.Id] = newOrderTable
 
@@ -102,22 +100,19 @@ func OrderControl(
 							primaryStatus := OC_OrderTable[elevIndex][floor][btn]
 							rcvStatus := newOrderTable[elevIndex][floor][btn]
 
-							var orderID int
+							if isRequestedByAll(OC_AllOrderTables, elevIndex, floor, btn, OC_AliveList) {
+								OC_OrderTable[elevIndex][floor][btn] = elev.OS_CONFIRMED
 
-							if isReassignable(elevio.ButtonType(btn), rcvStatus, primaryStatus) {
-								orderID = CalculateWhichElevator(elevIndex, floor, btn, newOrderTable, OC_AliveList, int(OC_NumElevs))
-							} else {
-								orderID = elevIndex
-							}
+							} else if isClearedByAll(OC_AllOrderTables, elevIndex, floor, btn, OC_AliveList) {
+								OC_OrderTable[elevIndex][floor][btn] = elev.OS_NO_ORDER
 
-							if isRequestedByAll(OC_AllOrderTables, orderID, floor, btn, OC_AliveList) {
-								OC_OrderTable[orderID][floor][btn] = elev.OS_CONFIRMED
-
-							} else if isClearedByAll(OC_AllOrderTables, orderID, floor, btn, OC_AliveList) {
-								OC_OrderTable[orderID][floor][btn] = elev.OS_NO_ORDER
+							} else if isReassignable(elevio.ButtonType(btn), rcvStatus, primaryStatus) {
+								bestID := CalculateWhichElevator(elevIndex, floor, btn, newOrderTable, OC_AliveList, int(OC_NumElevs))
+								fmt.Printf("isReassignable: bestID = %d\n", bestID)
+								OC_OrderTable[bestID][floor][btn] = elev.OS_REQUESTED
 
 							} else {
-								OC_OrderTable[orderID][floor][btn] = CalculateNewStatus(elevIndex, floor, btn, rcvStatus, primaryStatus, orderID, packet.Id, OC_AllOrderTables, OC_AliveList, OC_PhysicalInfo.Id)
+								OC_OrderTable[elevIndex][floor][btn] = CalculateNewStatus(elevIndex, floor, btn, rcvStatus, primaryStatus, packet.Id, OC_AllOrderTables, OC_AliveList, OC_PhysicalInfo.Id)
 							}
 
 						}
@@ -145,7 +140,6 @@ func CalculateNewStatus(
 	btn int,
 	rcvStatus elev.OrderStatus,
 	primaryStatus elev.OrderStatus,
-	orderID int,
 	packetID int,
 	AllOrderTables elev.AllOrderTables,
 	AliveList elev.AliveList,
@@ -161,14 +155,8 @@ func CalculateNewStatus(
 			return elev.OS_CLEAR
 		} else {
 			fmt.Println("Bindestrek 1")
-		}
+			return elev.OS_NO_ORDER
 
-	case elev.OS_REQUESTED:
-
-		if primaryStatus == elev.OS_NO_ORDER && packetID == elevIndex {
-			return elev.OS_REQUESTED
-		} else {
-			fmt.Println("Bindestrek 2")
 		}
 
 	case elev.OS_CONFIRMED:
@@ -177,19 +165,24 @@ func CalculateNewStatus(
 			return elev.OS_CONFIRMED
 		} else {
 			fmt.Println("Bindestrek 3")
+			return elev.OS_NO_ORDER
+
 		}
 
 	case elev.OS_CLEAR:
 
-		if primaryStatus == elev.OS_CONFIRMED && packetID == orderID {
+		if primaryStatus == elev.OS_CONFIRMED && packetID == elevIndex {
 			return elev.OS_CLEAR
 		} else {
 			fmt.Println("Bindestrek 4")
+			return elev.OS_NO_ORDER
+
 		}
 
+	default:
+		fmt.Println("CalculateNewStatus failed: Kraftig Bindestrek")
+		return elev.OS_NO_ORDER
 	}
-	fmt.Println("CalculateNewStatus failed: Kraftig Bindestrek")
-	return elev.OS_NO_ORDER
 
 }
 
