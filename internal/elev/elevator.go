@@ -3,6 +3,7 @@ package elev
 import (
 	"elevator-project-g7/internal/elevio"
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -230,4 +231,45 @@ func ElevatorMovementToString(movement ElevatorMovement) string {
 	}
 	return movementString
 
+}
+
+func (status OrderStatus) String() string {
+	switch status {
+	case OS_CLEAR:
+		return "Clear"
+	case OS_NO_ORDER:
+		return "No order"
+	case OS_REQUESTED:
+		return "Requested"
+	case OS_CONFIRMED:
+		return "Confirmed"
+	default:
+		return "Unknown"
+	}
+}
+
+func PrintOrderTableSlice(table OrderTable, elevID int) {
+	OT_Slice := table[elevID]
+	buttonNames := []string{"Hall Up", "Hall Down", "Cab"}
+
+	fmt.Printf("--- Primary's Order Table page %d\n", elevID)
+
+	// Print header: "Button / Floor" etterfulgt av alle etasjenumrene
+	fmt.Printf("%-12s", "Button\\Floor")
+	for f := 0; f < len(OT_Slice); f++ {
+		fmt.Printf(" | Floor %-2d", f)
+	}
+	fmt.Println(" |")
+	fmt.Println(strings.Repeat("-", 12+len(OT_Slice)*11))
+
+	// Print én rad for hver knappetype
+	for b := 0; b < len(buttonNames); b++ {
+		fmt.Printf("%-12s", buttonNames[b])
+		for f := 0; f < len(OT_Slice); f++ {
+			status := OT_Slice[f][b]
+			fmt.Printf(" | %-8s", status)
+		}
+		fmt.Println(" |")
+	}
+	fmt.Println(strings.Repeat("-", 12+len(OT_Slice)*11))
 }
