@@ -87,7 +87,7 @@ func OrderControl(
 				OC_AllOrderTables[packet.Id] = packet.OrderTable
 				OC_OrderTable = CalculateNewPrimaryOrderTable(OC_OrderTable, OC_AliveList, OC_AllOrderTables, OC_PhysicalInfo, OC_NumElevs, packet)
 				// The new primary order table is sent to network and backups are updated accordingly
-				elev.PrintOrderTableSlice(OC_OrderTable, packet.Id)
+				//elev.PrintOrderTableSlice(OC_OrderTable, packet.Id)
 				ch_fromOC_OrderTable <- OC_OrderTable
 				ch_fromOC_LOT <- orderTableToLOT(OC_OrderTable, OC_PhysicalInfo.Id)
 
@@ -157,15 +157,37 @@ func CalculateNewPrimaryOrderTable(
 
 				} else if primaryStatus == elev.OS_NO_ORDER && rcvStatus == elev.OS_REQUESTED {
 
+					if elevio.ButtonType(btn) != elevio.BT_Cab {
+						// Propagate hall order request to all alive elevators
+						for e := 0; e < elev.N_MAX_ELEVS; e++ {
+							if OC_AliveList[e].Role != elev.ER_Dead {
+								primaryOT[e][floor][btn] = elev.OS_REQUESTED
+							}
+						}
+					} else {
+						primaryOT[elevIndex][floor][btn] = elev.OS_REQUESTED
+					}
+
+				} else if primaryStatus == elev.OS_REQUESTED && rcvStatus == elev.OS_NO_ORDER {
+
 					primaryOT[elevIndex][floor][btn] = elev.OS_REQUESTED
 
-				} else if primaryStatus == elev.OS_CONFIRMED && rcvStatus == elev.OS_CLEAR {
+				} else if primaryStatus == elev.OS_CONFIRMED && rcvStatus == elev.OS_CLEAR && packet.Id == elevIndex {
 
+					fmt.Printf("CLEAR CASE\n")
 					primaryOT[elevIndex][floor][btn] = elev.OS_CLEAR
 
 				} else if primaryStatus == elev.OS_CLEAR && rcvStatus == elev.OS_NO_ORDER {
 
 					primaryOT[elevIndex][floor][btn] = elev.OS_NO_ORDER
+
+				} else if primaryStatus == elev.OS_CLEAR && rcvStatus == elev.OS_CLEAR {
+
+					primaryOT[elevIndex][floor][btn] = elev.OS_NO_ORDER
+
+				} else if primaryStatus == elev.OS_REQUESTED && rcvStatus == elev.OS_CLEAR {
+
+					primaryOT[elevIndex][floor][btn] = elev.OS_REQUESTED
 
 				} else {
 
@@ -254,6 +276,8 @@ func CalculateNewOrderStatus(
 	// ============================ Marius og Eskil BEGIN ===================
 	//			Foreslår å snu om til switch primarystatus på vår kode og
 
+	fmt.Printf("UWU\n")
+
 	switch rcvStatus {
 
 	case elev.OS_NO_ORDER:
@@ -339,7 +363,7 @@ func isClearedByAll(
 		}
 
 		thisStatus := AllOrderTables[elevIndex][orderID][floor][btn]
-		if thisStatus == elev.OS_REQUESTED || thisStatus == elev.OS_CONFIRMED {
+		if thisStatus == elev.OS_REQUESTED || thisStatus == elev.OS_CONFIRMED || thisStatus == elev.OS_NO_ORDER {
 			return false
 		}
 	}

@@ -34,7 +34,7 @@ func main() {
 
 	// Time for debugging
 	timeStart := time.Now()
-	ticker_printElevator := time.NewTicker(2000 * time.Millisecond)
+	ticker_printElevator := time.NewTicker(500 * time.Millisecond)
 	ticker_AliveList := time.NewTicker(500 * time.Millisecond)
 	defer ticker_printElevator.Stop()
 	defer ticker_AliveList.Stop()
@@ -101,6 +101,7 @@ func main() {
 			case <-ticker_printElevator.C:
 				uptime := time.Since(timeStart).Seconds()
 				elev.PrintElevatorInfo(elevator, uptime)
+				elev.PrintOrderTableSlice(elevator.OrderTable, elevator.PhysicalInfo.Id)
 
 			// ========================== FROM HARDWARE =========================
 
