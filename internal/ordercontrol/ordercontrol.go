@@ -67,15 +67,16 @@ func OrderControl(
 					break
 				}
 				OC_PrevOrderTable = packet.OrderTable
-				// Break if backup and message not from primary
-				if packet.Id != OC_PhysicalInfo.PrimaryId {
-					break
+
+				if packet.Id == OC_PhysicalInfo.PrimaryId { //Dette er mer lesbart
+
+					// Oppdater backup sine verdier ihht primary
+					OC_OrderTable = packet.OrderTable
+					OC_PhysicalInfo.LocalOrderTable = orderTableToLOT(OC_OrderTable, OC_PhysicalInfo.Id)
+					ch_fromOC_OrderTable <- OC_OrderTable
+					ch_fromOC_LOT <- OC_PhysicalInfo.LocalOrderTable
+
 				}
-				// Oppdater backup sine verdier ihht primary
-				OC_OrderTable = packet.OrderTable
-				OC_PhysicalInfo.LocalOrderTable = orderTableToLOT(OC_OrderTable, OC_PhysicalInfo.Id)
-				ch_fromOC_OrderTable <- OC_OrderTable
-				ch_fromOC_LOT <- OC_PhysicalInfo.LocalOrderTable
 
 			case elev.ER_Primary:
 

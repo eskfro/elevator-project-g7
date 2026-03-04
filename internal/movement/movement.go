@@ -12,7 +12,7 @@ import (
 
 // [X]
 func Movement(
-	elevator elev.Elevator,
+	initElev elev.Elevator,
 	ch_updateMV_PhysicalInfo chan elev.ElevatorPhysicalInfo,
 	ch_FloorArrival chan int,
 	ch_fromMV_LOT chan elev.LocalOrderTable,
@@ -20,7 +20,8 @@ func Movement(
 	ch_fromMV_MotorDir chan elevio.MotorDirection,
 	ch_fromMV_ClearOrder chan elev.Order) {
 
-	MV_PhysicalInfo := elevator.PhysicalInfo
+	MV_PhysicalInfo := initElev.PhysicalInfo
+	MV_prevLOT := initElev.PhysicalInfo.LocalOrderTable
 	doorTimer := timer.New(elev.DOOR_OPEN_TIME)
 
 	for {
@@ -28,6 +29,10 @@ func Movement(
 
 		case newPhysicalInfo := <-ch_updateMV_PhysicalInfo:
 
+			if newPhysicalInfo.LocalOrderTable == MV_prevLOT {
+				break
+			}
+			MV_prevLOT = newPhysicalInfo.LocalOrderTable
 			MV_PhysicalInfo = newPhysicalInfo
 			MV_PhysicalInfo = FSM_OnTableUpdate(MV_PhysicalInfo, doorTimer, ch_fromMV_LOT, ch_fromMV_Movement, ch_fromMV_MotorDir, ch_fromMV_ClearOrder)
 
