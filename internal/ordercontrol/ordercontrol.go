@@ -109,9 +109,8 @@ func CalculateNewPrimaryOrderTable(
 
 	for elevIndex := 0; elevIndex < elev.N_MAX_ELEVS; elevIndex++ {
 
-		// Skip dead elev
+		// Skip dead elev :)
 		if OC_AliveList[elevIndex].Role == elev.ER_Dead {
-			fmt.Printf("dead\n")
 			continue
 		}
 
@@ -139,9 +138,9 @@ func CalculateNewPrimaryOrderTable(
 
 						// Hvis ordren flyttes, nullstill den gamle plassen i Primary sin tabell
 						// Tror egentlig den ikke trengs nå fordi vi er inne i RequestedByAll
-						if bestID != elevIndex {
-							primaryOT[elevIndex][floor][btn] = elev.OS_REQUESTED
-						}
+						// if bestID != elevIndex {
+						// 	primaryOT[elevIndex][floor][btn] = elev.OS_REQUESTED
+						// }
 
 						primaryOT[bestID][floor][btn] = elev.OS_CONFIRMED
 
@@ -168,14 +167,13 @@ func CalculateNewPrimaryOrderTable(
 						primaryOT[elevIndex][floor][btn] = elev.OS_REQUESTED
 					}
 
+				} else if packet.Id == elevIndex {
+
+					primaryOT = ElevatorIsOwner(primaryOT, primaryStatus, rcvStatus, elevIndex, floor, btn)
+
 				} else if primaryStatus == elev.OS_REQUESTED && rcvStatus == elev.OS_NO_ORDER {
 
 					primaryOT[elevIndex][floor][btn] = elev.OS_REQUESTED
-
-				} else if primaryStatus == elev.OS_CONFIRMED && rcvStatus == elev.OS_CLEAR && packet.Id == elevIndex {
-
-					fmt.Printf("CLEAR CASE\n")
-					primaryOT[elevIndex][floor][btn] = elev.OS_CLEAR
 
 				} else if primaryStatus == elev.OS_CLEAR && rcvStatus == elev.OS_NO_ORDER {
 
@@ -183,7 +181,7 @@ func CalculateNewPrimaryOrderTable(
 
 				} else if primaryStatus == elev.OS_CLEAR && rcvStatus == elev.OS_CLEAR {
 
-					primaryOT[elevIndex][floor][btn] = elev.OS_NO_ORDER
+					primaryOT[elevIndex][floor][btn] = elev.OS_CLEAR // changed from noorder to clear
 
 				} else if primaryStatus == elev.OS_REQUESTED && rcvStatus == elev.OS_CLEAR {
 
@@ -216,6 +214,31 @@ func CalculateNewPrimaryOrderTable(
 		}
 	}
 
+	for elevIndex := 0; elevIndex < elev.N_MAX_ELEVS; elevIndex++ {
+		for floor := 0; floor < elev.N_FLOORS; floor++ {
+			for btn := 0; btn < elev.N_BUTTONS; btn++ {
+				if primaryOT[elevIndex][floor][btn] == elev.OS_CLEAR {
+					primaryOT[elevIndex][floor][btn] = elev.OS_NO_ORDER
+				}
+			}
+		}
+	}
+
+	return primaryOT
+}
+
+func ElevatorIsOwner(primaryOT elev.OrderTable, primaryStatus elev.OrderStatus, rcvStatus elev.OrderStatus, elevIndex int, floor int, btn int) elev.OrderTable {
+
+	if primaryStatus == elev.OS_CONFIRMED && rcvStatus == elev.OS_CLEAR || primaryStatus == elev.OS_CLEAR && rcvStatus == elev.OS_CONFIRMED {
+
+		primaryOT[elevIndex][floor][btn] = elev.OS_CLEAR // this was OS_CLEARED
+		return primaryOT
+
+	} else if primaryStatus == elev.OS_CONFIRMED && rcvStatus == elev.OS_NO_ORDER {
+
+		primaryOT[elevIndex][floor][btn] = elev.OS_NO_ORDER // this was NO ORDER
+		return primaryOT
+	}
 	return primaryOT
 }
 
@@ -233,97 +256,103 @@ func CalculateNewOrderStatus(
 	packetID int,
 	thisID int) elev.OrderStatus {
 
+	fmt.Printf("UWU\n")
+
 	//======================= GEMINI BEGIN (Funka dårligare enn vår kode) =========================
 
-	/*
-		switch primaryStatus {
+	switch primaryStatus {
 
-		case elev.OS_NO_ORDER:
-			// Her venter Primary på at noen skal trykke på en knapp
-			if rcvStatus == elev.OS_REQUESTED {
-				return elev.OS_REQUESTED
-			}
-			return elev.OS_NO_ORDER
+	case elev.OS_NO_ORDER:
+		fmt.Printf("norder\n")
 
-		case elev.OS_REQUESTED:
-			// Primary har sett REQUESTED, og venter på at ALLE skal se den.
-			// Denne sjekken gjøres i ER_Primary-loopen din vha isRequestedByAll.
-			// Hvis ikke alle har sett den ennå, beholder vi REQUESTED.
+		// Her venter Primary på at noen skal trykke på en knapp
+		if rcvStatus == elev.OS_REQUESTED {
 			return elev.OS_REQUESTED
-
-		case elev.OS_CONFIRMED:
-			// Ordren er låst og sendt ut. Nå venter vi på at heisen som
-			// eier ordren (elevIndex) skal sette den til CLEAR når den er fremme.
-			if rcvStatus == elev.OS_CLEAR && packetID == elevIndex {
-				return elev.OS_CLEAR
-			}
-			return elev.OS_CONFIRMED
-
-		case elev.OS_CLEAR:
-			// Primary har sett at ordren er utført. Nå venter vi på at
-			// ALLE heiser har satt den til CLEAR (vha isClearedByAll i loopen).
-			// Inntil det skjer, beholder vi CLEAR for å "smitte" de andre.
-			return elev.OS_CLEAR
-
-		default:
-			return elev.OS_NO_ORDER
 		}
+		return elev.OS_NO_ORDER
 
-	*/
+	case elev.OS_REQUESTED:
+		fmt.Printf("req\n")
+
+		// Primary har sett REQUESTED, og venter på at ALLE skal se den.
+		// Denne sjekken gjøres i ER_Primary-loopen din vha isRequestedByAll.
+		// Hvis ikke alle har sett den ennå, beholder vi REQUESTED.
+		return elev.OS_REQUESTED
+
+	case elev.OS_CONFIRMED:
+		fmt.Printf("confirmed\n")
+
+		// Ordren er låst og sendt ut. Nå venter vi på at heisen som
+		// eier ordren (elevIndex) skal sette den til CLEAR når den er fremme.
+		if rcvStatus == elev.OS_CLEAR && packetID == elevIndex {
+			return elev.OS_CLEAR
+		}
+		return elev.OS_CONFIRMED
+
+	case elev.OS_CLEAR:
+		fmt.Printf("clear\n")
+
+		// Primary har sett at ordren er utført. Nå venter vi på at
+		// ALLE heiser har satt den til CLEAR (vha isClearedByAll i loopen).
+		// Inntil det skjer, beholder vi CLEAR for å "smitte" de andre.
+		return elev.OS_CLEAR
+
+	default:
+		fmt.Printf("DEFAULT\n")
+		return elev.OS_CLEAR
+	}
 
 	//============================= GEMINI END ==============================
 
 	// ============================ Marius og Eskil BEGIN ===================
 	//			Foreslår å snu om til switch primarystatus på vår kode og
 
-	fmt.Printf("UWU\n")
+	// switch rcvStatus {
 
-	switch rcvStatus {
+	// case elev.OS_NO_ORDER:
 
-	case elev.OS_NO_ORDER:
+	// 	if primaryStatus == elev.OS_NO_ORDER {
+	// 		return elev.OS_NO_ORDER
+	// 	} else if primaryStatus == elev.OS_CLEAR && packetID == thisID {
+	// 		return elev.OS_NO_ORDER //Bytta fra clear til no order tirsdags kveld
+	// 	} else {
+	// 		fmt.Println("Bindestrek 1")
+	// 		return elev.OS_NO_ORDER
 
-		if primaryStatus == elev.OS_NO_ORDER {
-			return elev.OS_NO_ORDER
-		} else if primaryStatus == elev.OS_CLEAR && packetID == thisID {
-			return elev.OS_NO_ORDER //Bytta fra clear til no order tirsdags kveld
-		} else {
-			fmt.Println("Bindestrek 1")
-			return elev.OS_NO_ORDER
+	// 	}
 
-		}
+	// case elev.OS_REQUESTED: //La til denne casen igjen tirsdags kveld🔫
+	// 	if primaryStatus == elev.OS_NO_ORDER || primaryStatus == elev.OS_REQUESTED {
+	// 		return elev.OS_REQUESTED
+	// 	} else {
+	// 		fmt.Println("Bindestrek 2")
+	// 		return elev.OS_NO_ORDER
+	// 	}
 
-	case elev.OS_REQUESTED: //La til denne casen igjen tirsdags kveld🔫
-		if primaryStatus == elev.OS_NO_ORDER || primaryStatus == elev.OS_REQUESTED {
-			return elev.OS_REQUESTED
-		} else {
-			fmt.Println("Bindestrek 2")
-			return elev.OS_NO_ORDER
-		}
+	// case elev.OS_CONFIRMED:
 
-	case elev.OS_CONFIRMED:
+	// 	if primaryStatus == elev.OS_REQUESTED && packetID == thisID || primaryStatus == elev.OS_CONFIRMED {
+	// 		return elev.OS_CONFIRMED
+	// 	} else {
+	// 		fmt.Println("Bindestrek 3")
+	// 		return elev.OS_NO_ORDER
 
-		if primaryStatus == elev.OS_REQUESTED && packetID == thisID || primaryStatus == elev.OS_CONFIRMED {
-			return elev.OS_CONFIRMED
-		} else {
-			fmt.Println("Bindestrek 3")
-			return elev.OS_NO_ORDER
+	// 	}
 
-		}
+	// case elev.OS_CLEAR:
 
-	case elev.OS_CLEAR:
+	// 	if primaryStatus == elev.OS_CONFIRMED && packetID == elevIndex {
+	// 		return elev.OS_CLEAR
+	// 	} else {
+	// 		fmt.Println("Bindestrek 4")
+	// 		return elev.OS_NO_ORDER
 
-		if primaryStatus == elev.OS_CONFIRMED && packetID == elevIndex {
-			return elev.OS_CLEAR
-		} else {
-			fmt.Println("Bindestrek 4")
-			return elev.OS_NO_ORDER
+	// 	}
 
-		}
-
-	default:
-		fmt.Println("CalculateNewStatus failed: Kraftig Bindestrek")
-		return elev.OS_NO_ORDER
-	}
+	// default:
+	// 	fmt.Println("CalculateNewStatus failed: Kraftig Bindestrek")
+	// 	return elev.OS_NO_ORDER
+	// }
 
 }
 
