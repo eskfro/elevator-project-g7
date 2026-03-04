@@ -7,7 +7,7 @@ fi
 
 # Window Dimensions & Positions
 W=70   # Width in characters
-H=30   # Height in characters
+H=25   # Height in characters
 X0=0   # Left column X
 Y_BOT=500  # Bottom row Y (pixels)
 

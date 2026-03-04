@@ -122,12 +122,10 @@ func RxHeartBeat(
 
 		ch_RxOrderTableP <- recievedInfo.OrderTableP
 
-		if recievedInfo.PhysicalInfo.Id == thisElevId {
-			continue
-			
-		} else {
+		if recievedInfo.PhysicalInfo.Id != thisElevId {
 			ch_RxPhysicalInfo <- recievedInfo.PhysicalInfo
 		}
+
 	}
 }
 

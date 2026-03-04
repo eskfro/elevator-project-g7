@@ -14,6 +14,7 @@ import (
 	"elevator-project-g7/internal/elevio"
 	"elevator-project-g7/internal/requests"
 	"fmt"
+	"log"
 	"math"
 )
 
@@ -62,62 +63,29 @@ func OrderControl(
 			case elev.ER_Backup:
 
 				if packet.OrderTable == OC_PrevOrderTable { //	Flytta "if no update" inn i kvar rolle.
-					// 												Som backup var den riktig, men primary må sjekke riktig heis sin orderTable. Sjå 🏷️
+					//Som backup var den riktig, men primary må sjekke riktig heis sin orderTable. Sjå 🏷️
 					break
 				}
 				OC_PrevOrderTable = packet.OrderTable
-
 				// Break if backup and message not from primary
 				if packet.Id != OC_PhysicalInfo.PrimaryId {
 					break
 				}
-
 				// Oppdater backup sine verdier ihht primary
 				OC_OrderTable = packet.OrderTable
-
+				OC_PhysicalInfo.LocalOrderTable = orderTableToLOT(OC_OrderTable, OC_PhysicalInfo.Id)
 				ch_fromOC_OrderTable <- OC_OrderTable
-				ch_fromOC_LOT <- orderTableToLOT(OC_OrderTable, OC_PhysicalInfo.Id)
+				ch_fromOC_LOT <- OC_PhysicalInfo.LocalOrderTable
 
 			case elev.ER_Primary:
 
+				// Ignorer dersom det er ingen endringer
 				if OC_AllOrderTables[packet.Id] == packet.OrderTable { // 🏷️
 					break
 				}
 				OC_AllOrderTables[packet.Id] = packet.OrderTable
-
-				for elevIndex := 0; elevIndex < elev.N_MAX_ELEVS; elevIndex++ {
-					for floor := 0; floor < elev.N_FLOORS; floor++ {
-						for btn := 0; btn < elev.N_BUTTONS; btn++ {
-
-							primaryStatus := OC_OrderTable[elevIndex][floor][btn]
-							rcvStatus := OC_AllOrderTables[packet.Id][elevIndex][floor][btn]
-
-							if isRequestedByAll(OC_AllOrderTables, elevIndex, floor, btn, OC_AliveList) {
-								OC_OrderTable[elevIndex][floor][btn] = elev.OS_CONFIRMED
-								continue
-							}
-
-							if isClearedByAll(OC_AllOrderTables, elevIndex, floor, btn, OC_AliveList) {
-								OC_OrderTable[elevIndex][floor][btn] = elev.OS_NO_ORDER
-								continue
-							}
-
-							if isReassignable(elevio.ButtonType(btn), rcvStatus, primaryStatus) {
-								bestID := CalculateWhichElevator(elevIndex, floor, btn, OC_OrderTable, OC_AliveList, OC_NumElevs)
-
-								// Hvis ordren flyttes, nullstill den gamle plassen i Primary sin tabell
-								if bestID != elevIndex {
-									OC_OrderTable[elevIndex][floor][btn] = elev.OS_NO_ORDER
-								}
-								OC_OrderTable[bestID][floor][btn] = elev.OS_REQUESTED
-								continue
-							}
-
-							OC_OrderTable[elevIndex][floor][btn] = CalculateNewStatus(elevIndex, rcvStatus, primaryStatus, packet.Id, OC_PhysicalInfo.Id)
-
-						}
-					}
-				}
+				OC_OrderTable = CalculateNewPrimaryOrderTable(OC_OrderTable, OC_AliveList, OC_AllOrderTables, OC_PhysicalInfo, OC_NumElevs, packet)
+				// The new primary order table is sent to network and backups are updated accordingly
 				elev.PrintOrderTableSlice(OC_OrderTable, packet.Id)
 				ch_fromOC_OrderTable <- OC_OrderTable
 				ch_fromOC_LOT <- orderTableToLOT(OC_OrderTable, OC_PhysicalInfo.Id)
@@ -127,6 +95,107 @@ func OrderControl(
 	}
 }
 
+func CalculateNewPrimaryOrderTable(
+	OC_OrderTable elev.OrderTable,
+	OC_AliveList elev.AliveList,
+	OC_AllOrderTables elev.AllOrderTables,
+	OC_PhysicalInfo elev.ElevatorPhysicalInfo,
+	OC_NumElevs int,
+	packet elev.OrderTablePacket) elev.OrderTable {
+
+	primaryOT := OC_OrderTable
+	rcvOT := packet.OrderTable
+
+	for elevIndex := 0; elevIndex < elev.N_MAX_ELEVS; elevIndex++ {
+
+		// Skip dead elev
+		if OC_AliveList[elevIndex].Role == elev.ER_Dead {
+			fmt.Printf("dead\n")
+			continue
+		}
+
+		for floor := 0; floor < elev.N_FLOORS; floor++ {
+			for btn := 0; btn < elev.N_BUTTONS; btn++ {
+
+				primaryStatus := primaryOT[elevIndex][floor][btn]
+				rcvStatus := rcvOT[elevIndex][floor][btn]
+
+				if isClearedByAll(OC_AllOrderTables, elevIndex, floor, btn, OC_AliveList) {
+
+					primaryOT[elevIndex][floor][btn] = elev.OS_NO_ORDER
+					continue
+
+				} else if isRequestedByAll(OC_AllOrderTables, elevIndex, floor, btn, OC_AliveList) {
+
+					if elevio.ButtonType(btn) == elevio.BT_Cab {
+
+						primaryOT[elevIndex][floor][btn] = elev.OS_CONFIRMED
+
+					} else {
+
+						bestID := CalculateWhichElevator(elevIndex, floor, btn, primaryOT, OC_AliveList, OC_NumElevs)
+						fmt.Printf("BESTID = %d\n", bestID)
+
+						// Hvis ordren flyttes, nullstill den gamle plassen i Primary sin tabell
+						// Tror egentlig den ikke trengs nå fordi vi er inne i RequestedByAll
+						if bestID != elevIndex {
+							primaryOT[elevIndex][floor][btn] = elev.OS_REQUESTED
+						}
+
+						primaryOT[bestID][floor][btn] = elev.OS_CONFIRMED
+
+					}
+
+				} else if elevio.ButtonType(btn) == elevio.BT_Cab && rcvStatus == elev.OS_REQUESTED {
+
+					primaryOT[elevIndex][floor][btn] = elev.OS_CONFIRMED
+
+				} else if elevio.ButtonType(btn) == elevio.BT_Cab && rcvStatus == elev.OS_CLEAR {
+
+					primaryOT[elevIndex][floor][btn] = elev.OS_NO_ORDER
+
+				} else if primaryStatus == elev.OS_NO_ORDER && rcvStatus == elev.OS_REQUESTED {
+
+					primaryOT[elevIndex][floor][btn] = elev.OS_REQUESTED
+
+				} else if primaryStatus == elev.OS_CONFIRMED && rcvStatus == elev.OS_CLEAR {
+
+					primaryOT[elevIndex][floor][btn] = elev.OS_CLEAR
+
+				} else if primaryStatus == elev.OS_CLEAR && rcvStatus == elev.OS_NO_ORDER {
+
+					primaryOT[elevIndex][floor][btn] = elev.OS_NO_ORDER
+
+				} else {
+
+					primaryOT[elevIndex][floor][btn] = CalculateNewOrderStatus(elevIndex, rcvStatus, primaryStatus, packet.Id, OC_PhysicalInfo.Id)
+
+				}
+
+				// Handle the other cases lol
+
+				/*
+					if isReassignable(elevio.ButtonType(btn), rcvStatus, primaryStatus) {
+						bestID := CalculateWhichElevator(elevIndex, floor, btn, OC_OrderTable, OC_AliveList, OC_NumElevs)
+
+						// Hvis ordren flyttes, nullstill den gamle plassen i Primary sin tabell
+						if bestID != elevIndex {
+							OC_OrderTable[elevIndex][floor][btn] = elev.OS_NO_ORDER
+						}
+						OC_OrderTable[bestID][floor][btn] = elev.OS_REQUESTED
+						continue
+					}
+
+					OC_OrderTable[elevIndex][floor][btn] = CalculateNewStatus(elevIndex, rcvStatus, primaryStatus, packet.Id, OC_PhysicalInfo.Id)
+				*/
+
+			}
+		}
+	}
+
+	return primaryOT
+}
+
 func isReassignable(buttonType elevio.ButtonType, rcvStatus elev.OrderStatus, primaryStatus elev.OrderStatus) bool {
 	isHallOrder := buttonType != elevio.BT_Cab
 	shouldBeAssigned := (rcvStatus == elev.OS_REQUESTED) && (primaryStatus == elev.OS_NO_ORDER)
@@ -134,7 +203,7 @@ func isReassignable(buttonType elevio.ButtonType, rcvStatus elev.OrderStatus, pr
 }
 
 // Foreløpig ikkje ferdig funksjon
-func CalculateNewStatus(
+func CalculateNewOrderStatus(
 	elevIndex int,
 	rcvStatus elev.OrderStatus,
 	primaryStatus elev.OrderStatus,
@@ -142,6 +211,7 @@ func CalculateNewStatus(
 	thisID int) elev.OrderStatus {
 
 	//======================= GEMINI BEGIN (Funka dårligare enn vår kode) =========================
+
 	/*
 		switch primaryStatus {
 
@@ -174,11 +244,15 @@ func CalculateNewStatus(
 
 		default:
 			return elev.OS_NO_ORDER
-		}*/
+		}
+
+	*/
+
 	//============================= GEMINI END ==============================
 
 	// ============================ Marius og Eskil BEGIN ===================
-	//				Foreslår å snu om til switch primarystatus på vår kode og
+	//			Foreslår å snu om til switch primarystatus på vår kode og
+
 	switch rcvStatus {
 
 	case elev.OS_NO_ORDER:
@@ -226,8 +300,9 @@ func CalculateNewStatus(
 		return elev.OS_NO_ORDER
 	}
 
-	//============================== Marius og Eskil END ======================
 }
+
+// 	//============================== Marius og Eskil END ======================
 
 func isRequestedByAll(
 	AllOrderTables elev.AllOrderTables,
@@ -235,13 +310,14 @@ func isRequestedByAll(
 	floor int,
 	btn int,
 	AliveList elev.AliveList) bool {
-	for i := 0; i < elev.N_MAX_ELEVS; i++ {
 
-		if AliveList[i].Role == elev.ER_Dead {
+	for elevIndex := 0; elevIndex < elev.N_MAX_ELEVS; elevIndex++ {
+
+		if AliveList[elevIndex].Role == elev.ER_Dead {
 			continue
 		}
 
-		if AllOrderTables[i][orderID][floor][btn] != elev.OS_REQUESTED {
+		if AllOrderTables[elevIndex][orderID][floor][btn] != elev.OS_REQUESTED {
 			return false
 		}
 	}
@@ -254,13 +330,15 @@ func isClearedByAll(
 	floor int,
 	btn int,
 	AliveList elev.AliveList) bool {
-	for i := 0; i < elev.N_MAX_ELEVS; i++ {
 
-		if AliveList[i].Role == elev.ER_Dead {
+	for elevIndex := 0; elevIndex < elev.N_MAX_ELEVS; elevIndex++ {
+
+		if AliveList[elevIndex].Role == elev.ER_Dead {
 			continue
 		}
 
-		if AllOrderTables[i][orderID][floor][btn] != elev.OS_CLEAR {
+		thisStatus := AllOrderTables[elevIndex][orderID][floor][btn]
+		if thisStatus == elev.OS_REQUESTED || thisStatus == elev.OS_CONFIRMED {
 			return false
 		}
 	}
@@ -277,21 +355,17 @@ func CalculateWhichElevator(
 	AliveList elev.AliveList,
 	NumElevs int) int {
 
-	if NumElevs == 1 {
-		return AliveList[0].Id
-	}
-
 	// Large number lol
 	minCost := 1000
-	bestElevId := AliveList[0].Id
+	bestElevId := elev.INVALID_ELEVID
 
-	for i := 0; i < elev.N_MAX_ELEVS; i++ {
+	for elevIndex := 0; elevIndex < elev.N_MAX_ELEVS; elevIndex++ {
 
-		if AliveList[i].Role == elev.ER_Dead {
+		if AliveList[elevIndex].Role == elev.ER_Dead {
 			continue
 		}
 
-		currentElev := AliveList[i]
+		currentElev := AliveList[elevIndex]
 
 		LocalOrderTable := orderTableToLOT(OrderTable, currentElev.Id)
 
@@ -301,6 +375,10 @@ func CalculateWhichElevator(
 			minCost = cost
 			bestElevId = currentElev.Id
 		}
+	}
+
+	if bestElevId == elev.INVALID_ELEVID {
+		log.Fatalln("CalculateWhichElevator failed! No elevators found in alivelist.")
 	}
 
 	return bestElevId

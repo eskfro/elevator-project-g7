@@ -61,7 +61,7 @@ func FSM_OnTableUpdate(
 
 			doorTimer.Start()
 			fmt.Println("timer set 2")
-			updated_LOT , buttonsToClear := requests.ClearCurrentFloor(PhysicalInfo.LocalOrderTable, PhysicalInfo.Floor, PhysicalInfo.MotorDir)
+			updated_LOT, buttonsToClear := requests.ClearCurrentFloor(PhysicalInfo.LocalOrderTable, PhysicalInfo.Floor, PhysicalInfo.MotorDir)
 			PhysicalInfo.LocalOrderTable = updated_LOT
 			PhysicalInfo.Movement = elev.EM_DoorOpen
 			ch_fromMV_LOT <- PhysicalInfo.LocalOrderTable
@@ -100,7 +100,7 @@ func FSM_OnTableUpdate(
 			elevio.SetDoorOpenLamp(true)
 			doorTimer.Start()
 			fmt.Println("timer set 1")
-			updated_LOT , buttonsToClear:= requests.ClearCurrentFloor(PhysicalInfo.LocalOrderTable, PhysicalInfo.Floor, PhysicalInfo.MotorDir)
+			updated_LOT, buttonsToClear := requests.ClearCurrentFloor(PhysicalInfo.LocalOrderTable, PhysicalInfo.Floor, PhysicalInfo.MotorDir)
 
 			PhysicalInfo.LocalOrderTable = updated_LOT
 			ch_fromMV_LOT <- PhysicalInfo.LocalOrderTable
@@ -151,6 +151,7 @@ func FSM_OnFloorArrival(
 	updated_LOT, buttonsToClear := requests.ClearCurrentFloor(PhysicalInfo.LocalOrderTable, PhysicalInfo.Floor, PhysicalInfo.MotorDir)
 
 	PhysicalInfo.LocalOrderTable = updated_LOT
+	SetAllLights(updated_LOT)
 	ch_fromMV_LOT <- updated_LOT
 
 	for btn := 0; btn < elev.N_BUTTONS; btn++ {
@@ -158,8 +159,6 @@ func FSM_OnFloorArrival(
 			ch_fromMV_ClearOrder <- elev.Order{ElevatorNumber: PhysicalInfo.Id, Floor: PhysicalInfo.Floor, ButtonType: elevio.ButtonType(btn)}
 		}
 	}
-
-	SetAllLights(updated_LOT)
 
 	PhysicalInfo.Movement = elev.EM_DoorOpen
 	ch_fromMV_Movement <- elev.EM_DoorOpen
@@ -199,7 +198,7 @@ func FSM_OnDoorTimeout(
 
 			doorTimer.Start()
 			fmt.Println("timer set 4")
-			updated_LOT , buttonsToClear := requests.ClearCurrentFloor(PhysicalInfo.LocalOrderTable, PhysicalInfo.Floor, PhysicalInfo.MotorDir)
+			updated_LOT, buttonsToClear := requests.ClearCurrentFloor(PhysicalInfo.LocalOrderTable, PhysicalInfo.Floor, PhysicalInfo.MotorDir)
 
 			PhysicalInfo.LocalOrderTable = updated_LOT
 			ch_fromMV_LOT <- PhysicalInfo.LocalOrderTable

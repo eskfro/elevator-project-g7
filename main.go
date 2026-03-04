@@ -61,7 +61,6 @@ func main() {
 	ch_updateOC_NumElevs := make(chan int, 4)
 
 	// From OrderControl
-	ch_fromOC_ClearOrder := make(chan elevio.ButtonEvent, 4)
 	ch_fromOC_LOT := make(chan elev.LocalOrderTable, 4)
 	ch_fromOC_OrderTable := make(chan elev.OrderTable, 4)
 
@@ -108,10 +107,8 @@ func main() {
 			case btnPress := <-ch_PollButtonPress:
 
 				elevio.PrintButtonpress(btnPress)
-				newOrderTable := elevator.OrderTable
-				newOrderTable[elevator.PhysicalInfo.Id][btnPress.Floor][btnPress.Button] = elev.OS_REQUESTED
-
-				ch_updateTxOT <- newOrderTable
+				elevator.OrderTable[elevator.PhysicalInfo.Id][btnPress.Floor][btnPress.Button] = elev.OS_REQUESTED
+				ch_updateTxOT <- elevator.OrderTable
 
 			case obst := <-ch_PollObstruction:
 
@@ -137,6 +134,7 @@ func main() {
 
 				elevator.PhysicalInfo.LocalOrderTable = newLOT
 				ch_updateTxPhysicalInfo <- elevator.PhysicalInfo
+				ch_updateOC_PhysicalInfo <- elevator.PhysicalInfo
 
 			case newState := <-ch_fromMV_Movement:
 
@@ -152,11 +150,6 @@ func main() {
 
 			// ========================== FROM ORDERCONTROL ============================
 
-			case order := <-ch_fromOC_ClearOrder:
-
-				elevator.OrderTable[elevator.PhysicalInfo.Id][order.Floor][order.Button] = elev.OS_CLEAR
-				ch_updateTxOT <- elevator.OrderTable
-
 			case newOrderTable := <-ch_fromOC_OrderTable:
 
 				elevator.OrderTable = newOrderTable
@@ -167,10 +160,10 @@ func main() {
 				elevator.PhysicalInfo.LocalOrderTable = newLocalOrderTable
 				ch_updateMV_PhysicalInfo <- elevator.PhysicalInfo
 				ch_updateRM_PhysicalInfo <- elevator.PhysicalInfo
-				ch_updateOC_PhysicalInfo <- elevator.PhysicalInfo
 
 			// ========================== FROM ROLEMANAGER ============================
 
+			// TODO: maybe remove this case
 			case <-ticker_AliveList.C:
 
 				ch_updateRM_AliveList <- elevator.AliveList
@@ -179,6 +172,7 @@ func main() {
 
 				elevator.AliveList[deadElevId].Role = elev.ER_Dead
 				ch_updateRM_AliveList <- elevator.AliveList
+				ch_updateOC_AliveList <- elevator.AliveList
 
 			case newRole := <-ch_fromRM_Role:
 
@@ -190,6 +184,7 @@ func main() {
 			case newNumElevs := <-ch_fromRM_NumElevs:
 
 				elevator.NumElevs = newNumElevs
+				ch_updateOC_NumElevs <- newNumElevs
 
 			case newPrimaryId := <-ch_fromRM_PrimaryId:
 
@@ -203,7 +198,7 @@ func main() {
 
 				elevator.AliveList[heartBeat.Id] = heartBeat
 				ch_updateRM_AliveList <- elevator.AliveList
-				// Send id for starting heartbeat timer
+				ch_updateOC_AliveList <- elevator.AliveList
 				ch_toRM_HeartBeatId <- heartBeat.Id
 
 			}
