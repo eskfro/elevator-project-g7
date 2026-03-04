@@ -66,9 +66,10 @@ func OrderControl(
 					//Som backup var den riktig, men primary må sjekke riktig heis sin orderTable. Sjå 🏷️
 					break
 				}
-				OC_PrevOrderTable = packet.OrderTable
 
 				if packet.Id == OC_PhysicalInfo.PrimaryId { //Dette er mer lesbart
+
+					OC_PrevOrderTable = packet.OrderTable
 
 					// Oppdater backup sine verdier ihht primary
 					OC_OrderTable = packet.OrderTable
