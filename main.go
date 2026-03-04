@@ -106,19 +106,16 @@ func main() {
 			// ========================== FROM HARDWARE =========================
 
 			case btnPress := <-ch_PollButtonPress:
-
 				elevio.PrintButtonpress(btnPress)
 				elevator.OrderTable[elevator.PhysicalInfo.Id][btnPress.Floor][btnPress.Button] = elev.OS_REQUESTED
 				ch_updateTxOT <- elevator.OrderTable
 
 			case obst := <-ch_PollObstruction:
-
 				elevator.PhysicalInfo.Obstructed = obst
 				ch_updateTxPhysicalInfo <- elevator.PhysicalInfo
 				ch_updateMV_PhysicalInfo <- elevator.PhysicalInfo
 
 			case floor := <-ch_PollFloorSensor:
-
 				elevator.PhysicalInfo.Floor = floor
 				ch_toMV_FloorArrival <- floor
 				ch_updateTxPhysicalInfo <- elevator.PhysicalInfo
@@ -127,24 +124,20 @@ func main() {
 			// =========================== FROM MOVEMENT ============================
 
 			case clearOrder := <-ch_fromMV_ClearOrder:
-
 				elevator.OrderTable[clearOrder.ElevatorNumber][clearOrder.Floor][clearOrder.ButtonType] = elev.OS_CLEAR
 				ch_updateTxOT <- elevator.OrderTable
 
 			case newLOT := <-ch_fromMV_LOT:
-
 				elevator.PhysicalInfo.LocalOrderTable = newLOT
 				ch_updateTxPhysicalInfo <- elevator.PhysicalInfo
 				ch_updateOC_PhysicalInfo <- elevator.PhysicalInfo
 
 			case newState := <-ch_fromMV_Movement:
-
 				elevator.PhysicalInfo.Movement = newState
 				ch_updateTxPhysicalInfo <- elevator.PhysicalInfo
 				ch_updateOC_PhysicalInfo <- elevator.PhysicalInfo
 
 			case newMotorDir := <-ch_fromMV_MotorDir:
-
 				elevator.PhysicalInfo.MotorDir = newMotorDir
 				ch_updateTxPhysicalInfo <- elevator.PhysicalInfo
 				ch_updateOC_PhysicalInfo <- elevator.PhysicalInfo
@@ -152,12 +145,10 @@ func main() {
 			// ========================== FROM ORDERCONTROL ============================
 
 			case newOrderTable := <-ch_fromOC_OrderTable:
-
 				elevator.OrderTable = newOrderTable
 				ch_updateTxOT <- elevator.OrderTable
 
 			case newLocalOrderTable := <-ch_fromOC_LOT:
-
 				elevator.PhysicalInfo.LocalOrderTable = newLocalOrderTable
 				ch_updateMV_PhysicalInfo <- elevator.PhysicalInfo
 				ch_updateRM_PhysicalInfo <- elevator.PhysicalInfo
@@ -166,29 +157,24 @@ func main() {
 
 			// TODO: maybe remove this case
 			case <-ticker_AliveList.C:
-
 				ch_updateRM_AliveList <- elevator.AliveList
 
 			case deadElevId := <-ch_fromRM_DeadElevId:
-
 				elevator.AliveList[deadElevId].Role = elev.ER_Dead
 				ch_updateRM_AliveList <- elevator.AliveList
 				ch_updateOC_AliveList <- elevator.AliveList
 
 			case newRole := <-ch_fromRM_Role:
-
 				elevator.PhysicalInfo.Role = newRole
 				ch_updateTxPhysicalInfo <- elevator.PhysicalInfo
 				ch_updateMV_PhysicalInfo <- elevator.PhysicalInfo
 				ch_updateOC_PhysicalInfo <- elevator.PhysicalInfo
 
 			case newNumElevs := <-ch_fromRM_NumElevs:
-
 				elevator.NumElevs = newNumElevs
 				ch_updateOC_NumElevs <- newNumElevs
 
 			case newPrimaryId := <-ch_fromRM_PrimaryId:
-
 				elevator.PhysicalInfo.PrimaryId = newPrimaryId
 				ch_updateMV_PhysicalInfo <- elevator.PhysicalInfo
 				ch_updateOC_PhysicalInfo <- elevator.PhysicalInfo
@@ -196,7 +182,6 @@ func main() {
 			// ========================= FROM NETWORK ============================
 
 			case heartBeat := <-ch_RxPhysicalInfo:
-
 				elevator.AliveList[heartBeat.Id] = heartBeat
 				ch_updateRM_AliveList <- elevator.AliveList
 				ch_updateOC_AliveList <- elevator.AliveList

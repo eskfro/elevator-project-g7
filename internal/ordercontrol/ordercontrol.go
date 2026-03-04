@@ -60,18 +60,19 @@ func OrderControl(
 
 			switch OC_PhysicalInfo.Role {
 
+			// =========== BACKUP RCV NETWORK PACKET ======================
 			case elev.ER_Backup:
 
+				// Ignore dersom ingen endring i packet sin OrderTable
 				if packet.OrderTable == OC_PrevOrderTable { //	Flytta "if no update" inn i kvar rolle.
 					//Som backup var den riktig, men primary må sjekke riktig heis sin orderTable. Sjå 🏷️
 					break
 				}
 
-				if packet.Id == OC_PhysicalInfo.PrimaryId { //Dette er mer lesbart
+				// Oppdater backup sitt OrderTable dersom packet er fra primary
+				if packet.Id == OC_PhysicalInfo.PrimaryId {
 
 					OC_PrevOrderTable = packet.OrderTable
-
-					// Oppdater backup sine verdier ihht primary
 					OC_OrderTable = packet.OrderTable
 					OC_PhysicalInfo.LocalOrderTable = orderTableToLOT(OC_OrderTable, OC_PhysicalInfo.Id)
 					ch_fromOC_OrderTable <- OC_OrderTable
@@ -79,6 +80,7 @@ func OrderControl(
 
 				}
 
+			// ========== PRIMARY RCV NETWORK PACKET ========================
 			case elev.ER_Primary:
 
 				// Ignorer dersom det er ingen endringer
@@ -86,8 +88,11 @@ func OrderControl(
 					break
 				}
 				OC_AllOrderTables[packet.Id] = packet.OrderTable
-				OC_OrderTable = CalculateNewPrimaryOrderTable(OC_OrderTable, OC_AliveList, OC_AllOrderTables, OC_PhysicalInfo, OC_NumElevs, packet)
-				// The new primary order table is sent to network and backups are updated accordingly
+				newOrderTable := CalculateNewPrimaryOrderTable(OC_OrderTable, OC_AliveList, OC_AllOrderTables, OC_PhysicalInfo, OC_NumElevs, packet)
+				if OC_OrderTable == newOrderTable {
+					break
+				}
+				OC_OrderTable = newOrderTable
 				//elev.PrintOrderTableSlice(OC_OrderTable, packet.Id)
 				ch_fromOC_OrderTable <- OC_OrderTable
 				ch_fromOC_LOT <- orderTableToLOT(OC_OrderTable, OC_PhysicalInfo.Id)
@@ -108,93 +113,86 @@ func CalculateNewPrimaryOrderTable(
 	primaryOT := OC_OrderTable
 	rcvOT := packet.OrderTable
 
+	// Iterate through Primaries OrderTable and the Recieved OrderTable
 	for elevIndex := 0; elevIndex < elev.N_MAX_ELEVS; elevIndex++ {
-
-		// Skip dead elev :)
+		// Skip if elevator is not on the network (ER_Dead)
 		if OC_AliveList[elevIndex].Role == elev.ER_Dead {
 			continue
 		}
-
 		for floor := 0; floor < elev.N_FLOORS; floor++ {
 			for btn := 0; btn < elev.N_BUTTONS; btn++ {
-
+				// Define helpers
 				primaryStatus := primaryOT[elevIndex][floor][btn]
 				rcvStatus := rcvOT[elevIndex][floor][btn]
 
+				// Handle cab calls
+				if elevio.ButtonType(btn) == elevio.BT_Cab {
+					if rcvStatus == elev.OS_REQUESTED {
+						primaryOT[elevIndex][floor][btn] = elev.OS_CONFIRMED
+						continue
+					}
+					if rcvStatus == elev.OS_CLEAR {
+						primaryOT[elevIndex][floor][btn] = elev.OS_NO_ORDER
+						continue
+					}
+				}
+				// Alle heise enige om clear på denne ordren (btn, floor)
 				if isClearedByAll(OC_AllOrderTables, elevIndex, floor, btn, OC_AliveList) {
-
 					primaryOT[elevIndex][floor][btn] = elev.OS_NO_ORDER
 					continue
-
-				} else if isRequestedByAll(OC_AllOrderTables, elevIndex, floor, btn, OC_AliveList) {
-
+				}
+				// Alle heisene enige om requesy på denne ordren (btn, floor)
+				if isRequestedByAll(OC_AllOrderTables, elevIndex, floor, btn, OC_AliveList) {
 					if elevio.ButtonType(btn) == elevio.BT_Cab {
-
 						primaryOT[elevIndex][floor][btn] = elev.OS_CONFIRMED
-
-					} else {
-
-						bestID := CalculateWhichElevator(elevIndex, floor, btn, primaryOT, OC_AliveList, OC_NumElevs)
-						fmt.Printf("BESTID = %d\n", bestID)
-
-						// Hvis ordren flyttes, nullstill den gamle plassen i Primary sin tabell
-						// Tror egentlig den ikke trengs nå fordi vi er inne i RequestedByAll
-						// if bestID != elevIndex {
-						// 	primaryOT[elevIndex][floor][btn] = elev.OS_REQUESTED
-						// }
-
-						primaryOT[bestID][floor][btn] = elev.OS_CONFIRMED
-
+						continue
 					}
-
-				} else if elevio.ButtonType(btn) == elevio.BT_Cab && rcvStatus == elev.OS_REQUESTED {
-
-					primaryOT[elevIndex][floor][btn] = elev.OS_CONFIRMED
-
-				} else if elevio.ButtonType(btn) == elevio.BT_Cab && rcvStatus == elev.OS_CLEAR {
-
-					primaryOT[elevIndex][floor][btn] = elev.OS_NO_ORDER
-
-				} else if primaryStatus == elev.OS_NO_ORDER && rcvStatus == elev.OS_REQUESTED {
-
+					bestID := CalculateWhichElevator(elevIndex, floor, btn, primaryOT, OC_AliveList, OC_NumElevs)
+					fmt.Printf("BESTID = %d\n", bestID)
+					primaryOT[bestID][floor][btn] = elev.OS_CONFIRMED
+					continue
+					// Hvis ordren flyttes, nullstill den gamle plassen i Primary sin tabell
+					// if bestID != elevIndex {
+					// 	primaryOT[elevIndex][floor][btn] = elev.OS_REQUESTED
+					// }
+				}
+				if packet.Id == elevIndex {
+					primaryOT[elevIndex][floor][btn] = ElevatorIsOwner(primaryStatus, rcvStatus)
+					continue
+				}
+				if primaryStatus == elev.OS_NO_ORDER && rcvStatus == elev.OS_REQUESTED {
 					if elevio.ButtonType(btn) != elevio.BT_Cab {
-						// Propagate hall order request to all alive elevators
 						for e := 0; e < elev.N_MAX_ELEVS; e++ {
 							if OC_AliveList[e].Role != elev.ER_Dead {
 								primaryOT[e][floor][btn] = elev.OS_REQUESTED
 							}
 						}
-					} else {
-						primaryOT[elevIndex][floor][btn] = elev.OS_REQUESTED
+						continue
 					}
-
-				} else if packet.Id == elevIndex {
-
-					primaryOT = ElevatorIsOwner(primaryOT, primaryStatus, rcvStatus, elevIndex, floor, btn)
-
-				} else if primaryStatus == elev.OS_REQUESTED && rcvStatus == elev.OS_NO_ORDER {
-
+					// } else {
+					// 	primaryOT[elevIndex][floor][btn] = elev.OS_REQUESTED
+					// 	continue
+					// }
+				}
+				fmt.Printf("What happens here lol\n")
+				if primaryStatus == elev.OS_REQUESTED && rcvStatus == elev.OS_NO_ORDER {
 					primaryOT[elevIndex][floor][btn] = elev.OS_REQUESTED
-
-				} else if primaryStatus == elev.OS_CLEAR && rcvStatus == elev.OS_NO_ORDER {
-
+					continue
+				}
+				if primaryStatus == elev.OS_CLEAR && rcvStatus == elev.OS_NO_ORDER {
 					primaryOT[elevIndex][floor][btn] = elev.OS_NO_ORDER
-
-				} else if primaryStatus == elev.OS_CLEAR && rcvStatus == elev.OS_CLEAR {
-
-					primaryOT[elevIndex][floor][btn] = elev.OS_CLEAR // changed from noorder to clear
-
-				} else if primaryStatus == elev.OS_REQUESTED && rcvStatus == elev.OS_CLEAR {
-
+					continue
+				}
+				if primaryStatus == elev.OS_CLEAR && rcvStatus == elev.OS_CLEAR {
+					primaryOT[elevIndex][floor][btn] = elev.OS_NO_ORDER
+					continue
+				}
+				if primaryStatus == elev.OS_REQUESTED && rcvStatus == elev.OS_CLEAR {
 					primaryOT[elevIndex][floor][btn] = elev.OS_REQUESTED
-
-				} else {
-
-					primaryOT[elevIndex][floor][btn] = CalculateNewOrderStatus(elevIndex, rcvStatus, primaryStatus, packet.Id, OC_PhysicalInfo.Id)
-
+					continue
 				}
 
-				// Handle the other cases lol
+				primaryOT[elevIndex][floor][btn] = CalculateNewOrderStatus(elevIndex, rcvStatus, primaryStatus, packet.Id, OC_PhysicalInfo.Id)
 
 				// if isReassignable(elevio.ButtonType(btn), rcvStatus, primaryStatus) {
 				// 	bestID := CalculateWhichElevator(elevIndex, floor, btn, OC_OrderTable, OC_AliveList, OC_NumElevs)
@@ -213,32 +211,56 @@ func CalculateNewPrimaryOrderTable(
 		}
 	}
 
-	for elevIndex := 0; elevIndex < elev.N_MAX_ELEVS; elevIndex++ {
-		for floor := 0; floor < elev.N_FLOORS; floor++ {
-			for btn := 0; btn < elev.N_BUTTONS; btn++ {
-				if primaryOT[elevIndex][floor][btn] == elev.OS_CLEAR {
-					primaryOT[elevIndex][floor][btn] = elev.OS_NO_ORDER
-				}
-			}
-		}
-	}
+	// for elevIndex := 0; elevIndex < elev.N_MAX_ELEVS; elevIndex++ {
+	// 	for floor := 0; floor < elev.N_FLOORS; floor++ {
+	// 		for btn := 0; btn < elev.N_BUTTONS; btn++ {
+	// 			if primaryOT[elevIndex][floor][btn] == elev.OS_CLEAR {
+	// 				primaryOT[elevIndex][floor][btn] = elev.OS_NO_ORDER
+	// 			}
+	// 		}
+	// 	}
+	// }
 
 	return primaryOT
 }
 
-func ElevatorIsOwner(primaryOT elev.OrderTable, primaryStatus elev.OrderStatus, rcvStatus elev.OrderStatus, elevIndex int, floor int, btn int) elev.OrderTable {
+func ElevatorIsOwner(primaryStatus elev.OrderStatus, rcvStatus elev.OrderStatus) elev.OrderStatus {
 
-	if primaryStatus == elev.OS_CONFIRMED && rcvStatus == elev.OS_CLEAR || primaryStatus == elev.OS_CLEAR && rcvStatus == elev.OS_CONFIRMED {
-
-		primaryOT[elevIndex][floor][btn] = elev.OS_CLEAR // this was OS_CLEARED
-		return primaryOT
-
-	} else if primaryStatus == elev.OS_CONFIRMED && rcvStatus == elev.OS_NO_ORDER {
-
-		primaryOT[elevIndex][floor][btn] = elev.OS_NO_ORDER // this was NO ORDER
-		return primaryOT
+	if primaryStatus == elev.OS_CONFIRMED && rcvStatus == elev.OS_CLEAR {
+		return elev.OS_CLEAR
 	}
-	return primaryOT
+	// Otherwise keep primary state unchanged
+	return primaryStatus
+}
+
+func ElevatorIsOwner2(primaryStatus elev.OrderStatus, rcvStatus elev.OrderStatus) elev.OrderStatus {
+	// NO ORDER -> REQUESTED
+	if primaryStatus == elev.OS_NO_ORDER && rcvStatus == elev.OS_REQUESTED {
+		return elev.OS_REQUESTED
+	}
+	if primaryStatus == elev.OS_REQUESTED && rcvStatus == elev.OS_NO_ORDER {
+		fmt.Printf("ElevatorIsOwner: CONFIRMED -> NO ORDER ?\n")
+		return elev.OS_NO_ORDER
+	}
+	// CONFIRMED -> CLEAR
+	if primaryStatus == elev.OS_CONFIRMED && rcvStatus == elev.OS_CLEAR {
+		return elev.OS_CLEAR
+	}
+	if primaryStatus == elev.OS_CONFIRMED && rcvStatus == elev.OS_NO_ORDER {
+		fmt.Printf("ElevatorIsOwner: CONFIRMED -> NO ORDER ?\n")
+		return elev.OS_NO_ORDER
+	}
+	if primaryStatus == elev.OS_CLEAR && rcvStatus == elev.OS_NO_ORDER {
+		fmt.Printf("ElevatorIsOwner: CLEAR -> NO ORDER\n")
+		return elev.OS_NO_ORDER
+	}
+	if primaryStatus == elev.OS_CLEAR && rcvStatus == elev.OS_REQUESTED {
+		fmt.Printf("ElevatorIsOwner: CLEAR -> CLEAR ?\n")
+		return elev.OS_CLEAR
+	}
+
+	fmt.Printf("ElevatorIsOwner: Set rcvStatus\n")
+	return elev.OS_NO_ORDER //Maybe idk
 }
 
 func isReassignable(buttonType elevio.ButtonType, rcvStatus elev.OrderStatus, primaryStatus elev.OrderStatus) bool {
@@ -255,7 +277,7 @@ func CalculateNewOrderStatus(
 	packetID int,
 	thisID int) elev.OrderStatus {
 
-	fmt.Printf("UWU\n")
+	fmt.Printf("Entered CalculateNewOrderStatus\n")
 
 	//======================= GEMINI BEGIN (Funka dårligare enn vår kode) =========================
 
