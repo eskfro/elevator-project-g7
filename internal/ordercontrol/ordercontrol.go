@@ -196,20 +196,18 @@ func CalculateNewPrimaryOrderTable(
 
 				// Handle the other cases lol
 
-				/*
-					if isReassignable(elevio.ButtonType(btn), rcvStatus, primaryStatus) {
-						bestID := CalculateWhichElevator(elevIndex, floor, btn, OC_OrderTable, OC_AliveList, OC_NumElevs)
+				// if isReassignable(elevio.ButtonType(btn), rcvStatus, primaryStatus) {
+				// 	bestID := CalculateWhichElevator(elevIndex, floor, btn, OC_OrderTable, OC_AliveList, OC_NumElevs)
 
-						// Hvis ordren flyttes, nullstill den gamle plassen i Primary sin tabell
-						if bestID != elevIndex {
-							OC_OrderTable[elevIndex][floor][btn] = elev.OS_NO_ORDER
-						}
-						OC_OrderTable[bestID][floor][btn] = elev.OS_REQUESTED
-						continue
-					}
+				// 	// Hvis ordren flyttes, nullstill den gamle plassen i Primary sin tabell
+				// 	if bestID != elevIndex {
+				// 		OC_OrderTable[elevIndex][floor][btn] = elev.OS_NO_ORDER
+				// 	}
+				// 	OC_OrderTable[bestID][floor][btn] = elev.OS_REQUESTED
+				// 	continue
+				// }
 
-					OC_OrderTable[elevIndex][floor][btn] = CalculateNewStatus(elevIndex, rcvStatus, primaryStatus, packet.Id, OC_PhysicalInfo.Id)
-				*/
+				// OC_OrderTable[elevIndex][floor][btn] = CalculateNewStatus(elevIndex, rcvStatus, primaryStatus, packet.Id, OC_PhysicalInfo.Id)
 
 			}
 		}
