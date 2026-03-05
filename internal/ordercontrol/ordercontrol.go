@@ -26,11 +26,14 @@ func OrderControl(
 	ch_updateOC_NumElevs chan int,
 	ch_fromRX_OrderTableP chan elev.OrderTablePacket,
 	ch_fromOC_LOT chan elev.LocalOrderTable,
-	ch_fromOC_OrderTable chan elev.OrderTable) {
+	ch_fromOC_OrderTable chan elev.OrderTable,
+	ch_toOC_PrimaryOrderTableP chan elev.OrderTablePacket) {
 
+	// Local to OrderControl
 	OC_OrderTable := initElev.OrderTable
 	OC_PrevOrderTable := initElev.OrderTable
 	OC_AllOrderTables := initElev.AllOrderTables
+
 	OC_PhysicalInfo := initElev.PhysicalInfo
 	OC_AliveList := initElev.AliveList
 	OC_NumElevs := initElev.NumElevs
@@ -52,16 +55,36 @@ func OrderControl(
 		case newNumElevs := <-ch_updateOC_NumElevs:
 			OC_NumElevs = newNumElevs
 
+		// ====== PRIMARY UPDATES ITSELF ===============
+		case packetPrimary := <-ch_toOC_PrimaryOrderTableP:
+
+			// Update data from its own packet
+			OC_OrderTable = packetPrimary.OrderTable
+			OC_AllOrderTables[packetPrimary.Id] = packetPrimary.OrderTable
+
+			newPrimaryOrderTable := CalculateNewPrimaryOrderTable(OC_OrderTable, OC_AliveList, OC_AllOrderTables, OC_PhysicalInfo, OC_NumElevs, packetPrimary)
+
+			// Update local info
+			OC_OrderTable = newPrimaryOrderTable
+			OC_PrevOrderTable = OC_OrderTable
+			OC_AllOrderTables[OC_PhysicalInfo.Id] = OC_OrderTable
+			OC_PhysicalInfo.LocalOrderTable = orderTableToLOT(OC_OrderTable, OC_PhysicalInfo.Id)
+
+			// Send info to main
+			ch_fromOC_LOT <- OC_PhysicalInfo.LocalOrderTable
+			ch_fromOC_OrderTable <- OC_OrderTable
+
 		// ====== RX FROM NETWORK =============
 		case packet := <-ch_fromRX_OrderTableP:
 			switch OC_PhysicalInfo.Role {
 
-			// =========== BACKUP RCV NETWORK PACKET ======================
+			// =========== BACKUP RCV NETWORK PACKET ================
 			case elev.ER_Backup:
 				// Ignore dersom ingen endring i packet sin OrderTable
 				if packet.OrderTable == OC_PrevOrderTable { //	Flytta "if no update" inn i kvar rolle. Som backup var den riktig, men primary må sjekke riktig heis sin orderTable. Sjå 🏷️
 					break
 				}
+				// TODO: kanskje oppdater OC_PrevOrderTable
 				// Oppdater backup sitt OrderTable dersom packet er fra primary
 				if packet.Id == OC_PhysicalInfo.PrimaryId {
 					OC_PrevOrderTable = packet.OrderTable
@@ -69,7 +92,6 @@ func OrderControl(
 					OC_PhysicalInfo.LocalOrderTable = orderTableToLOT(OC_OrderTable, OC_PhysicalInfo.Id)
 					ch_fromOC_OrderTable <- OC_OrderTable
 					ch_fromOC_LOT <- OC_PhysicalInfo.LocalOrderTable
-
 				}
 
 			// ========== PRIMARY RCV NETWORK PACKET ========================
@@ -80,13 +102,15 @@ func OrderControl(
 					break
 				}
 				OC_AllOrderTables[packet.Id] = packet.OrderTable
+
 				newOrderTable := CalculateNewPrimaryOrderTable(OC_OrderTable, OC_AliveList, OC_AllOrderTables, OC_PhysicalInfo, OC_NumElevs, packet)
 				// Ignorer dersom det er ingen endringer
 				if OC_OrderTable == newOrderTable {
 					break
 				}
 				OC_OrderTable = newOrderTable
-				OC_AllOrderTables[packet.Id] = newOrderTable
+				OC_PrevOrderTable = OC_OrderTable
+				OC_AllOrderTables[OC_PhysicalInfo.Id] = OC_OrderTable
 				OC_PhysicalInfo.LocalOrderTable = orderTableToLOT(OC_OrderTable, OC_PhysicalInfo.Id)
 				ch_fromOC_OrderTable <- OC_OrderTable
 				ch_fromOC_LOT <- OC_PhysicalInfo.LocalOrderTable
@@ -140,9 +164,17 @@ func CalculateNewPrimaryOrderTable(
 					}
 				}
 
+				if primaryStatus == elev.OS_CLEAR {
+					if rcvStatus == elev.OS_REQUESTED {
+						primaryOT[elevIndex][floor][btn] = elev.OS_CLEAR
+						continue
+					}
+				}
+
 				// Alle heise enige om clear på denne ordren (btn, floor)
 				if isClearedByAll(OC_AllOrderTables, elevIndex, floor, btn, OC_AliveList) {
 					primaryOT[elevIndex][floor][btn] = elev.OS_NO_ORDER
+					// TODO: make this propagate throught the system again so it actually clears immediately. Now it waits for next OrderTableUpdate.
 					continue
 				}
 				// Alle heisene enige om requesy på denne ordren (btn, floor)
@@ -186,42 +218,11 @@ func CalculateNewPrimaryOrderTable(
 }
 
 func ElevatorIsOwner(primaryStatus elev.OrderStatus, rcvStatus elev.OrderStatus) elev.OrderStatus {
-
 	if primaryStatus == elev.OS_CONFIRMED && rcvStatus == elev.OS_CLEAR {
 		return elev.OS_CLEAR
 	}
 	// Otherwise keep primary state unchanged
 	return primaryStatus
-}
-
-func ElevatorIsOwner2(primaryStatus elev.OrderStatus, rcvStatus elev.OrderStatus) elev.OrderStatus {
-	// NO ORDER -> REQUESTED
-	if primaryStatus == elev.OS_NO_ORDER && rcvStatus == elev.OS_REQUESTED {
-		return elev.OS_REQUESTED
-	}
-	if primaryStatus == elev.OS_REQUESTED && rcvStatus == elev.OS_NO_ORDER {
-		fmt.Printf("ElevatorIsOwner: CONFIRMED -> NO ORDER ?\n")
-		return elev.OS_NO_ORDER
-	}
-	// CONFIRMED -> CLEAR
-	if primaryStatus == elev.OS_CONFIRMED && rcvStatus == elev.OS_CLEAR {
-		return elev.OS_CLEAR
-	}
-	if primaryStatus == elev.OS_CONFIRMED && rcvStatus == elev.OS_NO_ORDER {
-		fmt.Printf("ElevatorIsOwner: CONFIRMED -> NO ORDER ?\n")
-		return elev.OS_NO_ORDER
-	}
-	if primaryStatus == elev.OS_CLEAR && rcvStatus == elev.OS_NO_ORDER {
-		fmt.Printf("ElevatorIsOwner: CLEAR -> NO ORDER\n")
-		return elev.OS_NO_ORDER
-	}
-	if primaryStatus == elev.OS_CLEAR && rcvStatus == elev.OS_REQUESTED {
-		fmt.Printf("ElevatorIsOwner: CLEAR -> CLEAR ?\n")
-		return elev.OS_CLEAR
-	}
-
-	fmt.Printf("ElevatorIsOwner: Set rcvStatus\n")
-	return elev.OS_NO_ORDER //Maybe idk
 }
 
 func isReassignable(buttonType elevio.ButtonType, rcvStatus elev.OrderStatus, primaryStatus elev.OrderStatus) bool {
@@ -230,7 +231,6 @@ func isReassignable(buttonType elevio.ButtonType, rcvStatus elev.OrderStatus, pr
 	return isHallOrder && shouldBeAssigned
 }
 
-// Foreløpig ikkje ferdig funksjon
 func CalculateNewOrderStatus(
 	elevIndex int,
 	rcvStatus elev.OrderStatus,
@@ -238,107 +238,38 @@ func CalculateNewOrderStatus(
 	packetID int,
 	thisID int) elev.OrderStatus {
 
-	fmt.Printf("Entered CalculateNewOrderStatus\n")
-
-	//======================= GEMINI BEGIN (Funka dårligare enn vår kode) =========================
-
 	switch primaryStatus {
 
 	case elev.OS_NO_ORDER:
-		fmt.Printf("norder\n")
-
-		// Her venter Primary på at noen skal trykke på en knapp
 		if rcvStatus == elev.OS_REQUESTED {
 			return elev.OS_REQUESTED
 		}
 		return elev.OS_NO_ORDER
 
 	case elev.OS_REQUESTED:
-		fmt.Printf("req\n")
-
-		// Primary har sett REQUESTED, og venter på at ALLE skal se den.
-		// Denne sjekken gjøres i ER_Primary-loopen din vha isRequestedByAll.
-		// Hvis ikke alle har sett den ennå, beholder vi REQUESTED.
+		// Stay REQUESTED until primary explicitly confirms this elevator via CalculateWhichElevator.
+		// If the confirmed elevator dies, this naturally stays REQUESTED and gets reassigned.
+		if rcvStatus == elev.OS_CLEAR {
+			return elev.OS_NO_ORDER
+		}
 		return elev.OS_REQUESTED
 
 	case elev.OS_CONFIRMED:
-		fmt.Printf("confirmed\n")
-
-		// Ordren er låst og sendt ut. Nå venter vi på at heisen som
-		// eier ordren (elevIndex) skal sette den til CLEAR når den er fremme.
+		// Only the owning elevator (elevIndex == packetID) can clear its own confirmed order
 		if rcvStatus == elev.OS_CLEAR && packetID == elevIndex {
 			return elev.OS_CLEAR
 		}
 		return elev.OS_CONFIRMED
 
 	case elev.OS_CLEAR:
-		fmt.Printf("clear\n")
-
-		// Primary har sett at ordren er utført. Nå venter vi på at
-		// ALLE heiser har satt den til CLEAR (vha isClearedByAll i loopen).
-		// Inntil det skjer, beholder vi CLEAR for å "smitte" de andre.
+		// Propagate CLEAR until isClearedByAll(), which then sets NO_ORDER
 		return elev.OS_CLEAR
 
 	default:
-		fmt.Printf("DEFAULT\n")
-		return elev.OS_CLEAR
+		fmt.Printf("[CalculateNewOrderStatus] -> default case\n")
+		return elev.OS_NO_ORDER
 	}
-
-	//============================= GEMINI END ==============================
-
-	// ============================ Marius og Eskil BEGIN ===================
-	//			Foreslår å snu om til switch primarystatus på vår kode og
-
-	// switch rcvStatus {
-
-	// case elev.OS_NO_ORDER:
-
-	// 	if primaryStatus == elev.OS_NO_ORDER {
-	// 		return elev.OS_NO_ORDER
-	// 	} else if primaryStatus == elev.OS_CLEAR && packetID == thisID {
-	// 		return elev.OS_NO_ORDER //Bytta fra clear til no order tirsdags kveld
-	// 	} else {
-	// 		fmt.Println("Bindestrek 1")
-	// 		return elev.OS_NO_ORDER
-
-	// 	}
-
-	// case elev.OS_REQUESTED: //La til denne casen igjen tirsdags kveld🔫
-	// 	if primaryStatus == elev.OS_NO_ORDER || primaryStatus == elev.OS_REQUESTED {
-	// 		return elev.OS_REQUESTED
-	// 	} else {
-	// 		fmt.Println("Bindestrek 2")
-	// 		return elev.OS_NO_ORDER
-	// 	}
-
-	// case elev.OS_CONFIRMED:
-
-	// 	if primaryStatus == elev.OS_REQUESTED && packetID == thisID || primaryStatus == elev.OS_CONFIRMED {
-	// 		return elev.OS_CONFIRMED
-	// 	} else {
-	// 		fmt.Println("Bindestrek 3")
-	// 		return elev.OS_NO_ORDER
-
-	// 	}
-
-	// case elev.OS_CLEAR:
-
-	// 	if primaryStatus == elev.OS_CONFIRMED && packetID == elevIndex {
-	// 		return elev.OS_CLEAR
-	// 	} else {
-	// 		fmt.Println("Bindestrek 4")
-	// 		return elev.OS_NO_ORDER
-
-	// 	}
-
-	// default:
-	// 	fmt.Println("CalculateNewStatus failed: Kraftig Bindestrek")
-	// 	return elev.OS_NO_ORDER
-	// }
-
 }
-
-// 	//============================== Marius og Eskil END ======================
 
 func isRequestedByAll(
 	AllOrderTables elev.AllOrderTables,
@@ -374,7 +305,7 @@ func isClearedByAll(
 		}
 
 		thisStatus := AllOrderTables[elevIndex][orderID][floor][btn]
-		if thisStatus == elev.OS_REQUESTED || thisStatus == elev.OS_CONFIRMED || thisStatus == elev.OS_NO_ORDER {
+		if thisStatus == elev.OS_REQUESTED || thisStatus == elev.OS_CONFIRMED {
 			return false
 		}
 	}
