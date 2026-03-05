@@ -32,8 +32,9 @@ var lc = net.ListenConfig{
 func TxHeartBeat(
 	initElev elev.Elevator,
 	port_hb int,
-	ch_updateTxOT chan elev.OrderTable,
-	ch_updateTxPhysicalInfo chan elev.ElevatorPhysicalInfo) {
+	ch_updateTX_OTP chan elev.OrderTablePacket,
+	ch_updateTX_PacketId chan int,
+	ch_updateTX_PhysicalInfo chan elev.ElevatorPhysicalInfo) {
 
 	initOTP := elev.OrderTablePacket{Id: initElev.PhysicalInfo.Id, OrderTable: initElev.OrderTable}
 	message := elev.NetworkPacket{OrderTableP: initOTP, PhysicalInfo: initElev.PhysicalInfo}
@@ -53,36 +54,48 @@ func TxHeartBeat(
 		log.Printf("Failed to resolve bcast adress: %v \n", err)
 	}
 
+	broadcast := func() {
+		data, err := json.Marshal(message)
+		if err != nil {
+			log.Println("JSON Marshal error:", err)
+		}
+		_, err = conn.WriteTo(data, dst)
+		if err != nil {
+			log.Println("Error sending message: ", err)
+		}
+	}
+
 	ticker := time.NewTicker(elev.BCAST_INTERVAL)
 	defer ticker.Stop()
 
 	for {
 		select {
-		case message.OrderTableP.OrderTable = <-ch_updateTxOT:
+		case newOrderTableP := <-ch_updateTX_OTP:
+			message.OrderTableP = newOrderTableP
+			broadcast()
+			ticker.Reset(elev.BCAST_INTERVAL)
 
-		case message.PhysicalInfo = <-ch_updateTxPhysicalInfo:
+		case newPacketId := <-ch_updateTX_PacketId:
+			message.OrderTableP.Id = newPacketId
+			broadcast()
+			ticker.Reset(elev.BCAST_INTERVAL)
+
+		case newPhysicalInfo := <-ch_updateTX_PhysicalInfo:
+			message.PhysicalInfo = newPhysicalInfo
+			broadcast()
+			ticker.Reset(elev.BCAST_INTERVAL)
 
 		case <-ticker.C:
-
-			data, err := json.Marshal(message)
-			if err != nil {
-				log.Println("JSON Marshal error:", err)
-				continue
-			}
-
-			_, err = conn.WriteTo(data, dst)
-			if err != nil {
-				log.Println("Error sending message: ", err)
-				continue
-			}
+			broadcast()
+			ticker.Reset(elev.BCAST_INTERVAL)
 		}
 	}
 }
 
 func RxHeartBeat(
 	port_hb int,
-	ch_RxOrderTableP chan elev.OrderTablePacket,
-	ch_RxPhysicalInfo chan elev.ElevatorPhysicalInfo,
+	ch_fromRX_OrderTableP chan elev.OrderTablePacket,
+	ch_fromRX_PhysicalInfo chan elev.ElevatorPhysicalInfo,
 	thisElevId int) {
 
 	addr := ":" + strconv.Itoa(port_hb)
@@ -120,17 +133,28 @@ func RxHeartBeat(
 			continue
 		}
 
-		ch_RxOrderTableP <- recievedInfo.OrderTableP
+		select {
+		case ch_fromRX_OrderTableP <- recievedInfo.OrderTableP:
 
-		if recievedInfo.PhysicalInfo.Id != thisElevId {
-			ch_RxPhysicalInfo <- recievedInfo.PhysicalInfo
+		default:
+			log.Println("OrderTableP case in OrderControl is full!")
 		}
+		// Send OrderTablePacket to OrderControl
 
+		// Send ElevatorPhysicalInfo heartbeat if not self
+		if recievedInfo.PhysicalInfo.Id != thisElevId {
+			select {
+			case ch_fromRX_PhysicalInfo <- recievedInfo.PhysicalInfo:
+
+			default:
+				log.Println("fromRX_PhysicalInfo is full!")
+
+			}
+		}
 	}
 }
 
 func GetLocalIP() string {
 	addr, _ := LocalIP()
-
 	return addr
 }

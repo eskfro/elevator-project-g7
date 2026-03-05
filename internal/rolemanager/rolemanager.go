@@ -43,14 +43,12 @@ func RoleManager(
 		select {
 
 		case timedOutID := <-ch_TimedOutId:
-
 			RM_AliveList[timedOutID].Role = elev.ER_Dead
 			RM_NumElevs = CountNumElevs(RM_AliveList)
 			ch_fromRM_DeadElevId <- timedOutID
 			ch_fromRM_NumElevs <- RM_NumElevs
 
 		case newAliveList := <-ch_updateRM_AliveList:
-
 			RM_AliveList = newAliveList
 			RM_NumElevs = CountNumElevs(RM_AliveList)
 			ch_fromRM_NumElevs <- RM_NumElevs
@@ -94,11 +92,9 @@ func RoleManager(
 			}
 
 		case newPhysicalInfo := <-ch_updateRM_PhysicalInfo:
-
 			RM_PhysicalInfo = newPhysicalInfo
 
 		case newNumElevs := <-ch_updateRM_NumElevs:
-
 			RM_NumElevs = newNumElevs
 
 		}

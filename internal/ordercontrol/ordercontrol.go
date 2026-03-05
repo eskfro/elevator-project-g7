@@ -24,7 +24,7 @@ func OrderControl(
 	ch_updateOC_PhysicalInfo chan elev.ElevatorPhysicalInfo,
 	ch_updateOC_AliveList chan elev.AliveList,
 	ch_updateOC_NumElevs chan int,
-	ch_RxOrderTableP chan elev.OrderTablePacket,
+	ch_fromRX_OrderTableP chan elev.OrderTablePacket,
 	ch_fromOC_LOT chan elev.LocalOrderTable,
 	ch_fromOC_OrderTable chan elev.OrderTable) {
 
@@ -40,38 +40,30 @@ func OrderControl(
 		select {
 
 		case newAllOrderTables := <-ch_updateOC_AllOrderTables:
-
 			OC_AllOrderTables = newAllOrderTables
 
 		case newPhysicalInfo := <-ch_updateOC_PhysicalInfo:
-
 			OC_PhysicalInfo = newPhysicalInfo
 
 		case newAliveList := <-ch_updateOC_AliveList:
-
 			OC_AliveList = newAliveList
 
 		//Delete case later
 		case newNumElevs := <-ch_updateOC_NumElevs:
-
 			OC_NumElevs = newNumElevs
 
-		case packet := <-ch_RxOrderTableP:
-
+		// ====== RX FROM NETWORK =============
+		case packet := <-ch_fromRX_OrderTableP:
 			switch OC_PhysicalInfo.Role {
 
 			// =========== BACKUP RCV NETWORK PACKET ======================
 			case elev.ER_Backup:
-
 				// Ignore dersom ingen endring i packet sin OrderTable
-				if packet.OrderTable == OC_PrevOrderTable { //	Flytta "if no update" inn i kvar rolle.
-					//Som backup var den riktig, men primary må sjekke riktig heis sin orderTable. Sjå 🏷️
+				if packet.OrderTable == OC_PrevOrderTable { //	Flytta "if no update" inn i kvar rolle. Som backup var den riktig, men primary må sjekke riktig heis sin orderTable. Sjå 🏷️
 					break
 				}
-
 				// Oppdater backup sitt OrderTable dersom packet er fra primary
 				if packet.Id == OC_PhysicalInfo.PrimaryId {
-
 					OC_PrevOrderTable = packet.OrderTable
 					OC_OrderTable = packet.OrderTable
 					OC_PhysicalInfo.LocalOrderTable = orderTableToLOT(OC_OrderTable, OC_PhysicalInfo.Id)
@@ -89,13 +81,16 @@ func OrderControl(
 				}
 				OC_AllOrderTables[packet.Id] = packet.OrderTable
 				newOrderTable := CalculateNewPrimaryOrderTable(OC_OrderTable, OC_AliveList, OC_AllOrderTables, OC_PhysicalInfo, OC_NumElevs, packet)
+				// Ignorer dersom det er ingen endringer
 				if OC_OrderTable == newOrderTable {
 					break
 				}
 				OC_OrderTable = newOrderTable
-				//elev.PrintOrderTableSlice(OC_OrderTable, packet.Id)
+				OC_AllOrderTables[packet.Id] = newOrderTable
+				OC_PhysicalInfo.LocalOrderTable = orderTableToLOT(OC_OrderTable, OC_PhysicalInfo.Id)
 				ch_fromOC_OrderTable <- OC_OrderTable
-				ch_fromOC_LOT <- orderTableToLOT(OC_OrderTable, OC_PhysicalInfo.Id)
+				ch_fromOC_LOT <- OC_PhysicalInfo.LocalOrderTable
+				//elev.PrintOrderTableSlice(OC_OrderTable, packet.Id)
 
 			}
 		}
@@ -136,6 +131,15 @@ func CalculateNewPrimaryOrderTable(
 						continue
 					}
 				}
+
+				// Request trigger
+				if primaryStatus == elev.OS_NO_ORDER {
+					if rcvStatus == elev.OS_REQUESTED {
+						primaryOT[elevIndex][floor][btn] = elev.OS_REQUESTED
+						continue
+					}
+				}
+
 				// Alle heise enige om clear på denne ordren (btn, floor)
 				if isClearedByAll(OC_AllOrderTables, elevIndex, floor, btn, OC_AliveList) {
 					primaryOT[elevIndex][floor][btn] = elev.OS_NO_ORDER
@@ -160,66 +164,23 @@ func CalculateNewPrimaryOrderTable(
 					primaryOT[elevIndex][floor][btn] = ElevatorIsOwner(primaryStatus, rcvStatus)
 					continue
 				}
-				if primaryStatus == elev.OS_NO_ORDER && rcvStatus == elev.OS_REQUESTED {
-					if elevio.ButtonType(btn) != elevio.BT_Cab {
-						for e := 0; e < elev.N_MAX_ELEVS; e++ {
-							if OC_AliveList[e].Role != elev.ER_Dead {
-								primaryOT[e][floor][btn] = elev.OS_REQUESTED
-							}
-						}
-						continue
-					}
-					// } else {
-					// 	primaryOT[elevIndex][floor][btn] = elev.OS_REQUESTED
-					// 	continue
-					// }
-				}
-				fmt.Printf("What happens here lol\n")
-				if primaryStatus == elev.OS_REQUESTED && rcvStatus == elev.OS_NO_ORDER {
-					primaryOT[elevIndex][floor][btn] = elev.OS_REQUESTED
-					continue
-				}
-				if primaryStatus == elev.OS_CLEAR && rcvStatus == elev.OS_NO_ORDER {
-					primaryOT[elevIndex][floor][btn] = elev.OS_NO_ORDER
-					continue
-				}
-				if primaryStatus == elev.OS_CLEAR && rcvStatus == elev.OS_CLEAR {
-					primaryOT[elevIndex][floor][btn] = elev.OS_NO_ORDER
-					continue
-				}
-				if primaryStatus == elev.OS_REQUESTED && rcvStatus == elev.OS_CLEAR {
-					primaryOT[elevIndex][floor][btn] = elev.OS_REQUESTED
-					continue
-				}
+				// if primaryStatus == elev.OS_NO_ORDER && rcvStatus == elev.OS_REQUESTED {
+				// 	primaryOT[elevIndex][floor][btn] = elev.OS_REQUESTED
+				// 	// if elevio.ButtonType(btn) != elevio.BT_Cab {
+				// 	// 	for e := 0; e < elev.N_MAX_ELEVS; e++ {
+				// 	// 		if OC_AliveList[e].Role != elev.ER_Dead {
+				// 	// 			primaryOT[e][floor][btn] = elev.OS_REQUESTED
+				// 	// 		}
+				// 	// 	}
+				// 	// 	continue
+				// 	// }
 
-				primaryOT[elevIndex][floor][btn] = CalculateNewOrderStatus(elevIndex, rcvStatus, primaryStatus, packet.Id, OC_PhysicalInfo.Id)
-
-				// if isReassignable(elevio.ButtonType(btn), rcvStatus, primaryStatus) {
-				// 	bestID := CalculateWhichElevator(elevIndex, floor, btn, OC_OrderTable, OC_AliveList, OC_NumElevs)
-
-				// 	// Hvis ordren flyttes, nullstill den gamle plassen i Primary sin tabell
-				// 	if bestID != elevIndex {
-				// 		OC_OrderTable[elevIndex][floor][btn] = elev.OS_NO_ORDER
-				// 	}
-				// 	OC_OrderTable[bestID][floor][btn] = elev.OS_REQUESTED
-				// 	continue
 				// }
 
-				// OC_OrderTable[elevIndex][floor][btn] = CalculateNewStatus(elevIndex, rcvStatus, primaryStatus, packet.Id, OC_PhysicalInfo.Id)
-
+				primaryOT[elevIndex][floor][btn] = CalculateNewOrderStatus(elevIndex, rcvStatus, primaryStatus, packet.Id, OC_PhysicalInfo.Id)
 			}
 		}
 	}
-
-	// for elevIndex := 0; elevIndex < elev.N_MAX_ELEVS; elevIndex++ {
-	// 	for floor := 0; floor < elev.N_FLOORS; floor++ {
-	// 		for btn := 0; btn < elev.N_BUTTONS; btn++ {
-	// 			if primaryOT[elevIndex][floor][btn] == elev.OS_CLEAR {
-	// 				primaryOT[elevIndex][floor][btn] = elev.OS_NO_ORDER
-	// 			}
-	// 		}
-	// 	}
-	// }
 
 	return primaryOT
 }
