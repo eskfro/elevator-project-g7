@@ -46,9 +46,9 @@ const (
 // ================ Helper Structs ===========================
 
 type Order struct {
-	ElevatorNumber int
-	Floor          int
-	ButtonType     elevio.ButtonType
+	ElevId     int
+	Floor      int
+	ButtonType elevio.ButtonType
 }
 
 type RoleIdPair struct {

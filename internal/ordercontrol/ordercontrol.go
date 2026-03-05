@@ -27,13 +27,14 @@ func OrderControl(
 	ch_fromRX_OrderTableP chan elev.OrderTablePacket,
 	ch_fromOC_LOT chan elev.LocalOrderTable,
 	ch_fromOC_OrderTable chan elev.OrderTable,
-	ch_toOC_PrimaryOrderTableP chan elev.OrderTablePacket) {
+	ch_toOC_PrimaryOrderTableP chan elev.OrderTablePacket,
+	ch_updateTX_OTP chan elev.OrderTablePacket,
+	ch_fromMV_ClearOrder chan elev.Order,
+	ch_fromIO_BtnPress chan elevio.ButtonEvent) {
 
 	// Local to OrderControl
 	OC_OrderTable := initElev.OrderTable
-	OC_PrevOrderTable := initElev.OrderTable
 	OC_AllOrderTables := initElev.AllOrderTables
-
 	OC_PhysicalInfo := initElev.PhysicalInfo
 	OC_AliveList := initElev.AliveList
 	OC_NumElevs := initElev.NumElevs
@@ -54,47 +55,84 @@ func OrderControl(
 		//Delete case later
 		case newNumElevs := <-ch_updateOC_NumElevs:
 			OC_NumElevs = newNumElevs
+		// =========================================================================== CLEAR ORDER
+		case clearOrder := <-ch_fromMV_ClearOrder:
+			OC_OrderTable[OC_PhysicalInfo.Id][clearOrder.Floor][clearOrder.ButtonType] = elev.OS_CLEAR
 
-		// ====== PRIMARY UPDATES ITSELF ===============
-		case packetPrimary := <-ch_toOC_PrimaryOrderTableP:
+			switch OC_PhysicalInfo.Role {
+			case elev.ER_Backup:
+				// Backup only updates its OrderTable on the network
+				ch_updateTX_OTP <- elev.OrderTablePacket{Id: OC_PhysicalInfo.Id, OrderTable: OC_OrderTable}
+				// TODO: send OrderTable update kanskje til andre
 
-			// Update data from its own packet
-			OC_OrderTable = packetPrimary.OrderTable
-			OC_AllOrderTables[packetPrimary.Id] = packetPrimary.OrderTable
+			case elev.ER_Primary:
+				// Idk om dette er greit egentlig
+				for elevId := 0; elevId < elev.N_MAX_ELEVS; elevId++ {
+					if OC_AliveList[elevId].Role != elev.ER_Dead {
+						OC_AllOrderTables[elevId][OC_PhysicalInfo.Id][clearOrder.Floor][clearOrder.ButtonType] = elev.OS_CLEAR
+					}
+				}
+				packet := elev.OrderTablePacket{Id: OC_PhysicalInfo.Id, OrderTable: OC_OrderTable}
+				newPrimaryOrderTable := CalculateNewPrimaryOrderTable(OC_OrderTable, OC_AliveList, OC_AllOrderTables, OC_PhysicalInfo, OC_NumElevs, packet)
+				// Update local info
+				OC_OrderTable = newPrimaryOrderTable
+				OC_AllOrderTables[OC_PhysicalInfo.Id] = OC_OrderTable
+				OC_PhysicalInfo.LocalOrderTable = orderTableToLOT(OC_OrderTable, OC_PhysicalInfo.Id)
 
-			newPrimaryOrderTable := CalculateNewPrimaryOrderTable(OC_OrderTable, OC_AliveList, OC_AllOrderTables, OC_PhysicalInfo, OC_NumElevs, packetPrimary)
+				// Send to network and main
+				ch_updateTX_OTP <- elev.OrderTablePacket{Id: OC_PhysicalInfo.Id, OrderTable: OC_OrderTable}
+				ch_fromOC_LOT <- OC_PhysicalInfo.LocalOrderTable
+				ch_fromOC_OrderTable <- OC_OrderTable
 
-			// Update local info
-			OC_OrderTable = newPrimaryOrderTable
-			OC_PrevOrderTable = OC_OrderTable
-			OC_AllOrderTables[OC_PhysicalInfo.Id] = OC_OrderTable
-			OC_PhysicalInfo.LocalOrderTable = orderTableToLOT(OC_OrderTable, OC_PhysicalInfo.Id)
+			}
 
-			// Send info to main
-			ch_fromOC_LOT <- OC_PhysicalInfo.LocalOrderTable
-			ch_fromOC_OrderTable <- OC_OrderTable
+		// ============================================================================== BTN PRESS
+		case btnPress := <-ch_fromIO_BtnPress:
+			elevio.PrintButtonpress(btnPress)
+			OC_OrderTable[OC_PhysicalInfo.Id][btnPress.Floor][btnPress.Button] = elev.OS_REQUESTED
 
-		// ====== RX FROM NETWORK =============
+			switch OC_PhysicalInfo.Role {
+			case elev.ER_Backup:
+				// Backup only updates its OrderTable on the network
+				ch_updateTX_OTP <- elev.OrderTablePacket{Id: OC_PhysicalInfo.Id, OrderTable: OC_OrderTable}
+				// TODO: send OrderTable update kanskje til andre
+
+			case elev.ER_Primary:
+				// Idk om dette er greit egentlig
+				for elevId := 0; elevId < elev.N_MAX_ELEVS; elevId++ {
+					if OC_AliveList[elevId].Role != elev.ER_Dead {
+						OC_AllOrderTables[elevId][OC_PhysicalInfo.Id][btnPress.Floor][btnPress.Button] = elev.OS_REQUESTED
+					}
+				}
+				packet := elev.OrderTablePacket{Id: OC_PhysicalInfo.Id, OrderTable: OC_OrderTable}
+				newPrimaryOrderTable := CalculateNewPrimaryOrderTable(OC_OrderTable, OC_AliveList, OC_AllOrderTables, OC_PhysicalInfo, OC_NumElevs, packet)
+				// Update local info
+				OC_OrderTable = newPrimaryOrderTable
+				OC_AllOrderTables[OC_PhysicalInfo.Id] = OC_OrderTable
+				OC_PhysicalInfo.LocalOrderTable = orderTableToLOT(OC_OrderTable, OC_PhysicalInfo.Id)
+
+				// Send to network and main
+				ch_updateTX_OTP <- elev.OrderTablePacket{Id: OC_PhysicalInfo.Id, OrderTable: OC_OrderTable}
+				ch_fromOC_LOT <- OC_PhysicalInfo.LocalOrderTable
+				ch_fromOC_OrderTable <- OC_OrderTable
+
+			}
+
 		case packet := <-ch_fromRX_OrderTableP:
 			switch OC_PhysicalInfo.Role {
-
-			// =========== BACKUP RCV NETWORK PACKET ================
+			// ============================================================ BACKUP RCV NETWORK PACKET
 			case elev.ER_Backup:
-				// Ignore dersom ingen endring i packet sin OrderTable
-				if packet.OrderTable == OC_PrevOrderTable { //	Flytta "if no update" inn i kvar rolle. Som backup var den riktig, men primary må sjekke riktig heis sin orderTable. Sjå 🏷️
+				// Ignore dersom ingen endring eller OrderTablePacket ikke fra primary
+				if packet.OrderTable == OC_OrderTable || packet.Id != OC_PhysicalInfo.PrimaryId {
 					break
 				}
-				// TODO: kanskje oppdater OC_PrevOrderTable
-				// Oppdater backup sitt OrderTable dersom packet er fra primary
-				if packet.Id == OC_PhysicalInfo.PrimaryId {
-					OC_PrevOrderTable = packet.OrderTable
-					OC_OrderTable = packet.OrderTable
-					OC_PhysicalInfo.LocalOrderTable = orderTableToLOT(OC_OrderTable, OC_PhysicalInfo.Id)
-					ch_fromOC_OrderTable <- OC_OrderTable
-					ch_fromOC_LOT <- OC_PhysicalInfo.LocalOrderTable
-				}
+				OC_OrderTable = packet.OrderTable
+				OC_PhysicalInfo.LocalOrderTable = orderTableToLOT(OC_OrderTable, OC_PhysicalInfo.Id)
 
-			// ========== PRIMARY RCV NETWORK PACKET ========================
+				// Set OrderTable and LocalOrderTable the same as the rcv Primary
+				ch_fromOC_OrderTable <- OC_OrderTable
+				ch_fromOC_LOT <- OC_PhysicalInfo.LocalOrderTable
+			// =========================================================== PRIMARY RCV NETWORK PACKET
 			case elev.ER_Primary:
 
 				// Ignorer dersom det er ingen endringer
@@ -109,7 +147,6 @@ func OrderControl(
 					break
 				}
 				OC_OrderTable = newOrderTable
-				OC_PrevOrderTable = OC_OrderTable
 				OC_AllOrderTables[OC_PhysicalInfo.Id] = OC_OrderTable
 				OC_PhysicalInfo.LocalOrderTable = orderTableToLOT(OC_OrderTable, OC_PhysicalInfo.Id)
 				ch_fromOC_OrderTable <- OC_OrderTable
@@ -131,89 +168,109 @@ func CalculateNewPrimaryOrderTable(
 
 	primaryOT := OC_OrderTable
 	rcvOT := packet.OrderTable
+	prevOT := packet.OrderTable
 
-	// Iterate through Primaries OrderTable and the Recieved OrderTable
-	for elevIndex := 0; elevIndex < elev.N_MAX_ELEVS; elevIndex++ {
-		// Skip if elevator is not on the network (ER_Dead)
-		if OC_AliveList[elevIndex].Role == elev.ER_Dead {
-			continue
-		}
-		for floor := 0; floor < elev.N_FLOORS; floor++ {
-			for btn := 0; btn < elev.N_BUTTONS; btn++ {
-				// Define helpers
-				primaryStatus := primaryOT[elevIndex][floor][btn]
-				rcvStatus := rcvOT[elevIndex][floor][btn]
+	for {
+		count := 0
+		// Iterate through Primaries OrderTable and the Recieved OrderTable
+		for elevIndex := 0; elevIndex < elev.N_MAX_ELEVS; elevIndex++ {
+			// Skip if elevator is not on the network (ER_Dead)
+			if OC_AliveList[elevIndex].Role == elev.ER_Dead {
+				continue
+			}
+			for floor := 0; floor < elev.N_FLOORS; floor++ {
+				for btn := 0; btn < elev.N_BUTTONS; btn++ {
+					// Define helpers
+					primaryStatus := primaryOT[elevIndex][floor][btn]
+					rcvStatus := rcvOT[elevIndex][floor][btn]
 
-				// Handle cab calls
-				if elevio.ButtonType(btn) == elevio.BT_Cab {
-					if rcvStatus == elev.OS_REQUESTED {
-						primaryOT[elevIndex][floor][btn] = elev.OS_CONFIRMED
-						continue
+					// Handle cab calls
+					if elevio.ButtonType(btn) == elevio.BT_Cab {
+						if rcvStatus == elev.OS_REQUESTED {
+							primaryOT[elevIndex][floor][btn] = elev.OS_CONFIRMED
+							continue
+						}
+						if rcvStatus == elev.OS_CLEAR {
+							primaryOT[elevIndex][floor][btn] = elev.OS_NO_ORDER
+							continue
+						}
 					}
-					if rcvStatus == elev.OS_CLEAR {
+
+					// Request trigger
+					if primaryStatus == elev.OS_NO_ORDER {
+						if rcvStatus == elev.OS_REQUESTED {
+							primaryOT[elevIndex][floor][btn] = elev.OS_REQUESTED
+							for e := 0; e < elev.N_MAX_ELEVS; e++ {
+								if OC_AliveList[e].Role != elev.ER_Dead {
+									OC_AllOrderTables[e][elevIndex][floor][btn] = elev.OS_REQUESTED
+								}
+							}
+							continue
+
+						}
+					}
+					// IDK
+					if primaryStatus == elev.OS_CLEAR {
+						if rcvStatus != elev.OS_CLEAR {
+							primaryOT[elevIndex][floor][btn] = elev.OS_CLEAR
+							for e := 0; e < elev.N_MAX_ELEVS; e++ {
+								if OC_AliveList[e].Role != elev.ER_Dead {
+									OC_AllOrderTables[e][elevIndex][floor][btn] = elev.OS_CLEAR
+								}
+							}
+							continue
+						}
+					}
+
+					// Alle heise enige om clear på denne ordren (btn, floor)
+					if isClearedByAll(OC_AllOrderTables, elevIndex, floor, btn, OC_AliveList) {
 						primaryOT[elevIndex][floor][btn] = elev.OS_NO_ORDER
 						continue
 					}
-				}
-
-				// Request trigger
-				if primaryStatus == elev.OS_NO_ORDER {
-					if rcvStatus == elev.OS_REQUESTED {
-						primaryOT[elevIndex][floor][btn] = elev.OS_REQUESTED
+					// Alle heisene enige om requesy på denne ordren (btn, floor)
+					if isRequestedByAll(OC_AllOrderTables, elevIndex, floor, btn, OC_AliveList) {
+						if elevio.ButtonType(btn) == elevio.BT_Cab {
+							primaryOT[elevIndex][floor][btn] = elev.OS_CONFIRMED
+							continue
+						}
+						bestID := CalculateWhichElevator(elevIndex, floor, btn, primaryOT, OC_AliveList, OC_NumElevs)
+						fmt.Printf("BESTID = %d\n", bestID)
+						primaryOT[bestID][floor][btn] = elev.OS_CONFIRMED
+						continue
+						// Hvis ordren flyttes, nullstill den gamle plassen i Primary sin tabell
+						// if bestID != elevIndex {
+						// 	primaryOT[elevIndex][floor][btn] = elev.OS_REQUESTED
+						// }
+					}
+					if packet.Id == elevIndex {
+						primaryOT[elevIndex][floor][btn] = ElevatorIsOwner(primaryStatus, rcvStatus)
 						continue
 					}
-				}
-
-				if primaryStatus == elev.OS_CLEAR {
-					if rcvStatus == elev.OS_REQUESTED {
-						primaryOT[elevIndex][floor][btn] = elev.OS_CLEAR
-						continue
-					}
-				}
-
-				// Alle heise enige om clear på denne ordren (btn, floor)
-				if isClearedByAll(OC_AllOrderTables, elevIndex, floor, btn, OC_AliveList) {
-					primaryOT[elevIndex][floor][btn] = elev.OS_NO_ORDER
-					// TODO: make this propagate throught the system again so it actually clears immediately. Now it waits for next OrderTableUpdate.
-					continue
-				}
-				// Alle heisene enige om requesy på denne ordren (btn, floor)
-				if isRequestedByAll(OC_AllOrderTables, elevIndex, floor, btn, OC_AliveList) {
-					if elevio.ButtonType(btn) == elevio.BT_Cab {
-						primaryOT[elevIndex][floor][btn] = elev.OS_CONFIRMED
-						continue
-					}
-					bestID := CalculateWhichElevator(elevIndex, floor, btn, primaryOT, OC_AliveList, OC_NumElevs)
-					fmt.Printf("BESTID = %d\n", bestID)
-					primaryOT[bestID][floor][btn] = elev.OS_CONFIRMED
-					continue
-					// Hvis ordren flyttes, nullstill den gamle plassen i Primary sin tabell
-					// if bestID != elevIndex {
+					// if primaryStatus == elev.OS_NO_ORDER && rcvStatus == elev.OS_REQUESTED {
 					// 	primaryOT[elevIndex][floor][btn] = elev.OS_REQUESTED
+					// 	// if elevio.ButtonType(btn) != elevio.BT_Cab {
+					// 	// 	for e := 0; e < elev.N_MAX_ELEVS; e++ {
+					// 	// 		if OC_AliveList[e].Role != elev.ER_Dead {
+					// 	// 			primaryOT[e][floor][btn] = elev.OS_REQUESTED
+					// 	// 		}
+					// 	// 	}
+					// 	// 	continue
+					// 	// }
+
 					// }
-				}
-				if packet.Id == elevIndex {
-					primaryOT[elevIndex][floor][btn] = ElevatorIsOwner(primaryStatus, rcvStatus)
-					continue
-				}
-				// if primaryStatus == elev.OS_NO_ORDER && rcvStatus == elev.OS_REQUESTED {
-				// 	primaryOT[elevIndex][floor][btn] = elev.OS_REQUESTED
-				// 	// if elevio.ButtonType(btn) != elevio.BT_Cab {
-				// 	// 	for e := 0; e < elev.N_MAX_ELEVS; e++ {
-				// 	// 		if OC_AliveList[e].Role != elev.ER_Dead {
-				// 	// 			primaryOT[e][floor][btn] = elev.OS_REQUESTED
-				// 	// 		}
-				// 	// 	}
-				// 	// 	continue
-				// 	// }
 
-				// }
-
-				primaryOT[elevIndex][floor][btn] = CalculateNewOrderStatus(elevIndex, rcvStatus, primaryStatus, packet.Id, OC_PhysicalInfo.Id)
+					primaryOT[elevIndex][floor][btn] = CalculateNewOrderStatus(elevIndex, rcvStatus, primaryStatus, packet.Id, OC_PhysicalInfo.Id)
+				}
 			}
 		}
-	}
+		count++
 
+		if primaryOT == prevOT || count == 1 {
+			break
+		} else {
+			prevOT = primaryOT
+		}
+	}
 	return primaryOT
 }
 
@@ -250,7 +307,7 @@ func CalculateNewOrderStatus(
 		// Stay REQUESTED until primary explicitly confirms this elevator via CalculateWhichElevator.
 		// If the confirmed elevator dies, this naturally stays REQUESTED and gets reassigned.
 		if rcvStatus == elev.OS_CLEAR {
-			return elev.OS_NO_ORDER
+			return elev.OS_CLEAR
 		}
 		return elev.OS_REQUESTED
 

@@ -39,19 +39,18 @@ func main() {
 	defer ticker_printElevator.Stop()
 	defer ticker_AliveList.Stop()
 
-	// POLLING
-	ch_PollObstruction := make(chan bool, 10)
-	ch_PollFloorSensor := make(chan int, 10)
-	ch_PollButtonPress := make(chan elevio.ButtonEvent, 10)
-
 	// PhysicalInfo updates [critical]
 	ch_updateMV_PhysicalInfo := make(chan elev.ElevatorPhysicalInfo, 5)
 	ch_updateOC_PhysicalInfo := make(chan elev.ElevatorPhysicalInfo, 4)
 	ch_updateRM_PhysicalInfo := make(chan elev.ElevatorPhysicalInfo, 4)
 	ch_updateTX_PhysicalInfo := make(chan elev.ElevatorPhysicalInfo, 4)
 
-	// From Movement
+	ch_fromIO_Floor := make(chan int, 20)
+	ch_fromIO_Obstruction := make(chan bool, 20)
+	ch_fromIO_BtnPress := make(chan elevio.ButtonEvent, 50)
 	ch_toMV_FloorArrival := make(chan int, 5)
+
+	// From Movement
 	ch_fromMV_LOT := make(chan elev.LocalOrderTable, 2)
 	ch_fromMV_MotorDir := make(chan elevio.MotorDirection, 2)
 	ch_fromMV_Movement := make(chan elev.ElevatorMovement, 2)
@@ -83,14 +82,27 @@ func main() {
 	ch_updateTX_PacketId := make(chan int, 4)
 
 	// From Network
-	ch_fromRX_OrderTableP := make(chan elev.OrderTablePacket, 4)
+	ch_fromRX_OrderTableP := make(chan elev.OrderTablePacket, 50)
 	ch_fromRX_PhysicalInfo := make(chan elev.ElevatorPhysicalInfo, 20)
 
-	go elevio.PollObstructionSwitch(ch_PollObstruction)
-	go elevio.PollFloorSensor(ch_PollFloorSensor)
-	go elevio.PollButtons(ch_PollButtonPress)
-	go movement.Movement(elevator, ch_updateMV_PhysicalInfo, ch_toMV_FloorArrival, ch_fromMV_LOT, ch_fromMV_Movement, ch_fromMV_MotorDir, ch_fromMV_ClearOrder)
-	go ordercontrol.OrderControl(elevator, ch_updateOC_AllOrderTables, ch_updateOC_PhysicalInfo, ch_updateOC_AliveList, ch_updateOC_NumElevs, ch_fromRX_OrderTableP, ch_fromOC_LOT, ch_fromOC_OrderTable, ch_toOC_PrimaryOrderTableP)
+	go elevio.PollObstructionSwitch(ch_fromIO_Obstruction)
+	go elevio.PollFloorSensor(ch_fromIO_Floor)
+	go elevio.PollButtons(ch_fromIO_BtnPress)
+
+	go movement.Movement(elevator, ch_updateMV_PhysicalInfo, ch_fromMV_LOT,
+		ch_fromMV_Movement, ch_fromMV_MotorDir, ch_fromMV_ClearOrder, ch_toMV_FloorArrival)
+	go ordercontrol.OrderControl(elevator,
+		ch_updateOC_AllOrderTables,
+		ch_updateOC_PhysicalInfo,
+		ch_updateOC_AliveList,
+		ch_updateOC_NumElevs,
+		ch_fromRX_OrderTableP,
+		ch_fromOC_LOT,
+		ch_fromOC_OrderTable,
+		ch_toOC_PrimaryOrderTableP,
+		ch_updateTX_OTP,
+		ch_fromMV_ClearOrder,
+		ch_fromIO_BtnPress)
 	go network.TxHeartBeat(elevator, ports.HeartBeat, ch_updateTX_OTP, ch_updateTX_PacketId, ch_updateTX_PhysicalInfo)
 	go network.RxHeartBeat(ports.HeartBeat, ch_fromRX_OrderTableP, ch_fromRX_PhysicalInfo, elevator.PhysicalInfo.Id)
 	go rolemanager.RoleManager(elevator, ch_updateRM_AliveList, ch_updateRM_PhysicalInfo, ch_updateRM_NumElevs, ch_toRM_HeartBeatId, ch_fromRM_Role, ch_fromRM_DeadElevId, ch_fromRM_NumElevs, ch_fromRM_PrimaryId)
@@ -103,23 +115,15 @@ func main() {
 				elev.PrintElevatorInfo(elevator, uptime)
 				elev.PrintOrderTableSlice(elevator.OrderTable, elevator.PhysicalInfo.Id)
 
-			// ========================== POLL SENSORS =========================
+			// =========================== FROM HARDWARE ============================
 
-			case btnPress := <-ch_PollButtonPress:
-				elevio.PrintButtonpress(btnPress)
-				elevator.OrderTable[elevator.PhysicalInfo.Id][btnPress.Floor][btnPress.Button] = elev.OS_REQUESTED
-				if elevator.PhysicalInfo.Role == elev.ER_Primary {
-					ch_toOC_PrimaryOrderTableP <- elev.OrderTablePacket{Id: elevator.PhysicalInfo.Id, OrderTable: elevator.OrderTable}
-				}
-				ch_updateTX_OTP <- elev.OrderTablePacket{Id: elevator.PhysicalInfo.Id, OrderTable: elevator.OrderTable}
-
-			case obst := <-ch_PollObstruction:
+			case obst := <-ch_fromIO_Obstruction:
 				elevator.PhysicalInfo.Obstructed = obst
 				ch_updateTX_PhysicalInfo <- elevator.PhysicalInfo
-				ch_updateMV_PhysicalInfo <- elevator.PhysicalInfo
+				ch_updateOC_PhysicalInfo <- elevator.PhysicalInfo
 				ch_updateRM_PhysicalInfo <- elevator.PhysicalInfo
 
-			case floor := <-ch_PollFloorSensor:
+			case floor := <-ch_fromIO_Floor:
 				elevator.PhysicalInfo.Floor = floor
 				ch_toMV_FloorArrival <- floor
 				ch_updateTX_PhysicalInfo <- elevator.PhysicalInfo
@@ -128,18 +132,14 @@ func main() {
 
 			// =========================== FROM MOVEMENT ============================
 
-			case clearOrder := <-ch_fromMV_ClearOrder:
-				elevator.OrderTable[clearOrder.ElevatorNumber][clearOrder.Floor][clearOrder.ButtonType] = elev.OS_CLEAR
-				ch_updateTX_OTP <- elev.OrderTablePacket{Id: elevator.PhysicalInfo.Id, OrderTable: elevator.OrderTable}
-
 			case newLOT := <-ch_fromMV_LOT:
 				elevator.PhysicalInfo.LocalOrderTable = newLOT
 				ch_updateTX_PhysicalInfo <- elevator.PhysicalInfo
 				ch_updateOC_PhysicalInfo <- elevator.PhysicalInfo
 				ch_updateRM_PhysicalInfo <- elevator.PhysicalInfo
 
-			case newState := <-ch_fromMV_Movement:
-				elevator.PhysicalInfo.Movement = newState
+			case newMovement := <-ch_fromMV_Movement:
+				elevator.PhysicalInfo.Movement = newMovement
 				ch_updateTX_PhysicalInfo <- elevator.PhysicalInfo
 				ch_updateOC_PhysicalInfo <- elevator.PhysicalInfo
 				ch_updateRM_PhysicalInfo <- elevator.PhysicalInfo
@@ -154,7 +154,6 @@ func main() {
 
 			case newOrderTable := <-ch_fromOC_OrderTable:
 				elevator.OrderTable = newOrderTable
-				ch_updateTX_OTP <- elev.OrderTablePacket{Id: elevator.PhysicalInfo.Id, OrderTable: elevator.OrderTable}
 
 			case newLocalOrderTable := <-ch_fromOC_LOT:
 				elevator.PhysicalInfo.LocalOrderTable = newLocalOrderTable
