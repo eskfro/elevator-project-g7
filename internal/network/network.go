@@ -32,12 +32,9 @@ var lc = net.ListenConfig{
 func TxHeartBeat(
 	initElev elev.Elevator,
 	port_hb int,
-	ch_updateTX_OTP chan elev.OrderTablePacket,
-	ch_updateTX_PacketId chan int,
 	ch_updateTX_PhysicalInfo chan elev.ElevatorPhysicalInfo) {
 
-	initOTP := elev.OrderTablePacket{Id: initElev.PhysicalInfo.Id, OrderTable: initElev.OrderTable}
-	message := elev.NetworkPacket{OrderTableP: initOTP, PhysicalInfo: initElev.PhysicalInfo}
+	message := initElev.PhysicalInfo
 
 	address := "255.255.255.255" + ":" + strconv.Itoa(port_hb)
 
@@ -70,18 +67,9 @@ func TxHeartBeat(
 
 	for {
 		select {
-		case newOrderTableP := <-ch_updateTX_OTP:
-			message.OrderTableP = newOrderTableP
-			broadcast()
-			ticker.Reset(elev.BCAST_INTERVAL)
-
-		case newPacketId := <-ch_updateTX_PacketId:
-			message.OrderTableP.Id = newPacketId
-			broadcast()
-			ticker.Reset(elev.BCAST_INTERVAL)
 
 		case newPhysicalInfo := <-ch_updateTX_PhysicalInfo:
-			message.PhysicalInfo = newPhysicalInfo
+			message = newPhysicalInfo
 			broadcast()
 			ticker.Reset(elev.BCAST_INTERVAL)
 
@@ -94,7 +82,6 @@ func TxHeartBeat(
 
 func RxHeartBeat(
 	port_hb int,
-	ch_fromRX_OrderTableP chan elev.OrderTablePacket,
 	ch_fromRX_PhysicalInfo chan elev.ElevatorPhysicalInfo,
 	thisElevId int) {
 
@@ -108,7 +95,7 @@ func RxHeartBeat(
 	for {
 		conn, err = lc.ListenPacket(context.Background(), "udp4", addr)
 		if err == nil {
-			log.Printf("Established connection on port %d\n", port_hb)
+			log.Printf("[UDP] Established connection on port %d\n", port_hb)
 			break
 		}
 		log.Printf("Port %d busy, trying again ...\n", port_hb)
@@ -125,7 +112,7 @@ func RxHeartBeat(
 			continue
 		}
 
-		var recievedInfo elev.NetworkPacket
+		var recievedInfo elev.ElevatorPhysicalInfo
 
 		err = json.Unmarshal(buf[:n], &recievedInfo)
 		if err != nil {
@@ -133,18 +120,10 @@ func RxHeartBeat(
 			continue
 		}
 
-		select {
-		case ch_fromRX_OrderTableP <- recievedInfo.OrderTableP:
-
-		default:
-			log.Println("OrderTableP case in OrderControl is full!")
-		}
-		// Send OrderTablePacket to OrderControl
-
 		// Send ElevatorPhysicalInfo heartbeat if not self
-		if recievedInfo.PhysicalInfo.Id != thisElevId {
+		if recievedInfo.Id != thisElevId {
 			select {
-			case ch_fromRX_PhysicalInfo <- recievedInfo.PhysicalInfo:
+			case ch_fromRX_PhysicalInfo <- recievedInfo:
 
 			default:
 				log.Println("fromRX_PhysicalInfo is full!")
@@ -157,4 +136,225 @@ func RxHeartBeat(
 func GetLocalIP() string {
 	addr, _ := LocalIP()
 	return addr
+}
+
+func TxOrderTableTCP(elevId int, port_ot int, ch_updateTX_OTP <-chan elev.OrderTablePacket) {
+
+	targetPort := port_ot + elevId
+	addr := ":" + strconv.Itoa(targetPort)
+
+	listener, err := net.Listen("tcp", addr)
+	if err != nil {
+		log.Fatalf("TCP Listen error: %v", err)
+	}
+	defer listener.Close()
+
+	log.Printf("[TX TCP] Waiting for Backup on %s\n", addr)
+
+	for {
+		log.Println("[TX TCP] Loop Warning")
+		conn, err := listener.Accept()
+		if err != nil {
+			log.Printf("Accept error: %v", err)
+			continue
+		}
+
+		log.Printf("[TX TCP] Backup connected: %s", conn.RemoteAddr())
+
+		encoder := json.NewEncoder(conn)
+
+		for otp := range ch_updateTX_OTP {
+			log.Println("[TX TCP] OrderTable Packet update")
+			err := encoder.Encode(otp)
+			if err != nil {
+				log.Printf("[TX TCP] Backup disconnected: %v", err)
+				conn.Close()
+				break
+			}
+		}
+	}
+}
+
+func RxOrderTableTCP(
+	initialIp string,
+	port_ot int,
+	ch_updateRX_PrimaryIp <-chan string,
+	ch_fromRX_OTP chan<- elev.OrderTablePacket,
+	initPrimaryId int,
+	ch_updateRX_PrimaryId <-chan int,
+) {
+
+	primaryIp := elev.INVALID_PRIMARYIP
+	primaryId := initPrimaryId
+
+	for {
+		log.Println("[RX TCP] Loop Warning (1)")
+
+		if primaryIp == elev.INVALID_PRIMARYIP {
+			log.Println("[RX TCP] Waiting for valid IP...")
+			select {
+			case primaryIp = <-ch_updateRX_PrimaryIp:
+			case primaryId = <-ch_updateRX_PrimaryId:
+			}
+		}
+
+		// Calculate the primary port
+		targetPort := port_ot + primaryId
+		addr := primaryIp + ":" + strconv.Itoa(targetPort)
+		log.Printf("[RX TCP] Dialing %s", addr)
+
+		conn, err := net.DialTimeout("tcp", addr, 2*time.Second)
+		if err != nil {
+			log.Println("[RX TCP] Idk man")
+			select {
+			case primaryIp = <-ch_updateRX_PrimaryIp:
+				log.Printf("[RX TCP] New IP: %s", primaryIp)
+			case primaryId = <-ch_updateRX_PrimaryId:
+				log.Printf("[RX TCP] New PrimaryId: %d", primaryId)
+			case <-time.After(time.Second):
+			}
+			continue
+		}
+
+		log.Printf("[RX TCP] Connected to %s", addr)
+
+		decoder := json.NewDecoder(conn)
+
+		for {
+			// Decode message
+			conn.SetReadDeadline(time.Now().Add(1 * time.Second))
+			var otp elev.OrderTablePacket
+			err := decoder.Decode(&otp)
+
+			//Handle error decoding message (ugly)
+			if err != nil {
+				if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
+					select {
+					case primaryIp = <-ch_updateRX_PrimaryIp:
+						log.Println("[RX TCP] IP changed, reconnecting")
+						conn.Close()
+						goto reconnect
+
+					case primaryId = <-ch_updateRX_PrimaryId:
+						log.Println("[RX TCP] PrimaryID changed, reconnecting")
+						conn.Close()
+						goto reconnect
+
+					default:
+						continue
+					}
+				}
+				log.Printf("[RX TCP] Connection lost: %v", err)
+				conn.Close()
+				break
+			}
+
+			// Send OrderTablePacket to
+			log.Println("[RX TCP] Sending OrderTable Package")
+			ch_fromRX_OTP <- otp
+		}
+
+	reconnect:
+	}
+}
+
+func RxOrderTableTCP2(
+	initialIP string,
+	port_ot int,
+	ch_updateIP <-chan string,
+	ch_fromRX_OTP chan<- elev.OrderTablePacket,
+	initPrimaryId int,
+	ch_updatePrimaryId <-chan int, // Receiver channel
+) {
+	currentIP := initialIP
+	primaryId := initPrimaryId
+
+	for {
+		// 1. Guard against invalid state
+		if currentIP == elev.INVALID_PRIMARYIP {
+			log.Println("[RX TCP] Waiting for valid IP...")
+			currentIP = <-ch_updateIP
+			continue
+		}
+
+		// 2. RE-CALCULATE port here so it updates when primaryId changes
+		targetPort := port_ot + primaryId
+		addr := currentIP + ":" + strconv.Itoa(targetPort)
+
+		log.Printf("[RX TCP] Attempting dial: %s", addr)
+		conn, err := net.DialTimeout("tcp", addr, 2*time.Second)
+
+		if err != nil {
+			// Check for updates during retry backoff
+			select {
+			case currentIP = <-ch_updateIP:
+				log.Printf("[RX TCP] New Ip: %s\n", currentIP)
+
+			case primaryId = <-ch_updatePrimaryId:
+				log.Printf("[RX TCP] New PrimaryId: %d\n", primaryId)
+
+			case <-time.After(1 * time.Second):
+			}
+			continue
+		}
+
+		// 3. Connection Successful
+		log.Printf("[RX TCP] Connected to %s", addr)
+		decoder := json.NewDecoder(conn)
+
+		for {
+			// OPTIONAL: Use SetReadDeadline here if you want to
+			// periodically check for IP/ID updates while connected.
+
+			var otp elev.OrderTablePacket
+			err := decoder.Decode(&otp)
+			if err != nil {
+				log.Printf("[RX TCP] Connection broken: %v", err)
+				break
+			}
+			ch_fromRX_OTP <- otp
+		}
+		conn.Close()
+	}
+}
+
+func TxOrderTableTCP2(port_ot int, ch_updateTX_OTP <-chan elev.OrderTablePacket) {
+	addr := ":" + strconv.Itoa(port_ot)
+	listener, err := net.Listen("tcp", addr)
+	if err != nil {
+		log.Fatalf("TCP Listen error: %v", err)
+	}
+	defer listener.Close()
+
+	log.Printf("[TX TCP] Primary: Waiting for Backup to connect on TCP %d...\n", port_ot)
+
+	for {
+		conn, err := listener.Accept()
+		if err != nil {
+			log.Printf("Accept error: %v", err)
+			continue
+		}
+		log.Printf("Backup connected: %s", conn.RemoteAddr())
+
+		// Handle the connection in a helper function
+		go func(c net.Conn) {
+			defer c.Close()
+			encoder := json.NewEncoder(c)
+
+			for {
+				// Wait for an actual update from the channel
+				otp, ok := <-ch_updateTX_OTP
+				if !ok {
+					return
+				}
+
+				err := encoder.Encode(otp)
+				if err != nil {
+					log.Printf("[TX TCP] Send failed (Backup disconnected): %v", err)
+					return
+				}
+				log.Println("Sent OrderTable update via TCP")
+			}
+		}(conn)
+	}
 }

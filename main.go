@@ -34,7 +34,7 @@ func main() {
 
 	// Time for debugging
 	timeStart := time.Now()
-	ticker_printElevator := time.NewTicker(500 * time.Millisecond)
+	ticker_printElevator := time.NewTicker(1000 * time.Millisecond)
 	ticker_AliveList := time.NewTicker(500 * time.Millisecond)
 	defer ticker_printElevator.Stop()
 	defer ticker_AliveList.Stop()
@@ -76,10 +76,12 @@ func main() {
 	ch_fromRM_DeadElevId := make(chan int, 4)
 	ch_fromRM_NumElevs := make(chan int, 4)
 	ch_fromRM_PrimaryId := make(chan int, 4)
+	ch_fromRM_PrimaryIp := make(chan string, 4)
 
 	// To Network
 	ch_updateTX_OTP := make(chan elev.OrderTablePacket, 4)
-	ch_updateTX_PacketId := make(chan int, 4)
+	ch_updateRX_PrimaryIp := make(chan string, 4)
+	ch_updateRX_PrimaryId := make(chan int, 4)
 
 	// From Network
 	ch_fromRX_OrderTableP := make(chan elev.OrderTablePacket, 50)
@@ -91,7 +93,8 @@ func main() {
 
 	go movement.Movement(elevator, ch_updateMV_PhysicalInfo, ch_fromMV_LOT,
 		ch_fromMV_Movement, ch_fromMV_MotorDir, ch_fromMV_ClearOrder, ch_toMV_FloorArrival)
-	go ordercontrol.OrderControl(elevator,
+	go ordercontrol.OrderControl(
+		elevator,
 		ch_updateOC_AllOrderTables,
 		ch_updateOC_PhysicalInfo,
 		ch_updateOC_AliveList,
@@ -103,9 +106,12 @@ func main() {
 		ch_updateTX_OTP,
 		ch_fromMV_ClearOrder,
 		ch_fromIO_BtnPress)
-	go network.TxHeartBeat(elevator, ports.HeartBeat, ch_updateTX_OTP, ch_updateTX_PacketId, ch_updateTX_PhysicalInfo)
-	go network.RxHeartBeat(ports.HeartBeat, ch_fromRX_OrderTableP, ch_fromRX_PhysicalInfo, elevator.PhysicalInfo.Id)
-	go rolemanager.RoleManager(elevator, ch_updateRM_AliveList, ch_updateRM_PhysicalInfo, ch_updateRM_NumElevs, ch_toRM_HeartBeatId, ch_fromRM_Role, ch_fromRM_DeadElevId, ch_fromRM_NumElevs, ch_fromRM_PrimaryId)
+	go rolemanager.RoleManager(elevator, ch_updateRM_AliveList, ch_updateRM_PhysicalInfo, ch_updateRM_NumElevs,
+		ch_toRM_HeartBeatId, ch_fromRM_Role, ch_fromRM_DeadElevId, ch_fromRM_NumElevs, ch_fromRM_PrimaryId, ch_fromRM_PrimaryIp)
+	go network.TxHeartBeat(elevator, ports.HeartBeat, ch_updateTX_PhysicalInfo)
+	go network.RxHeartBeat(ports.HeartBeat, ch_fromRX_PhysicalInfo, elevator.PhysicalInfo.Id)
+	go network.TxOrderTableTCP(elevator.PhysicalInfo.Id, ports.OrderTableP, ch_updateTX_OTP)
+	go network.RxOrderTableTCP(elevator.PhysicalInfo.PrimaryIp, ports.OrderTableP, ch_updateRX_PrimaryIp, ch_fromRX_OrderTableP, elevator.PhysicalInfo.PrimaryId, ch_updateRX_PrimaryId)
 
 	go func() {
 		for {
@@ -179,21 +185,29 @@ func main() {
 
 			case newNumElevs := <-ch_fromRM_NumElevs:
 				elevator.NumElevs = newNumElevs
-				ch_updateOC_NumElevs <- newNumElevs
+				//ch_updateOC_NumElevs <- newNumElevs //TODO: remove
 
 			case newPrimaryId := <-ch_fromRM_PrimaryId:
 				elevator.PhysicalInfo.PrimaryId = newPrimaryId
+				ch_updateRX_PrimaryId <- elevator.PhysicalInfo.PrimaryId
+				ch_updateMV_PhysicalInfo <- elevator.PhysicalInfo
+				ch_updateOC_PhysicalInfo <- elevator.PhysicalInfo
+				ch_updateTX_PhysicalInfo <- elevator.PhysicalInfo // HeartBeat
+
+			case newPrimaryIp := <-ch_fromRM_PrimaryIp:
+				elevator.PhysicalInfo.PrimaryIp = newPrimaryIp
 				ch_updateMV_PhysicalInfo <- elevator.PhysicalInfo
 				ch_updateOC_PhysicalInfo <- elevator.PhysicalInfo
 				ch_updateTX_PhysicalInfo <- elevator.PhysicalInfo
+				ch_updateRX_PrimaryIp <- elevator.PhysicalInfo.PrimaryIp
 
 			// ========================= FROM NETWORK ============================
 
 			case heartBeat := <-ch_fromRX_PhysicalInfo:
 				elevator.AliveList[heartBeat.Id] = heartBeat
+				ch_toRM_HeartBeatId <- heartBeat.Id
 				ch_updateRM_AliveList <- elevator.AliveList
 				ch_updateOC_AliveList <- elevator.AliveList
-				ch_toRM_HeartBeatId <- heartBeat.Id
 
 			}
 		}

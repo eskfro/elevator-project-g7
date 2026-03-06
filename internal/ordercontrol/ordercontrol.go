@@ -37,11 +37,14 @@ func OrderControl(
 	OC_AllOrderTables := initElev.AllOrderTables
 	OC_PhysicalInfo := initElev.PhysicalInfo
 	OC_AliveList := initElev.AliveList
-	OC_NumElevs := initElev.NumElevs
+	// OC_NumElevs := initElev.NumElevs
 
 	for {
 		// sletta ch_updateOC_Ordertable, det var ingen som skreiv til den, og trur den var farlig
 		select {
+
+		// case newNumElevs := <-ch_updateOC_NumElevs:
+		// 	OC_NumElevs = newNumElevs
 
 		case newAllOrderTables := <-ch_updateOC_AllOrderTables:
 			OC_AllOrderTables = newAllOrderTables
@@ -53,8 +56,8 @@ func OrderControl(
 			OC_AliveList = newAliveList
 
 		//Delete case later
-		case newNumElevs := <-ch_updateOC_NumElevs:
-			OC_NumElevs = newNumElevs
+		// case newNumElevs := <-ch_updateOC_NumElevs:
+		// 	OC_NumElevs = newNumElevs
 		// =========================================================================== CLEAR ORDER
 		case clearOrder := <-ch_fromMV_ClearOrder:
 			OC_OrderTable[OC_PhysicalInfo.Id][clearOrder.Floor][clearOrder.ButtonType] = elev.OS_CLEAR
@@ -73,8 +76,9 @@ func OrderControl(
 					}
 				}
 				packet := elev.OrderTablePacket{Id: OC_PhysicalInfo.Id, OrderTable: OC_OrderTable}
-				newPrimaryOrderTable := handle_primary_transition(OC_OrderTable, packet, OC_PhysicalInfo, OC_AliveList)
-				newPrimaryOrderTable = CalculateNewPrimaryOrderTable(OC_OrderTable, OC_AliveList, OC_AllOrderTables, OC_PhysicalInfo, OC_NumElevs, packet)
+				newPrimaryOrderTable := handle_primary_transition(OC_OrderTable, packet, OC_AliveList)
+				packet = elev.OrderTablePacket{Id: OC_PhysicalInfo.Id, OrderTable: newPrimaryOrderTable}
+				newPrimaryOrderTable = CalculateNewPrimaryOrderTable(OC_OrderTable, OC_AliveList, OC_AllOrderTables, OC_PhysicalInfo, packet)
 				// Update local info
 				OC_OrderTable = newPrimaryOrderTable
 				OC_AllOrderTables[OC_PhysicalInfo.Id] = OC_OrderTable
@@ -99,17 +103,17 @@ func OrderControl(
 				// TODO: send OrderTable update kanskje til andre
 
 			case elev.ER_Primary:
-				// Idk om dette er greit egentlig
-				for elevId := 0; elevId < elev.N_MAX_ELEVS; elevId++ {
-					if OC_AliveList[elevId].Role != elev.ER_Dead {
-						OC_AllOrderTables[elevId][OC_PhysicalInfo.Id][btnPress.Floor][btnPress.Button] = elev.OS_REQUESTED
-					}
-				}
 				packet := elev.OrderTablePacket{Id: OC_PhysicalInfo.Id, OrderTable: OC_OrderTable}
-				newPrimaryOrderTable := handle_primary_transition(OC_OrderTable, packet, OC_PhysicalInfo, OC_AliveList)
-				newPrimaryOrderTable = CalculateNewPrimaryOrderTable(OC_OrderTable, OC_AliveList, OC_AllOrderTables, OC_PhysicalInfo, OC_NumElevs, packet)
+
+				// First transition
+				OC_OrderTable = handle_primary_transition(OC_OrderTable, packet, OC_AliveList)
+				OC_AllOrderTables[OC_PhysicalInfo.PrimaryId] = OC_OrderTable
+				packet = elev.OrderTablePacket{Id: OC_PhysicalInfo.Id, OrderTable: OC_OrderTable}
+
+				// Second transition
+				OC_OrderTable = CalculateNewPrimaryOrderTable(OC_OrderTable, OC_AliveList, OC_AllOrderTables, OC_PhysicalInfo, packet)
+
 				// Update local info
-				OC_OrderTable = newPrimaryOrderTable
 				OC_AllOrderTables[OC_PhysicalInfo.Id] = OC_OrderTable
 				OC_PhysicalInfo.LocalOrderTable = orderTableToLOT(OC_OrderTable, OC_PhysicalInfo.Id)
 
@@ -121,6 +125,7 @@ func OrderControl(
 			}
 
 		case packet := <-ch_fromRX_OrderTableP:
+			fmt.Printf("[OrderControl] OrderTablePacket rcvd from Primary\n")
 			switch OC_PhysicalInfo.Role {
 			// ============================================================ BACKUP RCV NETWORK PACKET
 			case elev.ER_Backup:
@@ -128,35 +133,30 @@ func OrderControl(
 				if packet.OrderTable == OC_OrderTable || packet.Id != OC_PhysicalInfo.PrimaryId {
 					break
 				}
-				// Update OrderTable for valid Primary-to-Backup transitions
-				for e := 0; e < elev.N_MAX_ELEVS; e++ {
-					for f := 0; f < elev.N_FLOORS; f++ {
-						for b := 0; b < elev.N_BUTTONS; b++ {
-							OC_OrderTable[e][f][b] = valid_p2b_transition(OC_OrderTable, packet.OrderTable, e, f, b)
-						}
-					}
-				}
+				OC_OrderTable = packet.OrderTable
 				OC_PhysicalInfo.LocalOrderTable = orderTableToLOT(OC_OrderTable, OC_PhysicalInfo.Id)
-
 				// Set OrderTable and LocalOrderTable the same as the rcv Primary
 				ch_fromOC_OrderTable <- OC_OrderTable
 				ch_fromOC_LOT <- OC_PhysicalInfo.LocalOrderTable
 			// =========================================================== PRIMARY RCV NETWORK PACKET
 			case elev.ER_Primary:
-
-				// Ignorer dersom det er ingen endringer
+				if packet.Id == OC_PhysicalInfo.Id {
+					break
+				}
+				//Ignorer dersom det er ingen endringer
 				if OC_AllOrderTables[packet.Id] == packet.OrderTable { // 🏷️
 					break
 				}
 				OC_AllOrderTables[packet.Id] = packet.OrderTable
 
-				newOrderTable := handle_primary_transition(OC_OrderTable, packet, OC_PhysicalInfo, OC_AliveList)
-				newOrderTable = CalculateNewPrimaryOrderTable(OC_OrderTable, OC_AliveList, OC_AllOrderTables, OC_PhysicalInfo, OC_NumElevs, packet)
-				// Ignorer dersom det er ingen endringer
-				if OC_OrderTable == newOrderTable {
-					break
-				}
-				OC_OrderTable = newOrderTable
+				// First transition
+				OC_OrderTable := handle_primary_transition(OC_OrderTable, packet, OC_AliveList)
+				OC_AllOrderTables[OC_PhysicalInfo.Id] = OC_OrderTable
+				packet = elev.OrderTablePacket{Id: OC_PhysicalInfo.Id, OrderTable: OC_OrderTable}
+
+				// Second transition
+				OC_OrderTable = CalculateNewPrimaryOrderTable(OC_OrderTable, OC_AliveList, OC_AllOrderTables, OC_PhysicalInfo, packet)
+
 				OC_AllOrderTables[OC_PhysicalInfo.Id] = OC_OrderTable
 				OC_PhysicalInfo.LocalOrderTable = orderTableToLOT(OC_OrderTable, OC_PhysicalInfo.Id)
 				ch_fromOC_OrderTable <- OC_OrderTable
@@ -171,9 +171,9 @@ func OrderControl(
 func handle_primary_transition(
 	primaryOT elev.OrderTable,
 	packet elev.OrderTablePacket,
-	OC_PhysicalInfo elev.ElevatorPhysicalInfo,
 	OC_AliveList elev.AliveList,
 ) elev.OrderTable {
+
 	rcvOT := packet.OrderTable
 
 	for elevIndex := 0; elevIndex < elev.N_MAX_ELEVS; elevIndex++ {
@@ -198,7 +198,7 @@ func handle_primary_transition(
 						continue
 					}
 				} else {
-					primaryOT[elevIndex][floor][btn] = calculate_status_transition(elevIndex, rcvStatus, primaryStatus, packet.Id, OC_PhysicalInfo.Id)
+					primaryOT[elevIndex][floor][btn] = calculate_status_transition(elevIndex, rcvStatus, primaryStatus, packet.Id)
 				}
 			}
 		}
@@ -206,17 +206,45 @@ func handle_primary_transition(
 	return primaryOT
 }
 
+func calculate_status_transition(
+	elevIndex int,
+	rcvStatus elev.OrderStatus,
+	primaryStatus elev.OrderStatus,
+	packetId int,
+) elev.OrderStatus {
+
+	switch primaryStatus {
+
+	case elev.OS_NO_ORDER:
+		if rcvStatus == elev.OS_REQUESTED {
+			return elev.OS_REQUESTED
+		}
+
+	case elev.OS_REQUESTED:
+		return elev.OS_REQUESTED
+
+	case elev.OS_CONFIRMED:
+		if rcvStatus == elev.OS_CLEAR && packetId == elevIndex {
+			return elev.OS_CLEAR
+		}
+
+	case elev.OS_CLEAR:
+		return elev.OS_CLEAR
+	}
+
+	fmt.Printf("Base case hit! \n")
+	return primaryStatus
+}
+
 func CalculateNewPrimaryOrderTable(
 	OC_OrderTable elev.OrderTable,
 	OC_AliveList elev.AliveList,
 	OC_AllOrderTables elev.AllOrderTables,
 	OC_PhysicalInfo elev.ElevatorPhysicalInfo,
-	OC_NumElevs int,
 	packet elev.OrderTablePacket,
 ) elev.OrderTable {
 
 	primaryOT := OC_OrderTable
-	rcvOT := packet.OrderTable
 
 	// Iterate through Primaries OrderTable and the Recieved OrderTable
 	for elevIndex := 0; elevIndex < elev.N_MAX_ELEVS; elevIndex++ {
@@ -227,9 +255,6 @@ func CalculateNewPrimaryOrderTable(
 		for floor := 0; floor < elev.N_FLOORS; floor++ {
 			for btn := 0; btn < elev.N_BUTTONS; btn++ {
 				// Define helpers
-				primaryStatus := primaryOT[elevIndex][floor][btn]
-				rcvStatus := rcvOT[elevIndex][floor][btn]
-				primaryOT[elevIndex][floor][btn] = calculate_status_transition(elevIndex, rcvStatus, primaryStatus, packet.Id, OC_PhysicalInfo.Id)
 
 				// Alle heise enige om clear på denne ordren (btn, floor)
 				if isClearedByAll(OC_AllOrderTables, elevIndex, floor, btn, OC_AliveList) {
@@ -243,7 +268,7 @@ func CalculateNewPrimaryOrderTable(
 						primaryOT[elevIndex][floor][btn] = elev.OS_CONFIRMED
 						continue
 					}
-					bestID := CalculateWhichElevator(elevIndex, floor, btn, primaryOT, OC_AliveList, OC_NumElevs)
+					bestID := CalculateWhichElevator(elevIndex, floor, btn, primaryOT, OC_AliveList)
 					fmt.Printf("BESTID = %d\n", bestID)
 					primaryOT[bestID][floor][btn] = elev.OS_CONFIRMED
 					continue
@@ -258,42 +283,6 @@ func CalculateNewPrimaryOrderTable(
 	}
 
 	return primaryOT
-}
-
-func calculate_status_transition(
-	elevIndex int,
-	rcvStatus elev.OrderStatus,
-	primaryStatus elev.OrderStatus,
-	packetId int,
-	thisId int,
-) elev.OrderStatus {
-
-	switch primaryStatus {
-
-	case elev.OS_NO_ORDER:
-		if rcvStatus == elev.OS_REQUESTED {
-			return elev.OS_REQUESTED
-		}
-
-	case elev.OS_REQUESTED:
-		if rcvStatus == elev.OS_CONFIRMED {
-			return elev.OS_CONFIRMED
-		}
-		if rcvStatus == elev.OS_CLEAR {
-			return elev.OS_NO_ORDER
-		}
-
-	case elev.OS_CONFIRMED:
-		if rcvStatus == elev.OS_CLEAR && packetId == elevIndex {
-			return elev.OS_CLEAR
-		}
-
-	case elev.OS_CLEAR:
-		return elev.OS_CLEAR
-	}
-
-	fmt.Printf("Base case hit! \n")
-	return primaryStatus
 }
 
 func ElevatorIsOwner(primaryStatus elev.OrderStatus, rcvStatus elev.OrderStatus) elev.OrderStatus {
@@ -357,8 +346,7 @@ func CalculateWhichElevator(
 	orderFloor int,
 	btn int,
 	OrderTable elev.OrderTable,
-	AliveList elev.AliveList,
-	NumElevs int) int {
+	AliveList elev.AliveList) int {
 
 	// Large number lol
 	minCost := 1000

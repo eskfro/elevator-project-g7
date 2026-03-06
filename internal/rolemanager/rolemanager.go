@@ -28,7 +28,9 @@ func RoleManager(
 	ch_fromRM_Role chan elev.ElevatorRole,
 	ch_fromRM_DeadElevId chan int,
 	ch_fromRM_NumElevs chan int,
-	ch_fromRM_PrimaryId chan int) {
+	ch_fromRM_PrimaryId chan int,
+	ch_fromRM_PrimaryIp chan string,
+) {
 
 	RM_AliveList := elevator.AliveList
 	RM_NumElevs := elevator.NumElevs
@@ -49,43 +51,57 @@ func RoleManager(
 			ch_fromRM_NumElevs <- RM_NumElevs
 
 		case newAliveList := <-ch_updateRM_AliveList:
+			log.Println("[RoleManager] New AliveList update to RoleManager")
 			RM_AliveList = newAliveList
-			RM_NumElevs = CountNumElevs(RM_AliveList)
-			ch_fromRM_NumElevs <- RM_NumElevs
+			newNumElevs := CountNumElevs(RM_AliveList)
+			if newNumElevs != RM_NumElevs {
+				ch_fromRM_NumElevs <- newNumElevs
+			}
+			RM_NumElevs = newNumElevs
 
 			switch RM_PhysicalInfo.Role {
 
 			case elev.ER_Dead:
+				fmt.Println("[RoleManager] DEAD")
 
 			case elev.ER_Backup:
 
 				if ShouldBecomePrimary(RM_PhysicalInfo.Id, RM_PhysicalInfo.Role, RM_NumElevs, RM_AliveList, timeStart) {
+					log.Println("[RoleManager] Should Become Primary")
 
 					RM_PhysicalInfo.Role = elev.ER_Primary
+					RM_PhysicalInfo.PrimaryIp = RM_PhysicalInfo.Ip
 					RM_PhysicalInfo.PrimaryId = RM_PhysicalInfo.Id
 					RM_AliveList[RM_PhysicalInfo.Id] = RM_PhysicalInfo
 					ch_fromRM_Role <- RM_PhysicalInfo.Role
 					ch_fromRM_PrimaryId <- RM_PhysicalInfo.PrimaryId
+					ch_fromRM_PrimaryIp <- RM_PhysicalInfo.PrimaryIp
 				}
 
 				// Update PrimaryId when we know this elevator will be a backup
 				if ShouldUpdatePrimaryId(RM_PhysicalInfo.PrimaryId, timeStart) {
-
+					log.Println("[RoleManager] Should Update PrimaryID")
 					newPrimaryId := GetPrimaryId(RM_AliveList)
+					newPrimaryIp := GetPrimaryIp(RM_AliveList)
 					RM_PhysicalInfo.PrimaryId = newPrimaryId
+					RM_PhysicalInfo.PrimaryIp = newPrimaryIp
 					ch_fromRM_PrimaryId <- RM_PhysicalInfo.PrimaryId
+					ch_fromRM_PrimaryIp <- RM_PhysicalInfo.PrimaryIp
 
 				}
 
 			case elev.ER_Primary:
 
 				if ShouldBecomeBackup(RM_PhysicalInfo.Id, RM_PhysicalInfo.Role, RM_NumElevs, RM_AliveList) {
-
+					log.Println("[RoleManager] Should Become Backup")
 					RM_PhysicalInfo.Role = elev.ER_Backup
 					RM_AliveList[RM_PhysicalInfo.Id] = RM_PhysicalInfo
 					newPrimaryId := GetPrimaryId(RM_AliveList)
+					newPrimaryIp := GetPrimaryIp(RM_AliveList)
 					RM_PhysicalInfo.PrimaryId = newPrimaryId
+					RM_PhysicalInfo.PrimaryIp = newPrimaryIp
 					ch_fromRM_PrimaryId <- RM_PhysicalInfo.PrimaryId
+					ch_fromRM_PrimaryIp <- RM_PhysicalInfo.PrimaryIp
 					ch_fromRM_Role <- RM_PhysicalInfo.Role
 
 				}
@@ -142,6 +158,25 @@ func GetPrimaryId(AliveList elev.AliveList) int {
 	}
 
 	return primaryId
+
+}
+
+func GetPrimaryIp(AliveList elev.AliveList) string {
+
+	primaryIp := elev.INVALID_PRIMARYIP
+
+	for elevId := 0; elevId < elev.N_MAX_ELEVS; elevId++ {
+		if AliveList[elevId].Role == elev.ER_Primary {
+			primaryIp = AliveList[elevId].Ip
+			break
+		}
+	}
+
+	if primaryIp == elev.INVALID_PRIMARYIP {
+		log.Fatalf("GetPrimaryIp failed: No primary in AliveList\n")
+	}
+
+	return primaryIp
 
 }
 

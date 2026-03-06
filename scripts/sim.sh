@@ -16,9 +16,9 @@ SCRIPT_DIR=$(dirname "$0")
 cd "$SCRIPT_DIR/.."
 
 # Port Calculation
-HW_PORT=$((16657 + E_ID))
-HB_PORT=11311
-OT_PORT=10311
+HW_PORT=$((16657 + E_ID)) # hardware port, needs to mach the simulation script port
+HB_PORT=11311 # heartbeat port -> constant for all elevs
+OT_PORT=10411 # Port for primary TCP if this becomes primary
 
 # --- DUPLICATE CHECK ---
 # Check if an elevator with this ID is already running
