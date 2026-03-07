@@ -27,6 +27,7 @@ func Movement(
 	for {
 		select {
 		case newPhysicalInfo := <-ch_updateMV_PhysicalInfo:
+			log.Println("[Movement] PhysicalInfo Update")
 			// TODO: maybe remove ts
 			if newPhysicalInfo.LocalOrderTable == MV_prevLOT {
 				break
@@ -36,11 +37,11 @@ func Movement(
 			MV_PhysicalInfo = FSM_OnTableUpdate(MV_PhysicalInfo, doorTimer, ch_fromMV_LOT, ch_fromMV_Movement, ch_fromMV_MotorDir, ch_fromMV_ClearOrder)
 
 		case <-doorTimer.C:
-			fmt.Println("fsm doortimer event")
+			log.Println("[Movement] Doortimer Event")
 			MV_PhysicalInfo = FSM_OnDoorTimeout(MV_PhysicalInfo, doorTimer, ch_fromMV_LOT, ch_fromMV_Movement, ch_fromMV_MotorDir, ch_fromMV_ClearOrder)
 
 		case newFloor := <-ch_toMV_FloorArrival:
-			fmt.Printf("Floor arrival: floor = %d\n", newFloor)
+			fmt.Printf("[Movement]: Arrived at Floor = %d\n", newFloor)
 			MV_PhysicalInfo.Floor = newFloor
 			MV_PhysicalInfo = FSM_OnFloorArrival(MV_PhysicalInfo, doorTimer, ch_fromMV_LOT, ch_fromMV_Movement, ch_fromMV_ClearOrder)
 

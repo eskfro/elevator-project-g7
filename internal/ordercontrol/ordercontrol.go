@@ -23,7 +23,6 @@ func OrderControl(
 	ch_updateOC_AllOrderTables chan elev.AllOrderTables,
 	ch_updateOC_PhysicalInfo chan elev.ElevatorPhysicalInfo,
 	ch_updateOC_AliveList chan elev.AliveList,
-	ch_updateOC_NumElevs chan int,
 	ch_fromRX_OrderTableP chan elev.OrderTablePacket,
 	ch_fromOC_LOT chan elev.LocalOrderTable,
 	ch_fromOC_OrderTable chan elev.OrderTable,
@@ -47,12 +46,16 @@ func OrderControl(
 		// 	OC_NumElevs = newNumElevs
 
 		case newAllOrderTables := <-ch_updateOC_AllOrderTables:
+			log.Println("[OrderControl] AllOrderTables Update")
 			OC_AllOrderTables = newAllOrderTables
 
 		case newPhysicalInfo := <-ch_updateOC_PhysicalInfo:
+			log.Println("[OrderControl] PhysicalInfo Update")
 			OC_PhysicalInfo = newPhysicalInfo
 
+		// Directly from rolemanager
 		case newAliveList := <-ch_updateOC_AliveList:
+			log.Println("[OrderControl] AliveList Update")
 			OC_AliveList = newAliveList
 
 		//Delete case later
@@ -60,6 +63,7 @@ func OrderControl(
 		// 	OC_NumElevs = newNumElevs
 		// =========================================================================== CLEAR ORDER
 		case clearOrder := <-ch_fromMV_ClearOrder:
+			log.Println("[OrderControl] Clear Order")
 			OC_OrderTable[OC_PhysicalInfo.Id][clearOrder.Floor][clearOrder.ButtonType] = elev.OS_CLEAR
 
 			switch OC_PhysicalInfo.Role {
@@ -150,7 +154,7 @@ func OrderControl(
 				OC_AllOrderTables[packet.Id] = packet.OrderTable
 
 				// First transition
-				OC_OrderTable := handle_primary_transition(OC_OrderTable, packet, OC_AliveList)
+				OC_OrderTable = handle_primary_transition(OC_OrderTable, packet, OC_AliveList)
 				OC_AllOrderTables[OC_PhysicalInfo.Id] = OC_OrderTable
 				packet = elev.OrderTablePacket{Id: OC_PhysicalInfo.Id, OrderTable: OC_OrderTable}
 
@@ -350,7 +354,7 @@ func CalculateWhichElevator(
 
 	// Large number lol
 	minCost := 1000
-	bestElevId := elev.INVALID_ELEVID
+	bestElevId := elev.INVALID_ELEVATOR_ID
 
 	for elevIndex := 0; elevIndex < elev.N_MAX_ELEVS; elevIndex++ {
 		if AliveList[elevIndex].Role == elev.ER_Dead {
@@ -364,7 +368,7 @@ func CalculateWhichElevator(
 			bestElevId = currentElev.Id
 		}
 	}
-	if bestElevId == elev.INVALID_ELEVID {
+	if bestElevId == elev.INVALID_ELEVATOR_ID {
 		log.Fatalln("CalculateWhichElevator failed! No elevators found in alivelist.")
 	}
 	return bestElevId

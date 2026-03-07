@@ -121,15 +121,16 @@ func RxHeartBeat(
 		}
 
 		// Send ElevatorPhysicalInfo heartbeat if not self
-		if recievedInfo.Id != thisElevId {
-			select {
-			case ch_fromRX_PhysicalInfo <- recievedInfo:
+		// if recievedInfo.Id != thisElevId {
+		// 	select {
+		// 	case ch_fromRX_PhysicalInfo <- recievedInfo:
 
-			default:
-				log.Println("fromRX_PhysicalInfo is full!")
+		// 	default:
+		// 		log.Println("fromRX_PhysicalInfo is full!")
 
-			}
-		}
+		// 	}
+		// }
+		ch_fromRX_PhysicalInfo <- recievedInfo
 	}
 }
 
@@ -184,13 +185,13 @@ func RxOrderTableTCP(
 	ch_updateRX_PrimaryId <-chan int,
 ) {
 
-	primaryIp := elev.INVALID_PRIMARYIP
+	primaryIp := elev.INVALID_PRIMARY_IP
 	primaryId := initPrimaryId
 
 	for {
 		log.Println("[RX TCP] Loop Warning (1)")
 
-		if primaryIp == elev.INVALID_PRIMARYIP {
+		if primaryIp == elev.INVALID_PRIMARY_IP {
 			log.Println("[RX TCP] Waiting for valid IP...")
 			select {
 			case primaryIp = <-ch_updateRX_PrimaryIp:
@@ -271,7 +272,7 @@ func RxOrderTableTCP2(
 
 	for {
 		// 1. Guard against invalid state
-		if currentIP == elev.INVALID_PRIMARYIP {
+		if currentIP == elev.INVALID_PRIMARY_IP {
 			log.Println("[RX TCP] Waiting for valid IP...")
 			currentIP = <-ch_updateIP
 			continue

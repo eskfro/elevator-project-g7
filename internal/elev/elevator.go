@@ -12,10 +12,11 @@ const N_BUTTONS = 3
 const N_MAX_ELEVS = 4
 const DOOR_OPEN_TIME = 3 * time.Second
 const HEARTBEAT_TIMEOUT = 3 * time.Second
-const PRIMARY_ELECTION_DELAY = 500 * time.Millisecond
-const BCAST_INTERVAL = 30 * time.Millisecond
-const INVALID_ELEVID = N_MAX_ELEVS + 1
-const INVALID_PRIMARYIP = "invalid_ip"
+const PRIMARY_ELECTION_DELAY = 450 * time.Millisecond
+const BCAST_INTERVAL = 200 * time.Millisecond
+const INVALID_ELEVATOR_ID = N_MAX_ELEVS + 1
+const INVALID_PRIMARY_ID = N_MAX_ELEVS + 1
+const INVALID_PRIMARY_IP = "invalid_ip"
 
 // ================= ENUM TYPES ===============================
 
@@ -99,12 +100,9 @@ type Elevator struct {
 }
 
 func CreateElevator(_Id int, _Port int, _Ip string) Elevator {
-	e := Elevator{
-		PhysicalInfo: CreatePhysicalElevator(_Id, _Ip),
-	}
+	e := Elevator{PhysicalInfo: CreatePhysicalElevator(_Id, _Ip)}
 	e.AliveList[_Id] = e.PhysicalInfo
 	e.NumElevs = 1
-
 	return e
 }
 
@@ -113,8 +111,8 @@ func CreatePhysicalElevator(_Id int, _Ip string) ElevatorPhysicalInfo {
 		Id:         _Id,
 		Role:       ER_Backup,
 		Ip:         _Ip,
-		PrimaryId:  INVALID_ELEVID,
-		PrimaryIp:  INVALID_PRIMARYIP,
+		PrimaryId:  INVALID_ELEVATOR_ID,
+		PrimaryIp:  INVALID_PRIMARY_IP,
 		Floor:      elevio.GetFloor(),
 		MotorDir:   elevio.MD_Stop,
 		Movement:   EM_Idle,
