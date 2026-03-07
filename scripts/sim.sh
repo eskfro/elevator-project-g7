@@ -18,7 +18,9 @@ cd "$SCRIPT_DIR/.."
 # Port Calculation
 HW_PORT=$((16657 + E_ID)) # hardware port, needs to mach the simulation script port
 HB_PORT=11311 # heartbeat port -> constant for all elevs
-OT_PORT=10411 # Port for primary TCP if this becomes primary
+OT_PORT=10411 # Port for primary TCP if this becomes primary. Elevator ID is when elevator is inited. It is actually different for OrderTable things
+
+
 
 # --- DUPLICATE CHECK ---
 # Check if an elevator with this ID is already running

@@ -74,10 +74,10 @@ func main() {
 	// From RoleManager
 	ch_fromRM_Role := make(chan elev.ElevatorRole, 4)
 	ch_fromRM_DeadElevId := make(chan int, 4)
-	ch_fromRM_NumElevs := make(chan int, 4)
 	ch_fromRM_PrimaryId := make(chan int, 4)
 	ch_fromRM_PrimaryIp := make(chan string, 4)
 	ch_fromRM_AliveList := make(chan elev.AliveList, 10)
+	ch_fromRM_NumElevs := make(chan int)
 
 	// To Network
 	ch_updateTX_OTP := make(chan elev.OrderTablePacket, 4)
@@ -87,7 +87,6 @@ func main() {
 	// From Network
 	ch_fromRX_OrderTableP := make(chan elev.OrderTablePacket, 50)
 	ch_fromRX_PhysicalInfo := make(chan elev.ElevatorPhysicalInfo, 20)
-	ch_heartbeat := make(chan elev.ElevatorPhysicalInfo, 20)
 
 	go elevio.PollObstructionSwitch(ch_fromIO_Obstruction)
 	go elevio.PollFloorSensor(ch_fromIO_Floor)
@@ -98,9 +97,9 @@ func main() {
 	go ordercontrol.OrderControl(elevator, ch_updateOC_AllOrderTables, ch_updateOC_PhysicalInfo, ch_updateOC_AliveList, ch_fromRX_OrderTableP,
 		ch_fromOC_LOT, ch_fromOC_OrderTable, ch_toOC_PrimaryOrderTableP, ch_updateTX_OTP, ch_fromMV_ClearOrder, ch_fromIO_BtnPress)
 	go rolemanager.RoleManager(elevator, ch_updateRM_AliveList, ch_updateRM_PhysicalInfo, ch_updateRM_NumElevs,
-		ch_fromRM_Role, ch_fromRM_DeadElevId, ch_fromRM_NumElevs, ch_fromRM_PrimaryId, ch_fromRM_PrimaryIp, ch_fromRX_PhysicalInfo, ch_fromRM_AliveList)
+		ch_fromRM_Role, ch_fromRM_DeadElevId, ch_fromRM_PrimaryId, ch_fromRM_PrimaryIp, ch_fromRX_PhysicalInfo, ch_fromRM_AliveList, ch_fromRM_NumElevs)
 	go network.TxHeartBeat(elevator, ports.HeartBeat, ch_updateTX_PhysicalInfo)
-	go network.RxHeartBeat(ports.HeartBeat, ch_heartbeat, elevator.PhysicalInfo.Id)
+	go network.RxHeartBeat(ports.HeartBeat, ch_fromRX_PhysicalInfo, elevator.PhysicalInfo.Id)
 	go network.TxOrderTableTCP(elevator.PhysicalInfo.Id, ports.OrderTableP, ch_updateTX_OTP)
 	go network.RxOrderTableTCP(elevator.PhysicalInfo.PrimaryIp, ports.OrderTableP, ch_updateRX_PrimaryIp, ch_fromRX_OrderTableP, elevator.PhysicalInfo.PrimaryId, ch_updateRX_PrimaryId)
 
@@ -121,40 +120,30 @@ func main() {
 			case obst := <-ch_fromIO_Obstruction:
 				log.Println("[MAIN] FromIO obs")
 				elevator.PhysicalInfo.Obstructed = obst
-				ch_updateTX_PhysicalInfo <- elevator.PhysicalInfo
-				ch_updateOC_PhysicalInfo <- elevator.PhysicalInfo
-				ch_updateRM_PhysicalInfo <- elevator.PhysicalInfo
+				sendPhysicalInfoUpdate(elevator.PhysicalInfo, ch_updateRM_PhysicalInfo, ch_updateOC_PhysicalInfo, ch_updateTX_PhysicalInfo)
 
 			case floor := <-ch_fromIO_Floor:
 				log.Println("[MAIN] FromIO floor")
 				elevator.PhysicalInfo.Floor = floor
 				ch_toMV_FloorArrival <- floor
-				ch_updateTX_PhysicalInfo <- elevator.PhysicalInfo
-				ch_updateOC_PhysicalInfo <- elevator.PhysicalInfo
-				ch_updateRM_PhysicalInfo <- elevator.PhysicalInfo
+				sendPhysicalInfoUpdate(elevator.PhysicalInfo, ch_updateRM_PhysicalInfo, ch_updateOC_PhysicalInfo, ch_updateTX_PhysicalInfo)
 
 			// =========================== FROM MOVEMENT ============================
 
 			case newLOT := <-ch_fromMV_LOT:
 				log.Println("[MAIN] From MV: LocalOrderTable")
 				elevator.PhysicalInfo.LocalOrderTable = newLOT
-				ch_updateTX_PhysicalInfo <- elevator.PhysicalInfo
-				ch_updateOC_PhysicalInfo <- elevator.PhysicalInfo
-				ch_updateRM_PhysicalInfo <- elevator.PhysicalInfo
+				sendPhysicalInfoUpdate(elevator.PhysicalInfo, ch_updateRM_PhysicalInfo, ch_updateOC_PhysicalInfo, ch_updateTX_PhysicalInfo)
 
 			case newMovement := <-ch_fromMV_Movement:
 				log.Println("[MAIN] From MV: Movement")
 				elevator.PhysicalInfo.Movement = newMovement
-				ch_updateTX_PhysicalInfo <- elevator.PhysicalInfo
-				ch_updateOC_PhysicalInfo <- elevator.PhysicalInfo
-				ch_updateRM_PhysicalInfo <- elevator.PhysicalInfo
+				sendPhysicalInfoUpdate(elevator.PhysicalInfo, ch_updateRM_PhysicalInfo, ch_updateOC_PhysicalInfo, ch_updateTX_PhysicalInfo)
 
 			case newMotorDir := <-ch_fromMV_MotorDir:
 				log.Println("[MAIN] From MV: MotorDir")
 				elevator.PhysicalInfo.MotorDir = newMotorDir
-				ch_updateTX_PhysicalInfo <- elevator.PhysicalInfo
-				ch_updateOC_PhysicalInfo <- elevator.PhysicalInfo
-				ch_updateRM_PhysicalInfo <- elevator.PhysicalInfo
+				sendPhysicalInfoUpdate(elevator.PhysicalInfo, ch_updateRM_PhysicalInfo, ch_updateOC_PhysicalInfo, ch_updateTX_PhysicalInfo)
 
 			// ========================== FROM ORDERCONTROL ============================
 
@@ -165,8 +154,7 @@ func main() {
 			case newLocalOrderTable := <-ch_fromOC_LOT:
 				log.Println("[MAIN] From OC: LocalOrderTable")
 				elevator.PhysicalInfo.LocalOrderTable = newLocalOrderTable
-				ch_updateMV_PhysicalInfo <- elevator.PhysicalInfo
-				ch_updateRM_PhysicalInfo <- elevator.PhysicalInfo
+				sendPhysicalInfoUpdate(elevator.PhysicalInfo, ch_updateMV_PhysicalInfo, ch_updateRM_PhysicalInfo)
 
 			// ========================== FROM ROLEMANAGER ============================
 
@@ -174,6 +162,8 @@ func main() {
 			case <-ticker_AliveList.C:
 				// log.Println("[MAIN] From RM: AliveList Ticker")
 				ch_updateRM_PhysicalInfo <- elevator.PhysicalInfo
+
+			case elevator.NumElevs = <-ch_fromRM_NumElevs:
 
 			case deadElevId := <-ch_fromRM_DeadElevId:
 				log.Println("[MAIN] From RM: Dead Elev ID")
@@ -184,29 +174,18 @@ func main() {
 			case newRole := <-ch_fromRM_Role:
 				log.Println("[MAIN] From RM: Role")
 				elevator.PhysicalInfo.Role = newRole
-				ch_updateTX_PhysicalInfo <- elevator.PhysicalInfo
-				ch_updateMV_PhysicalInfo <- elevator.PhysicalInfo
-				ch_updateOC_PhysicalInfo <- elevator.PhysicalInfo
-
-			case newNumElevs := <-ch_fromRM_NumElevs:
-				log.Println("[MAIN] From RM: Num Elevs")
-				elevator.NumElevs = newNumElevs
-				//ch_updateOC_NumElevs <- newNumElevs //TODO: remove
+				sendPhysicalInfoUpdate(elevator.PhysicalInfo, ch_updateMV_PhysicalInfo, ch_updateOC_PhysicalInfo, ch_updateTX_PhysicalInfo)
 
 			case newPrimaryId := <-ch_fromRM_PrimaryId:
 				log.Println("[MAIN] From RM: Primary ID")
 				elevator.PhysicalInfo.PrimaryId = newPrimaryId
 				ch_updateRX_PrimaryId <- elevator.PhysicalInfo.PrimaryId
-				ch_updateMV_PhysicalInfo <- elevator.PhysicalInfo
-				ch_updateOC_PhysicalInfo <- elevator.PhysicalInfo
-				ch_updateTX_PhysicalInfo <- elevator.PhysicalInfo // HeartBeat
+				sendPhysicalInfoUpdate(elevator.PhysicalInfo, ch_updateMV_PhysicalInfo, ch_updateOC_PhysicalInfo, ch_updateTX_PhysicalInfo)
 
 			case newPrimaryIp := <-ch_fromRM_PrimaryIp:
 				log.Println("[MAIN] From RM: Primary IP")
 				elevator.PhysicalInfo.PrimaryIp = newPrimaryIp
-				ch_updateMV_PhysicalInfo <- elevator.PhysicalInfo
-				ch_updateOC_PhysicalInfo <- elevator.PhysicalInfo
-				ch_updateTX_PhysicalInfo <- elevator.PhysicalInfo
+				sendPhysicalInfoUpdate(elevator.PhysicalInfo, ch_updateMV_PhysicalInfo, ch_updateOC_PhysicalInfo, ch_updateTX_PhysicalInfo)
 				ch_updateRX_PrimaryIp <- elevator.PhysicalInfo.PrimaryIp
 
 			case newAliveList := <-ch_fromRM_AliveList:
@@ -215,14 +194,14 @@ func main() {
 				ch_updateOC_AliveList <- elevator.AliveList
 
 				// ========================= FROM NETWORK ============================
-
-			case heartbeat := <-ch_heartbeat:
-				// log.Println("[MAIN] From Network: Heartbeat")
-				ch_fromRX_PhysicalInfo <- heartbeat
 			}
 		}
 	}()
 
 	WaitForInterrupt()
-
+}
+func sendPhysicalInfoUpdate(info elev.ElevatorPhysicalInfo, channels ...chan<- elev.ElevatorPhysicalInfo) {
+	for _, ch := range channels {
+		ch <- info
+	}
 }
