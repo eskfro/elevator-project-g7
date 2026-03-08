@@ -56,7 +56,7 @@ func main() {
 	ch_fromMV_LOT := make(chan elev.LocalOrderTable, 2)
 	ch_fromMV_MotorDir := make(chan elevio.MotorDirection, 2)
 	ch_fromMV_Movement := make(chan elev.ElevatorMovement, 2)
-	ch_fromMV_ClearOrder := make(chan elev.Order, 4)
+	ch_fromMV_ClearOrder := make(chan elev.Order, 10)
 
 	// To OrderControl
 	ch_toOC_PrimaryOrderTableP := make(chan elev.OrderTablePacket, 4)

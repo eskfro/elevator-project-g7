@@ -252,6 +252,8 @@ func RxOrderTableTCP(
 
 			// Send OrderTablePacket to
 			log.Println("[RX TCP] Sending Rcvd OrderTable Package in Channel")
+
+
 			ch_fromRX_OTP <- otp
 		}
 

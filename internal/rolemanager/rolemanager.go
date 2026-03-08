@@ -33,6 +33,7 @@ func RoleManager(
 
 	go MonitorHeartBeats(ch_HeartBeatId, ch_TimedOutId)
 
+forLoop:
 	for {
 		select {
 
@@ -77,7 +78,7 @@ func RoleManager(
 					ch_fromRM_PrimaryId <- RM_PhysicalInfo.PrimaryId
 					ch_fromRM_PrimaryIp <- RM_PhysicalInfo.PrimaryIp
 					ch_fromRM_Role <- RM_PhysicalInfo.Role
-					break
+					continue forLoop
 				}
 
 				// Update PrimaryId when we know this elevator will be a backup
@@ -125,7 +126,7 @@ func RoleManager(
 			ch_HeartBeatId <- heartbeat.Id
 
 			if RM_AliveList[heartbeat.Id] == heartbeat && heartbeat.PrimaryId != elev.INVALID_PRIMARY_ID {
-				break
+				continue forLoop
 			}
 
 			// log.Println("[RoleManager] New AliveList update to RoleManager")

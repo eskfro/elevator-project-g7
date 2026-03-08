@@ -24,13 +24,14 @@ func Movement(
 	MV_prevLOT := initElev.PhysicalInfo.LocalOrderTable
 	doorTimer := timer.New(elev.DOOR_OPEN_TIME)
 
+forLoop:
 	for {
 		select {
 		case newPhysicalInfo := <-ch_updateMV_PhysicalInfo:
 			log.Println("[Movement] PhysicalInfo Update")
 			// TODO: maybe remove ts
 			if newPhysicalInfo.LocalOrderTable == MV_prevLOT {
-				break
+				continue forLoop
 			}
 			MV_prevLOT = newPhysicalInfo.LocalOrderTable
 			MV_PhysicalInfo = newPhysicalInfo
