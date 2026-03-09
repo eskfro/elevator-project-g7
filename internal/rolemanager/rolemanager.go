@@ -63,6 +63,7 @@ forLoop:
 			isHeartbeatUnchanged := RM_AliveList[heartbeat.Id] == heartbeat
 			isValidPrimaryId := heartbeat.PrimaryId != elev.INVALID_PRIMARY_ID
 
+			//I starten settes PrimaryId til INVALID. Da bryr man seg ikke om isHeartBeatUnchanged fordi man må uansett oppdatere PrimaryId
 			if isHeartbeatUnchanged && isValidPrimaryId {
 				continue forLoop
 			}

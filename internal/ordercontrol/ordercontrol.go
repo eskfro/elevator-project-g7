@@ -178,55 +178,6 @@ func updateOrderTable(
 	return OC_OrderTable
 }
 
-// GAMMEL KODE FOR ARKIVET PER NÅ
-/*
-case packet := <-ch_fromRX_OrderTableP:
-
-	// Ignore if we have info
-	// Also, we dont want to update OC_AllOrderTables yet I think.
-	if OC_AllOrderTables[packet.Id] == packet.OrderTable {
-		continue
-	}
-
-	fmt.Printf("[OrderControl] OrderTablePacket rcvd from Primary\n")
-	switch OC_PhysicalInfo.Role {
-	// ============================================================ BACKUP RCV OTP
-	case elev.ER_Backup:
-		// Ignore dersom ingen endring eller OrderTablePacket ikke fra primary
-		if packet.Id != OC_PhysicalInfo.PrimaryId {
-			break
-		}
-		OC_OrderTable = packet.OrderTable
-		OC_AllOrderTables[OC_PhysicalInfo.Id] = OC_OrderTable
-		OC_PhysicalInfo.LocalOrderTable = orderTableToLOT(OC_OrderTable, OC_PhysicalInfo.Id)
-
-		// Set OrderTable and LocalOrderTable the same as the rcv Primary
-		ch_updateTX_OTP <- elev.OrderTablePacket{Id: OC_PhysicalInfo.Id, OrderTable: OC_OrderTable}
-		ch_fromOC_OrderTable <- OC_OrderTable
-		ch_fromOC_LOT <- OC_PhysicalInfo.LocalOrderTable
-	// =========================================================== PRIMARY RCV OTP
-	case elev.ER_Primary:
-		// First transition
-		OC_OrderTable = handle_primary_transition(OC_OrderTable, packet, OC_AliveList)
-		OC_AllOrderTables[OC_PhysicalInfo.Id] = OC_OrderTable
-		packet = elev.OrderTablePacket{Id: OC_PhysicalInfo.Id, OrderTable: OC_OrderTable}
-
-		// Second transition
-		OC_OrderTable = CalculateNewPrimaryOrderTable(OC_OrderTable, OC_AliveList, OC_AllOrderTables, OC_PhysicalInfo, packet)
-
-		// Update data
-		OC_AllOrderTables[OC_PhysicalInfo.Id] = OC_OrderTable
-		OC_PhysicalInfo.LocalOrderTable = orderTableToLOT(OC_OrderTable, OC_PhysicalInfo.Id)
-
-		// Send data
-		ch_updateTX_OTP <- elev.OrderTablePacket{Id: OC_PhysicalInfo.PrimaryId, OrderTable: OC_OrderTable}
-		ch_fromOC_OrderTable <- OC_OrderTable
-		ch_fromOC_LOT <- OC_PhysicalInfo.LocalOrderTable
-		//elev.PrintOrderTableSlice(OC_OrderTable, packet.Id)
-
-	}
-*/
-
 func handleStatusTransitions(
 	OC_OrderTable elev.OrderTable,
 	packet elev.OrderTablePacket,
@@ -486,26 +437,3 @@ func orderTableToLOT(OrderTable elev.OrderTable, elevId int) elev.LocalOrderTabl
 	return LOT
 }
 
-// Regler som bestemmer hvordan primary kan overskrive backup
-func valid_p2b_transition(
-	backupOT elev.OrderTable,
-	primaryOT elev.OrderTable,
-	e int, f int, b int) elev.OrderStatus {
-
-	backup_status := backupOT[e][f][b]
-	primary_status := primaryOT[e][f][b]
-
-	if backup_status == elev.OS_REQUESTED &&
-		primary_status == elev.OS_NO_ORDER {
-		return elev.OS_REQUESTED
-	}
-	if backup_status == elev.OS_NO_ORDER &&
-		primary_status == elev.OS_REQUESTED {
-		return elev.OS_REQUESTED
-	}
-	if backup_status == elev.OS_CLEAR &&
-		primary_status == elev.OS_NO_ORDER {
-		return elev.OS_NO_ORDER
-	}
-	return primary_status
-}
