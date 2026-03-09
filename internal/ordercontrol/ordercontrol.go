@@ -56,21 +56,19 @@ func OrderControl(
 		// ============================================================================== BTN PRESS FROM IO
 		case btnPress := <-ch_fromIO_BtnPress:
 			elevio.PrintButtonpress(btnPress)
-
+			rcvOrderTable := OC_OrderTable
 			currentStatus := OC_OrderTable[OC_PhysicalInfo.Id][btnPress.Floor][btnPress.Button]
-			isOrderActive := currentStatus == elev.OS_REQUESTED || currentStatus == elev.OS_CONFIRMED
+			isOrderAlreadyActive := currentStatus == elev.OS_REQUESTED || currentStatus == elev.OS_CONFIRMED
 
-			if isOrderActive {
+			if isOrderAlreadyActive {
 				log.Println("[OrderControl] Order Already Active")
 				continue
 			}
 
-			OC_OrderTable[OC_PhysicalInfo.Id][btnPress.Floor][btnPress.Button] = elev.OS_REQUESTED
-			OC_AllOrderTables[OC_PhysicalInfo.Id] = OC_OrderTable
-			packet := elev.OrderTablePacket{Id: OC_PhysicalInfo.Id, OrderTable: OC_OrderTable}
+			rcvOrderTable[OC_PhysicalInfo.Id][btnPress.Floor][btnPress.Button] = elev.OS_REQUESTED
 
 			// Update states and send
-			OC_OrderTable = updateOrderTable(OC_OrderTable, OC_AllOrderTables, OC_PhysicalInfo, OC_AliveList, packet, ch_updateTX_OTP)
+			OC_OrderTable = updateOrderTable(OC_OrderTable, rcvOrderTable, OC_PhysicalInfo.Id, OC_AllOrderTables, OC_PhysicalInfo, OC_AliveList, ch_updateTX_OTP)
 			OC_AllOrderTables[OC_PhysicalInfo.Id] = OC_OrderTable
 			OC_PhysicalInfo.LocalOrderTable = orderTableToLOT(OC_OrderTable, OC_PhysicalInfo.Id)
 			sendUpdateFromOC(OC_OrderTable, OC_PhysicalInfo.LocalOrderTable, ch_fromOC_OrderTable, ch_fromOC_LOT)
@@ -78,27 +76,25 @@ func OrderControl(
 		// =========================================================================== CLEAR ORDER FROM MV
 		case clearOrders := <-ch_fromMV_ClearOrders:
 			log.Println("[OrderControl] Clear Order")
+			rcvOrderTable := OC_OrderTable
 
 			// Update OrderTable according to incoming clear order
 			for btn := 0; btn < elev.N_BUTTONS; btn++ {
 				isActiveClearOrder := clearOrders[btn].ElevId != elev.INVALID_ELEVATOR_ID
 				if isActiveClearOrder {
 					clearOrder := clearOrders[btn]
-					OC_OrderTable[clearOrder.ElevId][clearOrder.Floor][clearOrder.ButtonType] = elev.OS_CLEAR
+					rcvOrderTable[clearOrder.ElevId][clearOrder.Floor][clearOrder.ButtonType] = elev.OS_CLEAR
 				}
 			}
-			OC_AllOrderTables[OC_PhysicalInfo.Id] = OC_OrderTable
-			packet := elev.OrderTablePacket{Id: OC_PhysicalInfo.Id, OrderTable: OC_OrderTable}
 
 			// Update states and send
-			OC_OrderTable = updateOrderTable(OC_OrderTable, OC_AllOrderTables, OC_PhysicalInfo, OC_AliveList, packet, ch_updateTX_OTP)
+			OC_OrderTable = updateOrderTable(OC_OrderTable, rcvOrderTable, OC_PhysicalInfo.Id, OC_AllOrderTables, OC_PhysicalInfo, OC_AliveList, ch_updateTX_OTP)
 			OC_AllOrderTables[OC_PhysicalInfo.Id] = OC_OrderTable
 			OC_PhysicalInfo.LocalOrderTable = orderTableToLOT(OC_OrderTable, OC_PhysicalInfo.Id)
 			sendUpdateFromOC(OC_OrderTable, OC_PhysicalInfo.LocalOrderTable, ch_fromOC_OrderTable, ch_fromOC_LOT)
 
 		// =========================================================================== PACKET FROM NETWORK [RX]
 		case packet := <-ch_fromRX_OrderTableP:
-
 			// Ignore message from self (This dont make sense for current TCP setup, but will change)
 			isMsgFromSelf := packet.Id == OC_PhysicalInfo.Id
 			isNoChange := OC_AllOrderTables[packet.Id] == packet.OrderTable
@@ -106,10 +102,9 @@ func OrderControl(
 			if isMsgFromSelf || isNoChange {
 				continue
 			}
-			OC_AllOrderTables[packet.Id] = packet.OrderTable
 
 			// Update states and send
-			OC_OrderTable = updateOrderTable(OC_OrderTable, OC_AllOrderTables, OC_PhysicalInfo, OC_AliveList, packet, ch_updateTX_OTP)
+			OC_OrderTable = updateOrderTable(OC_OrderTable, packet.OrderTable, packet.Id, OC_AllOrderTables, OC_PhysicalInfo, OC_AliveList, ch_updateTX_OTP)
 			OC_AllOrderTables[OC_PhysicalInfo.Id] = OC_OrderTable
 			OC_PhysicalInfo.LocalOrderTable = orderTableToLOT(OC_OrderTable, OC_PhysicalInfo.Id)
 			sendUpdateFromOC(OC_OrderTable, OC_PhysicalInfo.LocalOrderTable, ch_fromOC_OrderTable, ch_fromOC_LOT)
@@ -133,51 +128,66 @@ func sendUpdateFromOC(OC_OrderTable elev.OrderTable, OC_LocalOrderTable elev.Loc
 // Hvis packet.Id == primaryId så oppdaterer du din OrderTable
 func updateOrderTable(
 	OrderTable elev.OrderTable,
+	rcvOrderTable elev.OrderTable,
+	rcvId int,
 	AllOrderTables elev.AllOrderTables,
 	PhysicalInfo elev.ElevatorPhysicalInfo,
 	AliveList elev.AliveList,
-	packet elev.OrderTablePacket,
 	ch_updateTX_OTP chan elev.OrderTablePacket,
 ) elev.OrderTable {
 
-	isMsgFromSelf := packet.Id == PhysicalInfo.Id
-	isMsgFromPrimary := packet.Id == PhysicalInfo.PrimaryId
-	prevOrderTable := OrderTable
+	isMsgFromSelf := rcvId == PhysicalInfo.Id
+	isMsgFromPrimary := rcvId == PhysicalInfo.PrimaryId
 
 	switch PhysicalInfo.Role {
 
 	case elev.ER_Backup:
+		backupOT := OrderTable
 
 		if isMsgFromPrimary || isMsgFromSelf {
 			// Backup is stupid 💀
-			OrderTable = packet.OrderTable
-			ch_updateTX_OTP <- elev.OrderTablePacket{Id: PhysicalInfo.Id, OrderTable: OrderTable}
+			backupOT = rcvOrderTable
+			ch_updateTX_OTP <- elev.OrderTablePacket{Id: PhysicalInfo.Id, OrderTable: backupOT}
 
-			return OrderTable
-
-			// TODO: send OrderTable update kanskje til andre (IDK)
+			return backupOT
 		}
 
 	case elev.ER_Primary:
+		primaryOT := OrderTable
 		// clearOrder or btnPress from self
 		if isMsgFromPrimary {
-			log.Printf("[OrderControl] isMsgFromPrimary")
-			OrderTable = packet.OrderTable
-		}
-		// First transition
-		OrderTable = handleStatusTransitions(OrderTable, packet, AliveList)
-		AllOrderTables[PhysicalInfo.Id] = OrderTable
-		// Second transition // TODO: Bytt fra packet input til OrderTable og id eller noe
-		packet = elev.OrderTablePacket{Id: PhysicalInfo.Id, OrderTable: OrderTable}
-		OrderTable = calculateNewPrimaryOrderTable(OrderTable, AliveList, AllOrderTables)
+			primaryOT = rcvOrderTable
+			AllOrderTables[PhysicalInfo.Id] = primaryOT
 
-		isOrderTableDifferent := prevOrderTable != OrderTable
+			// FIRST TRANSITION
+			primaryOT = handleStatusTransitions(primaryOT, primaryOT, rcvId, AliveList)
+			AllOrderTables[PhysicalInfo.Id] = primaryOT
 
-		// Send to network and main
-		if isOrderTableDifferent {
-			ch_updateTX_OTP <- elev.OrderTablePacket{Id: PhysicalInfo.Id, OrderTable: OrderTable}
+			// SECOND TRANSITION [Find best elev and clear]
+			primaryOT = calculateNewPrimaryOrderTable(primaryOT, AliveList, AllOrderTables, PhysicalInfo)
+
+			// Send to network
+			ch_updateTX_OTP <- elev.OrderTablePacket{Id: PhysicalInfo.Id, OrderTable: primaryOT}
+
+			return primaryOT
+
+			// Message from a backup over the network
+		} else {
+			AllOrderTables[rcvId] = rcvOrderTable
+
+			// FIRST TRANSITION
+			primaryOT = handleStatusTransitions(primaryOT, rcvOrderTable, rcvId, AliveList)
+			AllOrderTables[PhysicalInfo.Id] = primaryOT
+
+			// SECOND TRANSITION [Find best elev and clear]
+			primaryOT = calculateNewPrimaryOrderTable(primaryOT, AliveList, AllOrderTables, PhysicalInfo)
+
+			// Send to network
+			ch_updateTX_OTP <- elev.OrderTablePacket{Id: PhysicalInfo.Id, OrderTable: primaryOT}
+
+			return primaryOT
+
 		}
-		return OrderTable
 	}
 
 	log.Println("[handleOrderTable] Bottom Return Case")
@@ -186,12 +196,13 @@ func updateOrderTable(
 
 func handleStatusTransitions(
 	OrderTable elev.OrderTable,
-	packet elev.OrderTablePacket,
+	rcvOrderTable elev.OrderTable,
+	rcvId int,
 	AliveList elev.AliveList,
 ) elev.OrderTable {
 
 	primaryOT := OrderTable
-	rcvOT := packet.OrderTable
+	rcvOT := rcvOrderTable
 
 	for elevIndex := 0; elevIndex < elev.N_MAX_ELEVS; elevIndex++ {
 		// Skip if elevator is not on the network (ER_Dead)
@@ -204,9 +215,10 @@ func handleStatusTransitions(
 				// Define helpers
 				primaryStatus := primaryOT[elevIndex][floor][btn]
 				rcvStatus := rcvOT[elevIndex][floor][btn]
+				isCabCall := elevio.ButtonType(btn) == elevio.BT_Cab
 
 				// Handle cab calls
-				if elevio.ButtonType(btn) == elevio.BT_Cab {
+				if isCabCall {
 					if rcvStatus == elev.OS_REQUESTED {
 						primaryOT[elevIndex][floor][btn] = elev.OS_CONFIRMED
 						continue
@@ -217,7 +229,7 @@ func handleStatusTransitions(
 					}
 				} else {
 					// State machine logikk for OrderStatus transitions
-					primaryOT[elevIndex][floor][btn] = orderStatusTransition(elevIndex, primaryStatus, rcvStatus, packet.Id)
+					primaryOT[elevIndex][floor][btn] = orderStatusTransition(elevIndex, primaryStatus, rcvStatus, rcvId)
 				}
 			}
 		}
@@ -242,6 +254,9 @@ func orderStatusTransition(
 		}
 
 	case elev.OS_REQUESTED:
+		if rcvStatus == elev.OS_CLEAR { //La til denne
+			return elev.OS_CLEAR
+		}
 		return elev.OS_REQUESTED
 
 	case elev.OS_CONFIRMED:
@@ -254,7 +269,6 @@ func orderStatusTransition(
 	}
 
 	fmt.Printf("Base case hit! \n")
-
 	return primaryStatus
 	// return primaryStatus
 }
@@ -263,6 +277,7 @@ func calculateNewPrimaryOrderTable(
 	OrderTable elev.OrderTable,
 	AliveList elev.AliveList,
 	AllOrderTables elev.AllOrderTables,
+	PhysicalInfo elev.ElevatorPhysicalInfo,
 ) elev.OrderTable {
 
 	primaryOT := OrderTable
@@ -281,29 +296,28 @@ func calculateNewPrimaryOrderTable(
 
 				// Alle heise enige om clear på denne ordren (btn, floor)
 				if isClearedByAll(AOT, elevIndex, floor, btn, AliveList) {
+					// Clear
 					for e := 0; e < elev.N_MAX_ELEVS; e++ {
 						primaryOT[e][floor][btn] = elev.OS_NO_ORDER
 					}
-					AOT[elevIndex] = primaryOT
+					// Update primaries table after clearing
+					AOT[PhysicalInfo.Id] = primaryOT
 					continue
 				}
-				// The request trigger will hopefully trigger this
+
 				if isRequestedByAll(AOT, elevIndex, floor, btn, AliveList) {
 					// Approve requested cab buttons
 					if elevio.ButtonType(btn) == elevio.BT_Cab {
 						primaryOT[elevIndex][floor][btn] = elev.OS_CONFIRMED
-						AOT[elevIndex] = primaryOT
+						AOT[PhysicalInfo.Id] = primaryOT
 						continue
 					}
 					bestID := CalculateWhichElevator(elevIndex, floor, btn, primaryOT, AliveList)
 					fmt.Printf("BESTID = %d\n", bestID)
 					primaryOT[bestID][floor][btn] = elev.OS_CONFIRMED
-					AOT[elevIndex] = primaryOT
+					AOT[PhysicalInfo.Id] = primaryOT
 					continue
-					// Hvis ordren flyttes, nullstill den gamle plassen i Primary sin tabell
-					// if bestID != elevIndex {
-					// 	primaryOT[elevIndex][floor][btn] = elev.OS_REQUESTED
-					// }
+
 				}
 
 			}
@@ -332,7 +346,8 @@ func isRequestedByAll(
 		if isDeadElev {
 			continue
 		}
-		if AllOrderTables[elevIndex][orderID][floor][btn] != elev.OS_REQUESTED {
+		thisStatus := AllOrderTables[elevIndex][orderID][floor][btn]
+		if thisStatus != elev.OS_REQUESTED {
 			return false
 		}
 	}
@@ -348,11 +363,12 @@ func isClearedByAll(
 ) bool {
 
 	for elevIndex := 0; elevIndex < elev.N_MAX_ELEVS; elevIndex++ {
-		if AliveList[elevIndex].Role == elev.ER_Dead {
+		isDeadElev := AliveList[elevIndex].Role == elev.ER_Dead
+		if isDeadElev {
 			continue
 		}
 		thisStatus := AllOrderTables[elevIndex][orderID][floor][btn]
-		if thisStatus == elev.OS_REQUESTED || thisStatus == elev.OS_CONFIRMED {
+		if thisStatus != elev.OS_CLEAR {
 			return false
 		}
 	}

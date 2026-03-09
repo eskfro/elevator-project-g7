@@ -147,6 +147,7 @@ func FSM_OnTableUpdate(
 
 	}
 
+	SetAllLights(PhysicalInfo.LocalOrderTable)
 	printElevatorMovement(PhysicalInfo.Movement)
 	return PhysicalInfo
 
@@ -186,6 +187,7 @@ func FSM_OnFloorArrival(
 	ch_fromMV_LOT <- PhysicalInfo.LocalOrderTable
 	ch_fromMV_Movement <- elev.EM_DoorOpen
 
+	SetAllLights(PhysicalInfo.LocalOrderTable)
 	printElevatorMovement(PhysicalInfo.Movement)
 	return PhysicalInfo
 
@@ -241,6 +243,7 @@ func FSM_OnDoorTimeout(
 
 	}
 
+	SetAllLights(PhysicalInfo.LocalOrderTable)
 	printElevatorMovement(PhysicalInfo.Movement)
 	return PhysicalInfo
 }
