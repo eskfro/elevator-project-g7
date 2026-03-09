@@ -102,8 +102,6 @@ func FSM_OnTableUpdate(
 			ch_fromMV_Movement <- PhysicalInfo.Movement
 		}
 
-		return PhysicalInfo
-
 	case elev.EM_Moving:
 		SetAllLights(PhysicalInfo.LocalOrderTable)
 

@@ -79,7 +79,7 @@ func main() {
 	ch_fromRM_NumElevs := make(chan int)
 
 	// To Network
-	ch_updateTX_OTP := make(chan elev.OrderTablePacket, 4)
+	ch_updateTX_OTP := make(chan elev.OrderTablePacket, 50)
 	ch_updateRX_PrimaryIp := make(chan string, 4)
 	ch_updateRX_PrimaryId := make(chan int, 4)
 
