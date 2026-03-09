@@ -24,7 +24,6 @@ func RoleManager(
 
 	ch_HeartBeatId := make(chan int, 50)
 	ch_TimedOutId := make(chan int, 50)
-	ch_toElection := make(chan bool, 10)
 
 	RM_AliveList := elevator.AliveList
 	RM_NumElevs := elevator.NumElevs
@@ -39,11 +38,11 @@ forLoop:
 
 		case newAliveList := <-ch_updateRM_AliveList:
 			RM_AliveList = newAliveList
-			ch_toElection <- true
+			RM_PhysicalInfo, RM_AliveList, RM_NumElevs = handleAliveListUpdate(RM_PhysicalInfo, RM_AliveList, RM_NumElevs, timeStart, ch_fromRM_AliveList, ch_fromRM_PrimaryId, ch_fromRM_PrimaryIp, ch_fromRM_Role)
 
 		case newPhysicalInfo := <-ch_updateRM_PhysicalInfo:
 			RM_PhysicalInfo = newPhysicalInfo
-			ch_toElection <- true
+			RM_PhysicalInfo, RM_AliveList, RM_NumElevs = handleAliveListUpdate(RM_PhysicalInfo, RM_AliveList, RM_NumElevs, timeStart, ch_fromRM_AliveList, ch_fromRM_PrimaryId, ch_fromRM_PrimaryIp, ch_fromRM_Role)
 
 		case newNumElevs := <-ch_updateRM_NumElevs:
 			RM_NumElevs = newNumElevs
@@ -53,71 +52,7 @@ forLoop:
 			RM_NumElevs = CountNumElevs(RM_AliveList)
 			ch_fromRM_NumElevs <- RM_NumElevs
 			ch_fromRM_DeadElevId <- timedOutID
-			ch_toElection <- true
-
-		// ============================================================================ CHECK IF WE NEED TO SWITCH ROLE
-		case <-ch_toElection:
-
-			switch RM_PhysicalInfo.Role {
-
-			case elev.ER_Dead:
-				fmt.Println("[RoleManager] DEAD")
-
-			case elev.ER_Backup:
-
-				if ShouldBecomePrimary(RM_PhysicalInfo.Id, RM_PhysicalInfo.Role, RM_NumElevs, RM_AliveList, timeStart) {
-					log.Println("[RoleManager] Should Become Primary")
-					//Set change
-					RM_PhysicalInfo.Role = elev.ER_Primary
-					RM_PhysicalInfo.PrimaryIp = RM_PhysicalInfo.Ip
-					RM_PhysicalInfo.PrimaryId = RM_PhysicalInfo.Id
-					RM_AliveList[RM_PhysicalInfo.Id] = RM_PhysicalInfo
-
-					// Send update
-					ch_fromRM_AliveList <- RM_AliveList
-					ch_fromRM_PrimaryId <- RM_PhysicalInfo.PrimaryId
-					ch_fromRM_PrimaryIp <- RM_PhysicalInfo.PrimaryIp
-					ch_fromRM_Role <- RM_PhysicalInfo.Role
-					continue forLoop
-				}
-
-				// Update PrimaryId when we know this elevator will be a backup
-				if ShouldUpdatePrimaryId(RM_PhysicalInfo.PrimaryId, timeStart) {
-					log.Println("[RoleManager] Should Update PrimaryID")
-					// Set change
-					newPrimaryId := GetPrimaryId(RM_AliveList)
-					newPrimaryIp := GetPrimaryIp(RM_AliveList)
-					RM_PhysicalInfo.PrimaryId = newPrimaryId
-					RM_PhysicalInfo.PrimaryIp = newPrimaryIp
-					RM_AliveList[RM_PhysicalInfo.Id] = RM_PhysicalInfo
-
-					// Send update
-					ch_fromRM_AliveList <- RM_AliveList
-					ch_fromRM_PrimaryId <- RM_PhysicalInfo.PrimaryId
-					ch_fromRM_PrimaryIp <- RM_PhysicalInfo.PrimaryIp
-
-				}
-
-			case elev.ER_Primary:
-
-				if ShouldBecomeBackup(RM_PhysicalInfo.Id, RM_PhysicalInfo.Role, RM_NumElevs, RM_AliveList) {
-					log.Println("[RoleManager] Should Become Backup")
-					// Set change
-					RM_PhysicalInfo.Role = elev.ER_Backup
-					newPrimaryId := GetPrimaryId(RM_AliveList)
-					newPrimaryIp := GetPrimaryIp(RM_AliveList)
-					RM_PhysicalInfo.PrimaryId = newPrimaryId
-					RM_PhysicalInfo.PrimaryIp = newPrimaryIp
-					RM_AliveList[RM_PhysicalInfo.Id] = RM_PhysicalInfo
-
-					// Send update
-					ch_fromRM_AliveList <- RM_AliveList
-					ch_fromRM_PrimaryId <- RM_PhysicalInfo.PrimaryId
-					ch_fromRM_PrimaryIp <- RM_PhysicalInfo.PrimaryIp
-					ch_fromRM_Role <- RM_PhysicalInfo.Role
-
-				}
-			}
+			RM_PhysicalInfo, RM_AliveList, RM_NumElevs = handleAliveListUpdate(RM_PhysicalInfo, RM_AliveList, RM_NumElevs, timeStart, ch_fromRM_AliveList, ch_fromRM_PrimaryId, ch_fromRM_PrimaryIp, ch_fromRM_Role)
 
 		// ============================================================================ HEARTBEAT RCV FROM NETWORK
 		case heartbeat := <-ch_fromRX_PhysicalInfo:
@@ -125,7 +60,10 @@ forLoop:
 			// Always update watchdog timer
 			ch_HeartBeatId <- heartbeat.Id
 
-			if RM_AliveList[heartbeat.Id] == heartbeat && heartbeat.PrimaryId != elev.INVALID_PRIMARY_ID {
+			isHeartbeatUnchanged := RM_AliveList[heartbeat.Id] == heartbeat
+			isValidPrimaryId := heartbeat.PrimaryId != elev.INVALID_PRIMARY_ID
+
+			if isHeartbeatUnchanged && isValidPrimaryId {
 				continue forLoop
 			}
 
@@ -134,11 +72,91 @@ forLoop:
 			ch_fromRM_AliveList <- RM_AliveList
 			RM_NumElevs = CountNumElevs(RM_AliveList)
 			ch_fromRM_NumElevs <- RM_NumElevs
-
-			ch_toElection <- true
+			RM_PhysicalInfo, RM_AliveList, RM_NumElevs = handleAliveListUpdate(RM_PhysicalInfo, RM_AliveList, RM_NumElevs, timeStart, ch_fromRM_AliveList, ch_fromRM_PrimaryId, ch_fromRM_PrimaryIp, ch_fromRM_Role)
 
 		}
 	}
+}
+
+// TODO: fiks navn på funksjoner lul
+func handleAliveListUpdate(
+	RM_PhysicalInfo elev.ElevatorPhysicalInfo,
+	RM_AliveList elev.AliveList,
+	RM_NumElevs int,
+	timeStart time.Time,
+	ch_fromRM_AliveList chan elev.AliveList,
+	ch_fromRM_PrimaryId chan int,
+	ch_fromRM_PrimaryIp chan string,
+	ch_fromRM_Role chan elev.ElevatorRole,
+
+) (elev.ElevatorPhysicalInfo, elev.AliveList, int) {
+
+	switch RM_PhysicalInfo.Role {
+
+	case elev.ER_Dead:
+		fmt.Println("[RoleManager] DEAD")
+		return RM_PhysicalInfo, RM_AliveList, RM_NumElevs
+
+	case elev.ER_Backup:
+
+		if ShouldBecomePrimary(RM_PhysicalInfo.Id, RM_PhysicalInfo.Role, RM_NumElevs, RM_AliveList, timeStart) {
+			log.Println("[RoleManager] Should Become Primary")
+			//Set change
+			RM_PhysicalInfo.Role = elev.ER_Primary
+			RM_PhysicalInfo.PrimaryIp = RM_PhysicalInfo.Ip
+			RM_PhysicalInfo.PrimaryId = RM_PhysicalInfo.Id
+			RM_AliveList[RM_PhysicalInfo.Id] = RM_PhysicalInfo
+
+			// Send update
+			ch_fromRM_AliveList <- RM_AliveList
+			ch_fromRM_PrimaryId <- RM_PhysicalInfo.PrimaryId
+			ch_fromRM_PrimaryIp <- RM_PhysicalInfo.PrimaryIp
+			ch_fromRM_Role <- RM_PhysicalInfo.Role
+
+			return RM_PhysicalInfo, RM_AliveList, RM_NumElevs
+		}
+
+		// Update PrimaryId when we know this elevator will be a backup
+		if ShouldUpdatePrimaryId(RM_PhysicalInfo.PrimaryId, timeStart) {
+			log.Println("[RoleManager] Should Update PrimaryID")
+			// Set change
+			newPrimaryId := GetPrimaryId(RM_AliveList)
+			newPrimaryIp := GetPrimaryIp(RM_AliveList)
+			RM_PhysicalInfo.PrimaryId = newPrimaryId
+			RM_PhysicalInfo.PrimaryIp = newPrimaryIp
+			RM_AliveList[RM_PhysicalInfo.Id] = RM_PhysicalInfo
+
+			// Send update
+			ch_fromRM_AliveList <- RM_AliveList
+			ch_fromRM_PrimaryId <- RM_PhysicalInfo.PrimaryId
+			ch_fromRM_PrimaryIp <- RM_PhysicalInfo.PrimaryIp
+
+		}
+		return RM_PhysicalInfo, RM_AliveList, RM_NumElevs
+
+	case elev.ER_Primary:
+
+		if ShouldBecomeBackup(RM_PhysicalInfo.Id, RM_PhysicalInfo.Role, RM_NumElevs, RM_AliveList) {
+			log.Println("[RoleManager] Should Become Backup")
+			// Set change
+			RM_PhysicalInfo.Role = elev.ER_Backup
+			newPrimaryId := GetPrimaryId(RM_AliveList)
+			newPrimaryIp := GetPrimaryIp(RM_AliveList)
+			RM_PhysicalInfo.PrimaryId = newPrimaryId
+			RM_PhysicalInfo.PrimaryIp = newPrimaryIp
+			RM_AliveList[RM_PhysicalInfo.Id] = RM_PhysicalInfo
+
+			// Send update
+			ch_fromRM_AliveList <- RM_AliveList
+			ch_fromRM_PrimaryId <- RM_PhysicalInfo.PrimaryId
+			ch_fromRM_PrimaryIp <- RM_PhysicalInfo.PrimaryIp
+			ch_fromRM_Role <- RM_PhysicalInfo.Role
+
+		}
+		return RM_PhysicalInfo, RM_AliveList, RM_NumElevs
+	}
+	log.Println("[handleAliveListUpdate] Bottom Return Case")
+	return RM_PhysicalInfo, RM_AliveList, RM_NumElevs
 }
 
 func MonitorHeartBeats(ch_HeartBeatId chan int, ch_TimedOutId chan int) {

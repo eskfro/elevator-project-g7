@@ -75,6 +75,7 @@ type LocalOrderTable [N_FLOORS][N_BUTTONS]bool
 type OrderTable [N_MAX_ELEVS][N_FLOORS][N_BUTTONS]OrderStatus
 type AllOrderTables [N_MAX_ELEVS]OrderTable
 type AliveList [N_MAX_ELEVS]ElevatorPhysicalInfo
+type ClearOrders [N_BUTTONS]Order
 
 // Info about single elevator
 type ElevatorPhysicalInfo struct {

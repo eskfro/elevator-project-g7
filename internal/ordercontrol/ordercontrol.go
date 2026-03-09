@@ -26,12 +26,9 @@ func OrderControl(
 	ch_fromRX_OrderTableP chan elev.OrderTablePacket,
 	ch_fromOC_LOT chan elev.LocalOrderTable,
 	ch_fromOC_OrderTable chan elev.OrderTable,
-	ch_toOC_PrimaryOrderTableP chan elev.OrderTablePacket,
 	ch_updateTX_OTP chan elev.OrderTablePacket,
-	ch_fromMV_ClearOrder chan elev.Order,
+	ch_fromMV_ClearOrders chan elev.ClearOrders,
 	ch_fromIO_BtnPress chan elevio.ButtonEvent) {
-
-	ch_orderTableUpdate := make(chan elev.OrderTablePacket, 10)
 
 	// Local to OrderControl
 	OC_OrderTable := initElev.OrderTable
@@ -60,12 +57,33 @@ func OrderControl(
 		case btnPress := <-ch_fromIO_BtnPress:
 			elevio.PrintButtonpress(btnPress)
 			OC_OrderTable[OC_PhysicalInfo.Id][btnPress.Floor][btnPress.Button] = elev.OS_REQUESTED
-			ch_orderTableUpdate <- elev.OrderTablePacket{Id: OC_PhysicalInfo.Id, OrderTable: OC_OrderTable}
+			packet := elev.OrderTablePacket{Id: OC_PhysicalInfo.Id, OrderTable: OC_OrderTable}
+
+			// Update states and send
+			OC_OrderTable = updateOrderTable(OC_OrderTable, OC_AllOrderTables, OC_PhysicalInfo, OC_AliveList, packet, ch_updateTX_OTP)
+			OC_AllOrderTables[OC_PhysicalInfo.Id] = OC_OrderTable
+			OC_PhysicalInfo.LocalOrderTable = orderTableToLOT(OC_OrderTable, OC_PhysicalInfo.Id)
+			sendUpdateFromOC(OC_OrderTable, OC_PhysicalInfo.LocalOrderTable, ch_fromOC_OrderTable, ch_fromOC_LOT)
+
 		// =========================================================================== CLEAR ORDER FROM MV
-		case clearOrder := <-ch_fromMV_ClearOrder:
+		case clearOrders := <-ch_fromMV_ClearOrders:
 			log.Println("[OrderControl] Clear Order")
-			OC_OrderTable[OC_PhysicalInfo.Id][clearOrder.Floor][clearOrder.ButtonType] = elev.OS_CLEAR
-			ch_orderTableUpdate <- elev.OrderTablePacket{Id: OC_PhysicalInfo.Id, OrderTable: OC_OrderTable}
+
+			for btn := 0; btn < elev.N_BUTTONS; btn++ {
+				isActiveClearOrder := clearOrders[btn].ElevId != elev.INVALID_ELEVATOR_ID
+				if isActiveClearOrder {
+					clearOrder := clearOrders[btn]
+					OC_OrderTable[clearOrder.ElevId][clearOrder.Floor][clearOrder.ButtonType] = elev.OS_CLEAR
+				}
+			}
+			packet := elev.OrderTablePacket{Id: OC_PhysicalInfo.Id, OrderTable: OC_OrderTable}
+
+			// Update states and send
+			OC_OrderTable = updateOrderTable(OC_OrderTable, OC_AllOrderTables, OC_PhysicalInfo, OC_AliveList, packet, ch_updateTX_OTP)
+			OC_AllOrderTables[OC_PhysicalInfo.Id] = OC_OrderTable
+			OC_PhysicalInfo.LocalOrderTable = orderTableToLOT(OC_OrderTable, OC_PhysicalInfo.Id)
+			sendUpdateFromOC(OC_OrderTable, OC_PhysicalInfo.LocalOrderTable, ch_fromOC_OrderTable, ch_fromOC_LOT)
+
 		// =========================================================================== PACKET FROM NETWORK [RX]
 		case packet := <-ch_fromRX_OrderTableP:
 
@@ -76,74 +94,88 @@ func OrderControl(
 			if isMsgFromSelf || isNoChange {
 				continue
 			}
-			ch_orderTableUpdate <- packet
 
-		// Her oppdaterer man OrderTable.
-		// Her er de tre måtene OrderTable oppdateres
-		// 1. btnPress fra IO
-		// 2. clearOrder fra Movement
-		// 3. oppdatering fra primary gjennom nettverket
-
-		// Hvis packet.Id != din ID vet du at OrderTable kommer fra nettverket
-		// Hvis packet.Id == primaryId så oppdaterer du din OrderTable
-
-		case packet := <-ch_orderTableUpdate:
-
-			isMsgFromSelf := packet.Id == OC_PhysicalInfo.Id
-			isMsgFromPrimary := packet.Id == OC_PhysicalInfo.PrimaryId
-			prevOrderTable := OC_OrderTable
-
-			// Tror vi kan sette denne her
-			// Why not liksom, skader ikke at backup vet denne også
-			OC_AllOrderTables[packet.Id] = packet.OrderTable
-
-			switch OC_PhysicalInfo.Role {
-
-			case elev.ER_Backup:
-
-				if isMsgFromPrimary || isMsgFromSelf {
-					// Backup is stupid 💀
-					OC_OrderTable = packet.OrderTable
-					OC_AllOrderTables[OC_PhysicalInfo.Id] = OC_OrderTable
-
-					// Backup only updates its OrderTable on the network
-					ch_updateTX_OTP <- elev.OrderTablePacket{Id: OC_PhysicalInfo.Id, OrderTable: OC_OrderTable}
-					ch_fromOC_LOT <- orderTableToLOT(OC_OrderTable, OC_PhysicalInfo.Id)
-					ch_fromOC_OrderTable <- OC_OrderTable
-
-					// TODO: send OrderTable update kanskje til andre (IDK)
-				}
-
-			case elev.ER_Primary:
-
-				if isMsgFromPrimary { // clearOrder or btnPress from self
-					log.Printf("[OrderControl] isMsgFromPrimary")
-					OC_OrderTable = packet.OrderTable
-				}
-				// First transition
-				OC_OrderTable = handleStatusTransitions(OC_OrderTable, packet, OC_AliveList)
-				OC_AllOrderTables[OC_PhysicalInfo.Id] = OC_OrderTable
-				// Second transition // TODO: Bytt fra packet input til OrderTable og id eller noe
-				packet = elev.OrderTablePacket{Id: OC_PhysicalInfo.Id, OrderTable: OC_OrderTable}
-				OC_OrderTable = CalculateNewPrimaryOrderTable(OC_OrderTable, OC_AliveList, OC_AllOrderTables, OC_PhysicalInfo, packet)
-				OC_AllOrderTables[OC_PhysicalInfo.Id] = OC_OrderTable
-
-				// Update LOT
-				OC_PhysicalInfo.LocalOrderTable = orderTableToLOT(OC_OrderTable, OC_PhysicalInfo.Id)
-
-				isOrderTableDifferent := prevOrderTable != OC_OrderTable
-
-				// Send to network and main
-				if isOrderTableDifferent {
-					ch_updateTX_OTP <- elev.OrderTablePacket{Id: OC_PhysicalInfo.Id, OrderTable: OC_OrderTable}
-					ch_fromOC_LOT <- OC_PhysicalInfo.LocalOrderTable
-					ch_fromOC_OrderTable <- OC_OrderTable
-				}
-
-			}
+			// Update states and send
+			OC_OrderTable = updateOrderTable(OC_OrderTable, OC_AllOrderTables, OC_PhysicalInfo, OC_AliveList, packet, ch_updateTX_OTP)
+			OC_AllOrderTables[OC_PhysicalInfo.Id] = OC_OrderTable
+			OC_PhysicalInfo.LocalOrderTable = orderTableToLOT(OC_OrderTable, OC_PhysicalInfo.Id)
+			sendUpdateFromOC(OC_OrderTable, OC_PhysicalInfo.LocalOrderTable, ch_fromOC_OrderTable, ch_fromOC_LOT)
 
 		}
 	}
+}
+
+func sendUpdateFromOC(OC_OrderTable elev.OrderTable, OC_LocalOrderTable elev.LocalOrderTable, ch_fromOC_OrderTable chan elev.OrderTable, ch_fromOC_LOT chan elev.LocalOrderTable) {
+	ch_fromOC_OrderTable <- OC_OrderTable
+	ch_fromOC_LOT <- OC_LocalOrderTable
+}
+
+// Her oppdaterer man OrderTable.
+// Her er de tre måtene OrderTable oppdateres
+// 1. btnPress fra IO
+// 2. clearOrder fra Movement
+// 3. oppdatering fra primary gjennom nettverket
+
+// Hvis packet.Id != din ID vet du at OrderTable kommer fra nettverket
+// Hvis packet.Id == primaryId så oppdaterer du din OrderTable
+func updateOrderTable(
+	OC_OrderTable elev.OrderTable,
+	OC_AllOrderTables elev.AllOrderTables,
+	OC_PhysicalInfo elev.ElevatorPhysicalInfo,
+	OC_AliveList elev.AliveList,
+	packet elev.OrderTablePacket,
+	ch_updateTX_OTP chan elev.OrderTablePacket,
+) elev.OrderTable {
+
+	isMsgFromSelf := packet.Id == OC_PhysicalInfo.Id
+	isMsgFromPrimary := packet.Id == OC_PhysicalInfo.PrimaryId
+	prevOrderTable := OC_OrderTable
+
+	// Tror vi kan sette denne her
+	// Why not liksom, skader ikke at backup vet denne også
+	OC_AllOrderTables[packet.Id] = packet.OrderTable
+
+	switch OC_PhysicalInfo.Role {
+
+	case elev.ER_Backup:
+
+		if isMsgFromPrimary || isMsgFromSelf {
+			// Backup is stupid 💀
+			OC_OrderTable = packet.OrderTable
+			OC_PhysicalInfo.LocalOrderTable = orderTableToLOT(OC_OrderTable, OC_PhysicalInfo.Id)
+
+			// Backup only updates its OrderTable on the network
+			ch_updateTX_OTP <- elev.OrderTablePacket{Id: OC_PhysicalInfo.Id, OrderTable: OC_OrderTable}
+
+			return OC_OrderTable
+
+			// TODO: send OrderTable update kanskje til andre (IDK)
+		}
+
+	case elev.ER_Primary:
+		// clearOrder or btnPress from self
+		if isMsgFromPrimary {
+			log.Printf("[OrderControl] isMsgFromPrimary")
+			OC_OrderTable = packet.OrderTable
+		}
+		// First transition
+		OC_OrderTable = handleStatusTransitions(OC_OrderTable, packet, OC_AliveList)
+		OC_AllOrderTables[OC_PhysicalInfo.Id] = OC_OrderTable
+		// Second transition // TODO: Bytt fra packet input til OrderTable og id eller noe
+		packet = elev.OrderTablePacket{Id: OC_PhysicalInfo.Id, OrderTable: OC_OrderTable}
+		OC_OrderTable = CalculateNewPrimaryOrderTable(OC_OrderTable, OC_AliveList, OC_AllOrderTables, OC_PhysicalInfo, packet)
+
+		isOrderTableDifferent := prevOrderTable != OC_OrderTable
+
+		// Send to network and main
+		if isOrderTableDifferent {
+			ch_updateTX_OTP <- elev.OrderTablePacket{Id: OC_PhysicalInfo.Id, OrderTable: OC_OrderTable}
+		}
+		return OC_OrderTable
+	}
+
+	log.Println("[handleOrderTable] Bottom Return Case")
+	return OC_OrderTable
 }
 
 // GAMMEL KODE FOR ARKIVET PER NÅ
