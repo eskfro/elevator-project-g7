@@ -149,6 +149,18 @@ func updateOrderTable(
 		if isMsgFromPrimary || isMsgFromSelf {
 			// Backup stupid af 💀
 			backupOT = rcvOrderTable
+
+			for f := 0; f < elev.N_FLOORS; f++ {
+				for b := 0; b < elev.N_BUTTONS; b++ {
+					backupStatus := OrderTable[PhysicalInfo.Id][f][b]
+					primaryStatus := rcvOrderTable[PhysicalInfo.Id][f][b]
+
+					if backupStatus == elev.OS_REQUESTED && primaryStatus == elev.OS_NO_ORDER {
+						backupOT[PhysicalInfo.Id][f][b] = elev.OS_REQUESTED
+					}
+				}
+			}
+
 			ch_updateTX_OTP <- elev.OrderTablePacket{Id: PhysicalInfo.Id, OrderTable: backupOT}
 
 			return backupOT
@@ -287,6 +299,7 @@ func calculateNewPrimaryOrderTable(
 	PhysicalInfo elev.ElevatorPhysicalInfo,
 ) elev.OrderTable {
 
+	var isAssignedOrder [elev.N_FLOORS][elev.N_BUTTONS]bool
 	primaryOT := OrderTable
 	AOT := AllOrderTables
 
@@ -319,11 +332,14 @@ func calculateNewPrimaryOrderTable(
 						AOT[PhysicalInfo.Id] = primaryOT
 						continue
 					}
-					bestID := CalculateWhichElevator(elevIndex, floor, btn, primaryOT, AliveList)
-					fmt.Printf("BESTID = %d\n", bestID)
-					primaryOT[bestID][floor][btn] = elev.OS_CONFIRMED
-					AOT[PhysicalInfo.Id] = primaryOT
-					continue
+					if !isAssignedOrder[floor][btn] {
+						isAssignedOrder[floor][btn] = true
+						bestID := CalculateWhichElevator(elevIndex, floor, btn, primaryOT, AliveList)
+						fmt.Printf("BESTID = %d\n", bestID)
+						primaryOT[bestID][floor][btn] = elev.OS_CONFIRMED
+						AOT[PhysicalInfo.Id] = primaryOT
+						continue
+					}
 
 				}
 
