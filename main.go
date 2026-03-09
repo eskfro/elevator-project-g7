@@ -80,8 +80,6 @@ func main() {
 
 	// To Network
 	ch_updateTX_OTP := make(chan elev.OrderTablePacket, 50)
-	ch_updateRX_PrimaryIp := make(chan string, 4)
-	ch_updateRX_PrimaryId := make(chan int, 4)
 
 	// From Network
 	ch_fromRX_OrderTableP := make(chan elev.OrderTablePacket, 50)
@@ -99,8 +97,8 @@ func main() {
 		ch_fromRM_Role, ch_fromRM_DeadElevId, ch_fromRM_PrimaryId, ch_fromRM_PrimaryIp, ch_fromRX_PhysicalInfo, ch_fromRM_AliveList, ch_fromRM_NumElevs)
 	go network.TxHeartBeat(elevator, ports.HeartBeat, ch_updateTX_PhysicalInfo)
 	go network.RxHeartBeat(ports.HeartBeat, ch_fromRX_PhysicalInfo, elevator.PhysicalInfo.Id)
-	go network.TxOrderTableTCP(elevator.PhysicalInfo.Id, ports.OrderTableP, ch_updateTX_OTP)
-	go network.RxOrderTableTCP(elevator.PhysicalInfo.PrimaryIp, ports.OrderTableP, ch_updateRX_PrimaryIp, ch_fromRX_OrderTableP, elevator.PhysicalInfo.PrimaryId, ch_updateRX_PrimaryId)
+	go network.TxOrderTableUDP(elevator, ports.OrderTableP, ch_updateTX_OTP)
+	go network.RxOrderTableUDP(ports.OrderTableP, ch_fromRX_OrderTableP)
 
 	// go func() {
 	// 	log.Println(http.ListenAndServe("localhost:6060", nil))
@@ -178,14 +176,12 @@ func main() {
 			case newPrimaryId := <-ch_fromRM_PrimaryId:
 				log.Println("[MAIN] From RM: Primary ID")
 				elevator.PhysicalInfo.PrimaryId = newPrimaryId
-				ch_updateRX_PrimaryId <- elevator.PhysicalInfo.PrimaryId
 				sendPhysicalInfoUpdate(elevator.PhysicalInfo, ch_updateMV_PhysicalInfo, ch_updateOC_PhysicalInfo, ch_updateTX_PhysicalInfo)
 
 			case newPrimaryIp := <-ch_fromRM_PrimaryIp:
 				log.Println("[MAIN] From RM: Primary IP")
 				elevator.PhysicalInfo.PrimaryIp = newPrimaryIp
 				sendPhysicalInfoUpdate(elevator.PhysicalInfo, ch_updateMV_PhysicalInfo, ch_updateOC_PhysicalInfo, ch_updateTX_PhysicalInfo)
-				ch_updateRX_PrimaryIp <- elevator.PhysicalInfo.PrimaryIp
 
 			case newAliveList := <-ch_fromRM_AliveList:
 				log.Println("[MAIN] From RM: New AliveList")

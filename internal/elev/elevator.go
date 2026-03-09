@@ -13,7 +13,8 @@ const N_MAX_ELEVS = 4
 const DOOR_OPEN_TIME = 1500 * time.Millisecond
 const HEARTBEAT_TIMEOUT = 1 * time.Second
 const PRIMARY_ELECTION_DELAY = 450 * time.Millisecond
-const BCAST_INTERVAL = 200 * time.Millisecond
+const BCAST_INTERVAL_HB = 200 * time.Millisecond
+const BCAST_INTERVAL_OT = 200 * time.Millisecond
 const INVALID_ELEVATOR_ID = N_MAX_ELEVS + 1
 const INVALID_PRIMARY_ID = N_MAX_ELEVS + 1
 const INVALID_PRIMARY_IP = "invalid_ip"
@@ -60,6 +61,7 @@ type RoleIdPair struct {
 
 type OrderTablePacket struct {
 	Id         int
+	Version    uint64
 	OrderTable OrderTable
 }
 

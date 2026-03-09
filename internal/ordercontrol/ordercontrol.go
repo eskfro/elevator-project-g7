@@ -16,6 +16,7 @@ import (
 	"fmt"
 	"log"
 	"math"
+	"sync"
 )
 
 func OrderControl(
@@ -136,6 +137,7 @@ func updateOrderTable(
 	ch_updateTX_OTP chan elev.OrderTablePacket,
 ) elev.OrderTable {
 
+	prevOrderTable := OrderTable
 	isMsgFromSelf := rcvId == PhysicalInfo.Id
 	isMsgFromPrimary := rcvId == PhysicalInfo.PrimaryId
 
@@ -145,7 +147,7 @@ func updateOrderTable(
 		backupOT := OrderTable
 
 		if isMsgFromPrimary || isMsgFromSelf {
-			// Backup is stupid 💀
+			// Backup stupid af 💀
 			backupOT = rcvOrderTable
 			ch_updateTX_OTP <- elev.OrderTablePacket{Id: PhysicalInfo.Id, OrderTable: backupOT}
 
@@ -165,9 +167,12 @@ func updateOrderTable(
 
 			// SECOND TRANSITION [Find best elev and clear]
 			primaryOT = calculateNewPrimaryOrderTable(primaryOT, AliveList, AllOrderTables, PhysicalInfo)
+			isOrderTableChanged := primaryOT != prevOrderTable
 
-			// Send to network
-			ch_updateTX_OTP <- elev.OrderTablePacket{Id: PhysicalInfo.Id, OrderTable: primaryOT}
+			if isOrderTableChanged {
+				// Send to network
+				ch_updateTX_OTP <- elev.OrderTablePacket{Id: PhysicalInfo.Id, OrderTable: primaryOT}
+			}
 
 			return primaryOT
 
@@ -181,12 +186,14 @@ func updateOrderTable(
 
 			// SECOND TRANSITION [Find best elev and clear]
 			primaryOT = calculateNewPrimaryOrderTable(primaryOT, AliveList, AllOrderTables, PhysicalInfo)
+			isOrderTableChanged := primaryOT != prevOrderTable
 
-			// Send to network
-			ch_updateTX_OTP <- elev.OrderTablePacket{Id: PhysicalInfo.Id, OrderTable: primaryOT}
+			if isOrderTableChanged {
+				// Send to network
+				ch_updateTX_OTP <- elev.OrderTablePacket{Id: PhysicalInfo.Id, OrderTable: primaryOT}
+			}
 
 			return primaryOT
-
 		}
 	}
 
@@ -254,7 +261,7 @@ func orderStatusTransition(
 		}
 
 	case elev.OS_REQUESTED:
-		if rcvStatus == elev.OS_CLEAR { //La til denne
+		if rcvStatus == elev.OS_CLEAR { //La til denne, idk da
 			return elev.OS_CLEAR
 		}
 		return elev.OS_REQUESTED
@@ -451,4 +458,22 @@ func orderTableToLOT(OrderTable elev.OrderTable, elevId int) elev.LocalOrderTabl
 		}
 	}
 	return LOT
+}
+
+type VersionTracker struct {
+	sync.Mutex
+	currentVersion uint64
+}
+
+func (v *VersionTracker) Increment() uint64 {
+	v.Lock()
+	defer v.Unlock()
+	v.currentVersion++
+	return v.currentVersion
+}
+
+func (v *VersionTracker) Get() uint64 {
+	v.Lock()
+	defer v.Unlock()
+	return v.currentVersion
 }

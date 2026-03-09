@@ -3,6 +3,7 @@ package network
 import (
 	"context"
 	"elevator-project-g7/internal/elev"
+	"elevator-project-g7/internal/ordercontrol"
 	"encoding/json"
 	"log"
 	"net"
@@ -62,7 +63,7 @@ func TxHeartBeat(
 		}
 	}
 
-	ticker := time.NewTicker(elev.BCAST_INTERVAL)
+	ticker := time.NewTicker(elev.BCAST_INTERVAL_HB)
 	defer ticker.Stop()
 
 	for {
@@ -71,11 +72,11 @@ func TxHeartBeat(
 		case newPhysicalInfo := <-ch_updateTX_PhysicalInfo:
 			message = newPhysicalInfo
 			broadcast()
-			ticker.Reset(elev.BCAST_INTERVAL)
+			ticker.Reset(elev.BCAST_INTERVAL_HB)
 
 		case <-ticker.C:
 			broadcast()
-			ticker.Reset(elev.BCAST_INTERVAL)
+			ticker.Reset(elev.BCAST_INTERVAL_HB)
 		}
 	}
 }
@@ -138,6 +139,79 @@ func GetLocalIP() string {
 	addr, _ := LocalIP()
 	return addr
 }
+
+func TxOrderTableUDP(
+	initElev elev.Elevator,
+	port_ot int,
+	ch_updateTX_OTP <-chan elev.OrderTablePacket,
+) {
+	// 1. Setup Connection (Reusing your 'lc' logic)
+	address := "255.255.255.255:" + strconv.Itoa(port_ot)
+	conn, _ := lc.ListenPacket(context.Background(), "udp4", ":0")
+	defer conn.Close()
+	dst, _ := net.ResolveUDPAddr("udp4", address)
+
+	// Store the latest packet to rebroadcast periodically
+	var latestPacket elev.OrderTablePacket
+	versionTracker := &ordercontrol.VersionTracker{}
+
+	ticker := time.NewTicker(100 * time.Millisecond) // Periodic "Gospel" broadcast
+
+	for {
+		select {
+		case newOTP := <-ch_updateTX_OTP:
+			// Increment version before sending
+			newOTP.Version = versionTracker.Increment()
+			latestPacket = newOTP
+
+			// Send immediately
+			data, _ := json.Marshal(latestPacket)
+			conn.WriteTo(data, dst)
+
+		case <-ticker.C:
+			// Periodic rebroadcast of the last known state
+			// This helps elevators that were temporarily offline catch up
+			if latestPacket.Version > 0 {
+				data, _ := json.Marshal(latestPacket)
+				conn.WriteTo(data, dst)
+			}
+		}
+	}
+}
+
+func RxOrderTableUDP(
+	port_ot int,
+	ch_fromRX_OTP chan<- elev.OrderTablePacket,
+) {
+	addr := ":" + strconv.Itoa(port_ot)
+	conn, _ := lc.ListenPacket(context.Background(), "udp4", addr)
+
+	// Map to track the highest version seen from each Elevator ID
+	// key: ElevatorId, value: MaxVersion
+	versionsSeen := make(map[int]uint64)
+
+	buf := make([]byte, 4096) // Larger buffer for the whole table
+
+	for {
+		n, _, err := conn.ReadFrom(buf)
+		if err != nil {
+			continue
+		}
+
+		var rcvOTP elev.OrderTablePacket
+		json.Unmarshal(buf[:n], &rcvOTP)
+
+		// LOGIC: Only accept if this is "Newer" than what we've seen from this ID
+		if rcvOTP.Version > versionsSeen[rcvOTP.Id] {
+			versionsSeen[rcvOTP.Id] = rcvOTP.Version
+			ch_fromRX_OTP <- rcvOTP
+		} else {
+			// Log for debugging: log.Println("Discarding stale packet")
+		}
+	}
+}
+
+/*
 
 func TxOrderTableTCP(elevId int, port_ot int, ch_updateTX_OTP <-chan elev.OrderTablePacket) {
 
@@ -259,3 +333,4 @@ func RxOrderTableTCP(
 	reconnect:
 	}
 }
+*/
