@@ -127,6 +127,7 @@ func sendUpdateFromOC(OC_OrderTable elev.OrderTable, OC_LocalOrderTable elev.Loc
 
 // Hvis packet.Id != din ID vet du at OrderTable kommer fra nettverket
 // Hvis packet.Id == primaryId så oppdaterer du din OrderTable
+
 func updateOrderTable(
 	OrderTable elev.OrderTable,
 	rcvOrderTable elev.OrderTable,
@@ -149,20 +150,7 @@ func updateOrderTable(
 		if isMsgFromPrimary || isMsgFromSelf {
 			// Backup stupid af 💀
 			backupOT = rcvOrderTable
-
-			for f := 0; f < elev.N_FLOORS; f++ {
-				for b := 0; b < elev.N_BUTTONS; b++ {
-					backupStatus := OrderTable[PhysicalInfo.Id][f][b]
-					primaryStatus := rcvOrderTable[PhysicalInfo.Id][f][b]
-
-					if backupStatus == elev.OS_REQUESTED && primaryStatus == elev.OS_NO_ORDER {
-						backupOT[PhysicalInfo.Id][f][b] = elev.OS_REQUESTED
-					}
-				}
-			}
-
 			ch_updateTX_OTP <- elev.OrderTablePacket{Id: PhysicalInfo.Id, OrderTable: backupOT}
-
 			return backupOT
 		}
 
@@ -299,7 +287,7 @@ func calculateNewPrimaryOrderTable(
 	PhysicalInfo elev.ElevatorPhysicalInfo,
 ) elev.OrderTable {
 
-	var isAssignedOrder [elev.N_FLOORS][elev.N_BUTTONS]bool
+	var isAssignedOrder [elev.N_FLOORS][elev.N_BUTTONS]bool //TODO: trenger ikke denne tror jeg
 	primaryOT := OrderTable
 	AOT := AllOrderTables
 
@@ -332,12 +320,15 @@ func calculateNewPrimaryOrderTable(
 						AOT[PhysicalInfo.Id] = primaryOT
 						continue
 					}
+
+					//primaryOT = setAllRequested(primaryOT, floor, btn, AliveList)
+
 					if !isAssignedOrder[floor][btn] {
-						isAssignedOrder[floor][btn] = true
 						bestID := CalculateWhichElevator(elevIndex, floor, btn, primaryOT, AliveList)
 						fmt.Printf("BESTID = %d\n", bestID)
 						primaryOT[bestID][floor][btn] = elev.OS_CONFIRMED
 						AOT[PhysicalInfo.Id] = primaryOT
+						isAssignedOrder[floor][btn] = true
 						continue
 					}
 
@@ -356,6 +347,28 @@ func isReassignable(buttonType elevio.ButtonType, rcvStatus elev.OrderStatus, pr
 	return isHallOrder && shouldBeAssigned
 }
 
+func isRequestedByAny(
+	AllOrderTables elev.AllOrderTables,
+	orderID int,
+	floor int,
+	btn int,
+	AliveList elev.AliveList,
+) bool {
+
+	for elevIndex := 0; elevIndex < elev.N_MAX_ELEVS; elevIndex++ {
+		isDeadElev := AliveList[elevIndex].Role == elev.ER_Dead
+		if isDeadElev {
+			continue
+		}
+		isStatusRequested := AllOrderTables[elevIndex][orderID][floor][btn] == elev.OS_REQUESTED
+
+		if isStatusRequested {
+			return true
+		}
+	}
+	return false
+}
+
 func isRequestedByAll(
 	AllOrderTables elev.AllOrderTables,
 	orderID int,
@@ -369,8 +382,9 @@ func isRequestedByAll(
 		if isDeadElev {
 			continue
 		}
-		thisStatus := AllOrderTables[elevIndex][orderID][floor][btn]
-		if thisStatus != elev.OS_REQUESTED {
+		isStatusNotRequested := AllOrderTables[elevIndex][orderID][floor][btn] != elev.OS_REQUESTED
+
+		if isStatusNotRequested {
 			return false
 		}
 	}
@@ -460,6 +474,23 @@ func CalculateCost(orderFloor int, elevator elev.ElevatorPhysicalInfo, LocalOrde
 	}
 	return totalCost
 
+}
+
+func setAllRequested(
+	OrderTable elev.OrderTable,
+	floor int,
+	btn int,
+	AliveList elev.AliveList,
+) elev.OrderTable {
+
+	for elevIndex := 0; elevIndex < elev.N_MAX_ELEVS; elevIndex++ {
+		if AliveList[elevIndex].Role == elev.ER_Dead {
+			continue
+		}
+		OrderTable[elevIndex][floor][btn] = elev.OS_REQUESTED
+	}
+
+	return OrderTable
 }
 
 // cost++ antall floor unna target

@@ -121,17 +121,16 @@ func RxHeartBeat(
 			continue
 		}
 
-		// Send ElevatorPhysicalInfo heartbeat if not self
-		// if recievedInfo.Id != thisElevId {
-		// 	select {
-		// 	case ch_fromRX_PhysicalInfo <- recievedInfo:
+		isNotFromSelf := recievedInfo.Id != thisElevId
 
-		// 	default:
-		// 		log.Println("fromRX_PhysicalInfo is full!")
+		if isNotFromSelf {
+			select {
+			case ch_fromRX_PhysicalInfo <- recievedInfo:
+			default:
+				log.Println("[RxHeartBeat] fromRX_PhysicalInfo full!")
+			}
+		}
 
-		// 	}
-		// }
-		ch_fromRX_PhysicalInfo <- recievedInfo
 	}
 }
 
@@ -144,7 +143,11 @@ func TxOrderTableUDP(
 	initElev elev.Elevator,
 	port_ot int,
 	ch_updateTX_OTP <-chan elev.OrderTablePacket,
+	updateTX_Role chan elev.ElevatorRole,
 ) {
+
+	thisRole := initElev.PhysicalInfo.Role
+
 	// 1. Setup Connection (Reusing your 'lc' logic)
 	address := "255.255.255.255:" + strconv.Itoa(port_ot)
 	conn, _ := lc.ListenPacket(context.Background(), "udp4", ":0")
@@ -159,9 +162,19 @@ func TxOrderTableUDP(
 
 	for {
 		select {
+
+		case thisRole = <-updateTX_Role:
+
 		case newOTP := <-ch_updateTX_OTP:
 			// Increment version before sending
-			newOTP.Version = versionTracker.Increment()
+			isThisPrimary := thisRole == elev.ER_Primary
+
+			if isThisPrimary {
+				newOTP.Version = versionTracker.Increment()
+			} else {
+				newOTP.Version = versionTracker.Get()
+			}
+
 			latestPacket = newOTP
 
 			// Send immediately
@@ -180,9 +193,15 @@ func TxOrderTableUDP(
 }
 
 func RxOrderTableUDP(
+	initElev elev.Elevator,
 	port_ot int,
 	ch_fromRX_OTP chan<- elev.OrderTablePacket,
+	updateRX_Role chan elev.ElevatorRole, // TODO: Make this channel update thisRole
 ) {
+
+	thisRole := initElev.PhysicalInfo.Role
+	thisId := initElev.PhysicalInfo.Id
+
 	addr := ":" + strconv.Itoa(port_ot)
 	conn, _ := lc.ListenPacket(context.Background(), "udp4", addr)
 
@@ -193,144 +212,37 @@ func RxOrderTableUDP(
 	buf := make([]byte, 4096) // Larger buffer for the whole table
 
 	for {
-		n, _, err := conn.ReadFrom(buf)
-		if err != nil {
-			continue
-		}
+		select {
 
-		var rcvOTP elev.OrderTablePacket
-		json.Unmarshal(buf[:n], &rcvOTP)
+		case thisRole = <-updateRX_Role:
 
-		// LOGIC: Only accept if this is "Newer" than what we've seen from this ID
-		if rcvOTP.Version > versionsSeen[rcvOTP.Id] {
-			versionsSeen[rcvOTP.Id] = rcvOTP.Version
-			ch_fromRX_OTP <- rcvOTP
-		} else {
-			// Log for debugging: log.Println("Discarding stale packet")
-		}
-	}
-}
-
-/*
-
-func TxOrderTableTCP(elevId int, port_ot int, ch_updateTX_OTP <-chan elev.OrderTablePacket) {
-
-	targetPort := port_ot + elevId
-	addr := ":" + strconv.Itoa(targetPort)
-
-	listener, err := net.Listen("tcp", addr)
-	if err != nil {
-		log.Fatalf("TCP Listen error: %v", err)
-	}
-	defer listener.Close()
-
-	log.Printf("[TX TCP] Waiting for Backup on %s\n", addr)
-
-	for {
-		log.Println("[TX TCP] Loop Warning")
-		conn, err := listener.Accept()
-		if err != nil {
-			log.Printf("Accept error: %v", err)
-			continue
-		}
-
-		log.Printf("[TX TCP] Backup connected: %s", conn.RemoteAddr())
-
-		encoder := json.NewEncoder(conn)
-
-		for otp := range ch_updateTX_OTP {
-			log.Println("[TX TCP] OrderTable Packet update")
-			err := encoder.Encode(otp)
+		default:
+			n, _, err := conn.ReadFrom(buf)
 			if err != nil {
-				log.Printf("[TX TCP] Backup disconnected: %v", err)
-				conn.Close()
-				break
+				continue
 			}
+
+			var rcvOTP elev.OrderTablePacket
+			json.Unmarshal(buf[:n], &rcvOTP)
+
+			isThisPrimary := thisRole == elev.ER_Primary
+			isRcvVersionNewer := rcvOTP.Version > versionsSeen[rcvOTP.Id]
+			//isRcvVersionEqual := rcvOTP.Version == versionsSeen[rcvOTP.Id]
+			isMsgNotFromSelf := rcvOTP.Id != thisId
+
+			if isThisPrimary && isMsgNotFromSelf { //&& (isRcvVersionNewer || isRcvVersionEqual)
+				versionsSeen[rcvOTP.Id] = rcvOTP.Version
+				ch_fromRX_OTP <- rcvOTP
+
+			} else if isRcvVersionNewer {
+				versionsSeen[rcvOTP.Id] = rcvOTP.Version
+				ch_fromRX_OTP <- rcvOTP
+
+			} else {
+				// log.Println("[RxOrderTableUDP] Version Older (last else)")
+			}
+
 		}
+
 	}
 }
-
-func RxOrderTableTCP(
-	initialIp string,
-	port_ot int,
-	ch_updateRX_PrimaryIp <-chan string,
-	ch_fromRX_OTP chan<- elev.OrderTablePacket,
-	initPrimaryId int,
-	ch_updateRX_PrimaryId <-chan int,
-) {
-
-	primaryIp := elev.INVALID_PRIMARY_IP
-	primaryId := initPrimaryId
-
-	for {
-		log.Println("[RX TCP] Loop Warning (1)")
-
-		if primaryIp == elev.INVALID_PRIMARY_IP {
-			log.Println("[RX TCP] Waiting for valid IP...")
-			select {
-			case primaryIp = <-ch_updateRX_PrimaryIp:
-			case primaryId = <-ch_updateRX_PrimaryId:
-			}
-		}
-
-		// Calculate the primary port
-		targetPort := port_ot + primaryId
-		addr := primaryIp + ":" + strconv.Itoa(targetPort)
-		log.Printf("[RX TCP] Dialing %s", addr)
-
-		conn, err := net.DialTimeout("tcp", addr, 2*time.Second)
-		if err != nil {
-			log.Println("[RX TCP] Idk man")
-			select {
-			case primaryIp = <-ch_updateRX_PrimaryIp:
-				log.Printf("[RX TCP] New IP: %s", primaryIp)
-			case primaryId = <-ch_updateRX_PrimaryId:
-				log.Printf("[RX TCP] New PrimaryId: %d", primaryId)
-			case <-time.After(time.Second):
-			}
-			continue
-		}
-
-		log.Printf("[RX TCP] Connected to %s", addr)
-
-		decoder := json.NewDecoder(conn)
-
-		for {
-			// Decode message
-			conn.SetReadDeadline(time.Now().Add(1 * time.Second))
-			var otp elev.OrderTablePacket
-			err := decoder.Decode(&otp)
-
-			//Handle error decoding message (ugly)
-			if err != nil {
-				if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
-					select {
-					case primaryIp = <-ch_updateRX_PrimaryIp:
-						log.Println("[RX TCP] IP changed, reconnecting")
-						conn.Close()
-						goto reconnect
-
-					case primaryId = <-ch_updateRX_PrimaryId:
-						log.Println("[RX TCP] PrimaryID changed, reconnecting")
-						conn.Close()
-						goto reconnect
-
-					default:
-						continue
-					}
-				}
-				log.Printf("[RX TCP] Connection lost: %v", err)
-				conn.Close()
-				break
-			}
-
-			// Send OrderTablePacket to
-			log.Println("[RX TCP] Sending Rcvd OrderTable Package in Channel")
-
-			ch_fromRX_OTP <- otp
-		}
-
-	reconnect:
-	}
-}
-*/

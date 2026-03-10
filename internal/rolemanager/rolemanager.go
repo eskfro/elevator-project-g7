@@ -10,9 +10,7 @@ import (
 
 func RoleManager(
 	elevator elev.Elevator,
-	ch_updateRM_AliveList chan elev.AliveList,
 	ch_updateRM_PhysicalInfo chan elev.ElevatorPhysicalInfo,
-	ch_updateRM_NumElevs chan int,
 	ch_fromRM_Role chan elev.ElevatorRole,
 	ch_fromRM_DeadElevId chan int,
 	ch_fromRM_PrimaryId chan int,
@@ -36,29 +34,25 @@ forLoop:
 	for {
 		select {
 
-		case newAliveList := <-ch_updateRM_AliveList:
-			RM_AliveList = newAliveList
-			RM_PhysicalInfo, RM_AliveList, RM_NumElevs = handleAliveListUpdate(RM_PhysicalInfo, RM_AliveList, RM_NumElevs, timeStart, ch_fromRM_AliveList, ch_fromRM_PrimaryId, ch_fromRM_PrimaryIp, ch_fromRM_Role)
-
 		case newPhysicalInfo := <-ch_updateRM_PhysicalInfo:
 			RM_PhysicalInfo = newPhysicalInfo
-			RM_PhysicalInfo, RM_AliveList, RM_NumElevs = handleAliveListUpdate(RM_PhysicalInfo, RM_AliveList, RM_NumElevs, timeStart, ch_fromRM_AliveList, ch_fromRM_PrimaryId, ch_fromRM_PrimaryIp, ch_fromRM_Role)
-
-		case newNumElevs := <-ch_updateRM_NumElevs:
-			RM_NumElevs = newNumElevs
+			RM_PhysicalInfo, RM_AliveList, RM_NumElevs = handleAliveListUpdate(RM_PhysicalInfo, RM_AliveList, RM_NumElevs, timeStart, ch_fromRM_AliveList, ch_fromRM_PrimaryId, ch_fromRM_PrimaryIp, ch_fromRM_Role, ch_fromRM_NumElevs)
 
 		case timedOutID := <-ch_TimedOutId:
 			RM_AliveList[timedOutID].Role = elev.ER_Dead
 			RM_NumElevs = CountNumElevs(RM_AliveList)
-			ch_fromRM_NumElevs <- RM_NumElevs
 			ch_fromRM_DeadElevId <- timedOutID
-			RM_PhysicalInfo, RM_AliveList, RM_NumElevs = handleAliveListUpdate(RM_PhysicalInfo, RM_AliveList, RM_NumElevs, timeStart, ch_fromRM_AliveList, ch_fromRM_PrimaryId, ch_fromRM_PrimaryIp, ch_fromRM_Role)
+			RM_PhysicalInfo, RM_AliveList, RM_NumElevs = handleAliveListUpdate(RM_PhysicalInfo, RM_AliveList, RM_NumElevs, timeStart, ch_fromRM_AliveList, ch_fromRM_PrimaryId, ch_fromRM_PrimaryIp, ch_fromRM_Role, ch_fromRM_NumElevs)
 
 		// ============================================================================ HEARTBEAT RCV FROM NETWORK
 		case heartbeat := <-ch_fromRX_PhysicalInfo:
-			// log.Println("[RoleManager] Heartbeat from RX")
+			//log.Printf("[RoleManager] Heartbeat from RX | id = %d\n", heartbeat.Id)
 			// Always update watchdog timer
-			ch_HeartBeatId <- heartbeat.Id
+			select {
+			case ch_HeartBeatId <- heartbeat.Id:
+			default:
+				log.Println("[RoleManager] Sending Heartbeat Default Case")
+			}
 
 			isHeartbeatUnchanged := RM_AliveList[heartbeat.Id] == heartbeat
 			isValidPrimaryId := heartbeat.PrimaryId != elev.INVALID_PRIMARY_ID
@@ -72,8 +66,7 @@ forLoop:
 			RM_AliveList[heartbeat.Id] = heartbeat
 			ch_fromRM_AliveList <- RM_AliveList
 			RM_NumElevs = CountNumElevs(RM_AliveList)
-			ch_fromRM_NumElevs <- RM_NumElevs
-			RM_PhysicalInfo, RM_AliveList, RM_NumElevs = handleAliveListUpdate(RM_PhysicalInfo, RM_AliveList, RM_NumElevs, timeStart, ch_fromRM_AliveList, ch_fromRM_PrimaryId, ch_fromRM_PrimaryIp, ch_fromRM_Role)
+			RM_PhysicalInfo, RM_AliveList, RM_NumElevs = handleAliveListUpdate(RM_PhysicalInfo, RM_AliveList, RM_NumElevs, timeStart, ch_fromRM_AliveList, ch_fromRM_PrimaryId, ch_fromRM_PrimaryIp, ch_fromRM_Role, ch_fromRM_NumElevs)
 
 		}
 	}
@@ -81,102 +74,119 @@ forLoop:
 
 // TODO: fiks navn på funksjoner lul
 func handleAliveListUpdate(
-	RM_PhysicalInfo elev.ElevatorPhysicalInfo,
-	RM_AliveList elev.AliveList,
-	RM_NumElevs int,
+	PhysicalInfo elev.ElevatorPhysicalInfo,
+	AliveList elev.AliveList,
+	NumElevs int,
 	timeStart time.Time,
 	ch_fromRM_AliveList chan elev.AliveList,
 	ch_fromRM_PrimaryId chan int,
 	ch_fromRM_PrimaryIp chan string,
 	ch_fromRM_Role chan elev.ElevatorRole,
+	ch_fromRM_NumElevs chan int,
 
 ) (elev.ElevatorPhysicalInfo, elev.AliveList, int) {
 
-	switch RM_PhysicalInfo.Role {
+	switch PhysicalInfo.Role {
 
 	case elev.ER_Dead:
 		fmt.Println("[RoleManager] DEAD")
-		return RM_PhysicalInfo, RM_AliveList, RM_NumElevs
+		return PhysicalInfo, AliveList, NumElevs
 
 	case elev.ER_Backup:
 
-		if ShouldBecomePrimary(RM_PhysicalInfo.Id, RM_PhysicalInfo.Role, RM_NumElevs, RM_AliveList, timeStart) {
+		if ShouldBecomePrimary(PhysicalInfo.Id, PhysicalInfo.Role, NumElevs, AliveList, timeStart) {
 			log.Println("[RoleManager] Should Become Primary")
 			//Set change
-			RM_PhysicalInfo.Role = elev.ER_Primary
-			RM_PhysicalInfo.PrimaryIp = RM_PhysicalInfo.Ip
-			RM_PhysicalInfo.PrimaryId = RM_PhysicalInfo.Id
-			RM_AliveList[RM_PhysicalInfo.Id] = RM_PhysicalInfo
+			PhysicalInfo.Role = elev.ER_Primary
+			PhysicalInfo.PrimaryIp = PhysicalInfo.Ip
+			PhysicalInfo.PrimaryId = PhysicalInfo.Id
+			AliveList[PhysicalInfo.Id] = PhysicalInfo
+			NumElevs = CountNumElevs(AliveList)
 
 			// Send update
-			ch_fromRM_AliveList <- RM_AliveList
-			ch_fromRM_PrimaryId <- RM_PhysicalInfo.PrimaryId
-			ch_fromRM_PrimaryIp <- RM_PhysicalInfo.PrimaryIp
-			ch_fromRM_Role <- RM_PhysicalInfo.Role
+			ch_fromRM_AliveList <- AliveList
+			ch_fromRM_PrimaryId <- PhysicalInfo.PrimaryId
+			ch_fromRM_PrimaryIp <- PhysicalInfo.PrimaryIp
+			ch_fromRM_Role <- PhysicalInfo.Role
+			ch_fromRM_NumElevs <- NumElevs
 
-			return RM_PhysicalInfo, RM_AliveList, RM_NumElevs
+			return PhysicalInfo, AliveList, NumElevs
 		}
 
 		// Update PrimaryId when we know this elevator will be a backup
-		if ShouldUpdatePrimaryId(RM_PhysicalInfo.PrimaryId, timeStart) {
+		if ShouldUpdatePrimaryId(PhysicalInfo.PrimaryId, timeStart) {
 			log.Println("[RoleManager] Should Update PrimaryID")
 			// Set change
-			newPrimaryId := GetPrimaryId(RM_AliveList)
-			newPrimaryIp := GetPrimaryIp(RM_AliveList)
-			RM_PhysicalInfo.PrimaryId = newPrimaryId
-			RM_PhysicalInfo.PrimaryIp = newPrimaryIp
-			RM_AliveList[RM_PhysicalInfo.Id] = RM_PhysicalInfo
+			newPrimaryId := GetPrimaryId(AliveList)
+			newPrimaryIp := GetPrimaryIp(AliveList)
+			PhysicalInfo.PrimaryId = newPrimaryId
+			PhysicalInfo.PrimaryIp = newPrimaryIp
+			AliveList[PhysicalInfo.Id] = PhysicalInfo
+			NumElevs = CountNumElevs(AliveList)
 
 			// Send update
-			ch_fromRM_AliveList <- RM_AliveList
-			ch_fromRM_PrimaryId <- RM_PhysicalInfo.PrimaryId
-			ch_fromRM_PrimaryIp <- RM_PhysicalInfo.PrimaryIp
+			ch_fromRM_AliveList <- AliveList
+			ch_fromRM_PrimaryId <- PhysicalInfo.PrimaryId
+			ch_fromRM_PrimaryIp <- PhysicalInfo.PrimaryIp
+			ch_fromRM_NumElevs <- NumElevs
 
 		}
-		return RM_PhysicalInfo, RM_AliveList, RM_NumElevs
+		return PhysicalInfo, AliveList, NumElevs
 
 	case elev.ER_Primary:
 
-		if ShouldBecomeBackup(RM_PhysicalInfo.Id, RM_PhysicalInfo.Role, RM_NumElevs, RM_AliveList) {
+		if ShouldBecomeBackup(PhysicalInfo.Id, PhysicalInfo.Role, NumElevs, AliveList) {
 			log.Println("[RoleManager] Should Become Backup")
 			// Set change
-			RM_PhysicalInfo.Role = elev.ER_Backup
-			newPrimaryId := GetPrimaryId(RM_AliveList)
-			newPrimaryIp := GetPrimaryIp(RM_AliveList)
-			RM_PhysicalInfo.PrimaryId = newPrimaryId
-			RM_PhysicalInfo.PrimaryIp = newPrimaryIp
-			RM_AliveList[RM_PhysicalInfo.Id] = RM_PhysicalInfo
+			PhysicalInfo.Role = elev.ER_Backup
+			newPrimaryId := GetPrimaryId(AliveList)
+			newPrimaryIp := GetPrimaryIp(AliveList)
+			PhysicalInfo.PrimaryId = newPrimaryId
+			PhysicalInfo.PrimaryIp = newPrimaryIp
+			AliveList[PhysicalInfo.Id] = PhysicalInfo
+			NumElevs = CountNumElevs(AliveList)
 
 			// Send update
-			ch_fromRM_AliveList <- RM_AliveList
-			ch_fromRM_PrimaryId <- RM_PhysicalInfo.PrimaryId
-			ch_fromRM_PrimaryIp <- RM_PhysicalInfo.PrimaryIp
-			ch_fromRM_Role <- RM_PhysicalInfo.Role
+			ch_fromRM_AliveList <- AliveList
+			ch_fromRM_PrimaryId <- PhysicalInfo.PrimaryId
+			ch_fromRM_PrimaryIp <- PhysicalInfo.PrimaryIp
+			ch_fromRM_Role <- PhysicalInfo.Role
+			ch_fromRM_NumElevs <- NumElevs
 
 		}
-		return RM_PhysicalInfo, RM_AliveList, RM_NumElevs
+		return PhysicalInfo, AliveList, NumElevs
 	}
 	log.Println("[handleAliveListUpdate] Bottom Return Case")
-	return RM_PhysicalInfo, RM_AliveList, RM_NumElevs
+	return PhysicalInfo, AliveList, NumElevs
 }
 
 func MonitorHeartBeats(ch_HeartBeatId chan int, ch_TimedOutId chan int) {
-	elevTimers := make(map[int]*timer.Timer)
+	// Initialize a fixed-size array of pointers to your custom Timer
+	var elevTimers [elev.N_MAX_ELEVS]*timer.Timer
 
 	for id := range ch_HeartBeatId {
-		t, exists := elevTimers[id]
+		isIndexInvalid := id < 0 || id >= elev.N_MAX_ELEVS
 
-		if !exists {
-			fmt.Printf("New elevator detected: ID %d. Starting monitor.\n", id)
+		if isIndexInvalid {
+			fmt.Printf("[MonitorHeartBeats] Error: ID %d out of bounds\n", id)
+			continue
+		}
+
+		t := elevTimers[id]
+
+		// INIT TIMER GOROUTINE
+		if t == nil {
+			fmt.Printf("[MonitorHeartBeats] New elevator: ID %d. Initializing timer.\n", id)
+
+			// Create the timer and store it in the array
 			t = timer.New(elev.HEARTBEAT_TIMEOUT)
 			elevTimers[id] = t
 
-			// Start ONE goroutine for this elevator that lasts its lifetime
+			// Start the monitoring goroutine for this specific slot
 			go func(id int, timeoutChan chan<- int, timerC <-chan struct{}) {
-				for {
-					<-timerC // Wait for the custom timer's tick
+				for range timerC {
 					timeoutChan <- id
-					fmt.Printf("Timeout triggered on elev id = %d\n", id)
+					fmt.Printf("[MonitorHeartBeats] Timeout triggered on elev id = %d\n", id)
 				}
 			}(id, ch_TimedOutId, t.C)
 		}
@@ -184,6 +194,7 @@ func MonitorHeartBeats(ch_HeartBeatId chan int, ch_TimedOutId chan int) {
 		t.Start()
 	}
 }
+
 
 func GetPrimaryId(AliveList elev.AliveList) int {
 	primaryId := elev.INVALID_ELEVATOR_ID

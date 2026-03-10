@@ -53,37 +53,35 @@ func main() {
 	ch_toMV_FloorArrival := make(chan int, 5)
 
 	// From Movement
-	ch_fromMV_LOT := make(chan elev.LocalOrderTable, 2)
-	ch_fromMV_MotorDir := make(chan elevio.MotorDirection, 2)
-	ch_fromMV_Movement := make(chan elev.ElevatorMovement, 2)
-	ch_fromMV_ClearOrders := make(chan elev.ClearOrders, 10)
+	ch_fromMV_LOT := make(chan elev.LocalOrderTable, 20)
+	ch_fromMV_MotorDir := make(chan elevio.MotorDirection, 20)
+	ch_fromMV_Movement := make(chan elev.ElevatorMovement, 20)
+	ch_fromMV_ClearOrders := make(chan elev.ClearOrders, 20)
 
 	// To OrderControl
-	ch_updateOC_AllOrderTables := make(chan elev.AllOrderTables, 4)
+	ch_updateOC_AllOrderTables := make(chan elev.AllOrderTables, 20)
 	ch_updateOC_AliveList := make(chan elev.AliveList, 50)
 
 	// From OrderControl
-	ch_fromOC_LOT := make(chan elev.LocalOrderTable, 4)
-	ch_fromOC_OrderTable := make(chan elev.OrderTable, 4)
-
-	// To RoleManager
-	ch_updateRM_NumElevs := make(chan int, 4)
-	ch_updateRM_AliveList := make(chan elev.AliveList, 4)
+	ch_fromOC_LOT := make(chan elev.LocalOrderTable, 10)
+	ch_fromOC_OrderTable := make(chan elev.OrderTable, 10)
 
 	// From RoleManager
-	ch_fromRM_Role := make(chan elev.ElevatorRole, 4)
-	ch_fromRM_DeadElevId := make(chan int, 4)
-	ch_fromRM_PrimaryId := make(chan int, 4)
-	ch_fromRM_PrimaryIp := make(chan string, 4)
+	ch_fromRM_Role := make(chan elev.ElevatorRole, 5)
+	ch_fromRM_DeadElevId := make(chan int, 5)
+	ch_fromRM_PrimaryId := make(chan int, 5)
+	ch_fromRM_PrimaryIp := make(chan string, 5)
 	ch_fromRM_AliveList := make(chan elev.AliveList, 10)
-	ch_fromRM_NumElevs := make(chan int)
+	ch_fromRM_NumElevs := make(chan int, 20)
 
 	// To Network
 	ch_updateTX_OTP := make(chan elev.OrderTablePacket, 50)
+	updateTX_Role := make(chan elev.ElevatorRole, 5)
+	updateRX_Role := make(chan elev.ElevatorRole, 5)
 
 	// From Network
 	ch_fromRX_OrderTableP := make(chan elev.OrderTablePacket, 50)
-	ch_fromRX_PhysicalInfo := make(chan elev.ElevatorPhysicalInfo, 20)
+	ch_fromRX_PhysicalInfo := make(chan elev.ElevatorPhysicalInfo, 50)
 
 	go elevio.PollObstructionSwitch(ch_fromIO_Obstruction)
 	go elevio.PollFloorSensor(ch_fromIO_Floor)
@@ -93,12 +91,11 @@ func main() {
 		ch_fromMV_Movement, ch_fromMV_MotorDir, ch_fromMV_ClearOrders, ch_toMV_FloorArrival)
 	go ordercontrol.OrderControl(elevator, ch_updateOC_AllOrderTables, ch_updateOC_PhysicalInfo, ch_updateOC_AliveList, ch_fromRX_OrderTableP,
 		ch_fromOC_LOT, ch_fromOC_OrderTable, ch_updateTX_OTP, ch_fromMV_ClearOrders, ch_fromIO_BtnPress)
-	go rolemanager.RoleManager(elevator, ch_updateRM_AliveList, ch_updateRM_PhysicalInfo, ch_updateRM_NumElevs,
-		ch_fromRM_Role, ch_fromRM_DeadElevId, ch_fromRM_PrimaryId, ch_fromRM_PrimaryIp, ch_fromRX_PhysicalInfo, ch_fromRM_AliveList, ch_fromRM_NumElevs)
+	go rolemanager.RoleManager(elevator, ch_updateRM_PhysicalInfo, ch_fromRM_Role, ch_fromRM_DeadElevId, ch_fromRM_PrimaryId, ch_fromRM_PrimaryIp, ch_fromRX_PhysicalInfo, ch_fromRM_AliveList, ch_fromRM_NumElevs)
 	go network.TxHeartBeat(elevator, ports.HeartBeat, ch_updateTX_PhysicalInfo)
 	go network.RxHeartBeat(ports.HeartBeat, ch_fromRX_PhysicalInfo, elevator.PhysicalInfo.Id)
-	go network.TxOrderTableUDP(elevator, ports.OrderTableP, ch_updateTX_OTP)
-	go network.RxOrderTableUDP(ports.OrderTableP, ch_fromRX_OrderTableP)
+	go network.TxOrderTableUDP(elevator, ports.OrderTableP, ch_updateTX_OTP, updateTX_Role)
+	go network.RxOrderTableUDP(elevator, ports.OrderTableP, ch_fromRX_OrderTableP, updateRX_Role)
 
 	// go func() {
 	// 	log.Println(http.ListenAndServe("localhost:6060", nil))
@@ -165,12 +162,13 @@ func main() {
 			case deadElevId := <-ch_fromRM_DeadElevId:
 				log.Println("[MAIN] From RM: Dead Elev ID")
 				elevator.AliveList[deadElevId].Role = elev.ER_Dead
-				ch_updateRM_AliveList <- elevator.AliveList
 				ch_updateOC_AliveList <- elevator.AliveList
 
 			case newRole := <-ch_fromRM_Role:
 				log.Println("[MAIN] From RM: Role")
 				elevator.PhysicalInfo.Role = newRole
+				updateTX_Role <- elevator.PhysicalInfo.Role
+				updateRX_Role <- elevator.PhysicalInfo.Role
 				sendPhysicalInfoUpdate(elevator.PhysicalInfo, ch_updateMV_PhysicalInfo, ch_updateOC_PhysicalInfo, ch_updateTX_PhysicalInfo)
 
 			case newPrimaryId := <-ch_fromRM_PrimaryId:
@@ -195,8 +193,13 @@ func main() {
 
 	WaitForInterrupt()
 }
+
 func sendPhysicalInfoUpdate(info elev.ElevatorPhysicalInfo, channels ...chan<- elev.ElevatorPhysicalInfo) {
 	for _, ch := range channels {
-		ch <- info
+		select {
+		case ch <- info:
+		default:
+			log.Printf("[MAIN] Send Physical Info Default Case")
+		}
 	}
 }
