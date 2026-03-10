@@ -147,13 +147,20 @@ func updateOrderTable(
 			backupOT = rcvOrderTable
 			ch_updateTX_OTP <- elev.OrderTablePacket{Id: PhysicalInfo.Id, OrderTable: backupOT}
 			return backupOT
-		}
 
-		if isMsgFromPrimary {
-			backupOT = handleBackupStatusTransitions(backupOT, rcvOrderTable, AliveList)
-			ch_updateTX_OTP <- elev.OrderTablePacket{Id: PhysicalInfo.Id, OrderTable: backupOT}
+			// isMsgFromPrimary
+		} else {
+			backupOT = rcvOrderTable
 			return backupOT
 		}
+
+		// This creates a network feedback loop
+		// Dont think we need it
+		// if isMsgFromPrimary {
+		// 	backupOT = handleBackupStatusTransitions(backupOT, rcvOrderTable, AliveList)
+		// 	ch_updateTX_OTP <- elev.OrderTablePacket{Id: PhysicalInfo.Id, OrderTable: backupOT}
+		// 	return backupOT
+		// }
 
 	case elev.ER_Primary:
 		primaryOT := OrderTable
@@ -346,9 +353,36 @@ func calculateNewPrimaryOrderTable(
 	for floor := 0; floor < elev.N_FLOORS; floor++ {
 		for btn := 0; btn < elev.N_BUTTONS; btn++ {
 
+			isHall := elevio.ButtonType(btn) != elevio.BT_Cab
+			if isHall {
+
+				isAnyCleared := false
+
+				for e := 0; e < elev.N_MAX_ELEVS; e++ {
+					isDead := AliveList[e].Role == elev.ER_Dead
+					if isDead {
+						continue
+					}
+					isStatusClear := primaryOT[e][floor][btn] == elev.OS_CLEAR
+					if isStatusClear {
+						isAnyCleared = true
+						break
+					}
+				}
+
+				if isAnyCleared {
+					for e := 0; e < elev.N_MAX_ELEVS; e++ {
+						if AliveList[e].Role == elev.ER_Dead {
+							continue
+						}
+						primaryOT[e][floor][btn] = elev.OS_NO_ORDER
+					}
+					continue
+				}
+			}
+
 			isCab := elevio.ButtonType(btn) == elevio.BT_Cab
 			if isCab {
-
 				for e := 0; e < elev.N_MAX_ELEVS; e++ {
 					isDeadElev := AliveList[e].Role == elev.ER_Dead
 					if isDeadElev {
@@ -373,13 +407,11 @@ func calculateNewPrimaryOrderTable(
 				}
 				isStatusRequested := primaryOT[e][floor][btn] == elev.OS_REQUESTED
 				isStatusConfirmed := primaryOT[e][floor][btn] == elev.OS_CONFIRMED
-
 				if isStatusRequested || isStatusConfirmed {
 					isActiveOrder = true
 					break
 				}
 			}
-
 			if !isActiveOrder {
 				continue
 			}
@@ -395,9 +427,7 @@ func calculateNewPrimaryOrderTable(
 
 			// choose best elevator
 			bestElevId := CalculateWhichElevator(floor, btn, primaryOT, AliveList)
-
 			log.Printf("[OrderControl] bestId = %d\n", bestElevId)
-
 			primaryOT[bestElevId][floor][btn] = elev.OS_CONFIRMED
 		}
 	}
