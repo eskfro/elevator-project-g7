@@ -97,7 +97,8 @@ func OrderControl(
 		case packet := <-ch_fromRX_OrderTableP:
 			// Ignore message from self (This dont make sense for current TCP setup, but will change)
 			isMsgFromSelf := packet.Id == OC_PhysicalInfo.Id
-			isNoChange := OC_AllOrderTables[packet.Id] == packet.OrderTable
+			// isNoChange := OC_AllOrderTables[packet.Id] == packet.OrderTable
+			isNoChange := OC_OrderTable == packet.OrderTable //Trying this
 
 			if isMsgFromSelf || isNoChange {
 				continue
@@ -314,8 +315,98 @@ func orderStatusTransition(
 	// return primaryStatus
 }
 
-// TODO: skift navn på funksjon
+// En mer aggresiv type, tror denne kan fungere like bra egentlig, så egentlig trenger vi ikke AllOrderTables LOL.
 func calculateNewPrimaryOrderTable(
+	OrderTable elev.OrderTable,
+	AliveList elev.AliveList,
+	AllOrderTables elev.AllOrderTables,
+	PhysicalInfo elev.ElevatorPhysicalInfo,
+) elev.OrderTable {
+
+	primaryOT := OrderTable
+
+	// reclaim hall orders from dead elevators
+	for e := 0; e < elev.N_MAX_ELEVS; e++ {
+		isDeadElev := AliveList[e].Role == elev.ER_Dead
+
+		if isDeadElev {
+			for f := 0; f < elev.N_FLOORS; f++ {
+				for b := 0; b < elev.N_BUTTONS; b++ {
+					isHall := elevio.ButtonType(b) != elevio.BT_Cab
+					isStatusConfirmed := primaryOT[e][f][b] == elev.OS_CONFIRMED
+
+					if isHall && isStatusConfirmed {
+						primaryOT[e][f][b] = elev.OS_REQUESTED
+					}
+				}
+			}
+		}
+	}
+
+	for floor := 0; floor < elev.N_FLOORS; floor++ {
+		for btn := 0; btn < elev.N_BUTTONS; btn++ {
+
+			isCab := elevio.ButtonType(btn) == elevio.BT_Cab
+			if isCab {
+
+				for e := 0; e < elev.N_MAX_ELEVS; e++ {
+					isDeadElev := AliveList[e].Role == elev.ER_Dead
+					if isDeadElev {
+						continue
+					}
+					if primaryOT[e][floor][btn] == elev.OS_REQUESTED {
+						primaryOT[e][floor][btn] = elev.OS_CONFIRMED
+					}
+					if primaryOT[e][floor][btn] == elev.OS_CLEAR {
+						primaryOT[e][floor][btn] = elev.OS_NO_ORDER
+					}
+				}
+				continue
+			}
+
+			// isHall
+			isActiveOrder := false
+			for e := 0; e < elev.N_MAX_ELEVS; e++ {
+				isDeadElev := AliveList[e].Role == elev.ER_Dead
+				if isDeadElev {
+					continue
+				}
+				isStatusRequested := primaryOT[e][floor][btn] == elev.OS_REQUESTED
+				isStatusConfirmed := primaryOT[e][floor][btn] == elev.OS_CONFIRMED
+
+				if isStatusRequested || isStatusConfirmed {
+					isActiveOrder = true
+					break
+				}
+			}
+
+			if !isActiveOrder {
+				continue
+			}
+
+			// reset ownership
+			for e := 0; e < elev.N_MAX_ELEVS; e++ {
+				isDeadElev := AliveList[e].Role == elev.ER_Dead
+				if isDeadElev {
+					continue
+				}
+				primaryOT[e][floor][btn] = elev.OS_NO_ORDER
+			}
+
+			// choose best elevator
+			bestElevId := CalculateWhichElevator(floor, btn, primaryOT, AliveList)
+
+			log.Printf("[OrderControl] bestId = %d\n", bestElevId)
+
+			primaryOT[bestElevId][floor][btn] = elev.OS_CONFIRMED
+		}
+	}
+
+	return primaryOT
+}
+
+// TODO: skift navn på funksjon
+func calculateNewPrimaryOrderTable2(
 	OrderTable elev.OrderTable,
 	AliveList elev.AliveList,
 	AllOrderTables elev.AllOrderTables,
