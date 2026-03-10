@@ -113,19 +113,19 @@ func RxHeartBeat(
 			continue
 		}
 
-		var recievedInfo elev.ElevatorPhysicalInfo
+		var rcvPhysicalInfo elev.ElevatorPhysicalInfo
 
-		err = json.Unmarshal(buf[:n], &recievedInfo)
+		err = json.Unmarshal(buf[:n], &rcvPhysicalInfo)
 		if err != nil {
 			log.Printf("JSON unmarshal failed: %v\n", err)
 			continue
 		}
 
-		isNotFromSelf := recievedInfo.Id != thisElevId
+		isNotFromSelf := rcvPhysicalInfo.Id != thisElevId
 
 		if isNotFromSelf {
 			select {
-			case ch_fromRX_PhysicalInfo <- recievedInfo:
+			case ch_fromRX_PhysicalInfo <- rcvPhysicalInfo:
 			default:
 				log.Println("[RxHeartBeat] fromRX_PhysicalInfo full!")
 			}
@@ -158,7 +158,7 @@ func TxOrderTableUDP(
 	var latestPacket elev.OrderTablePacket
 	versionTracker := &ordercontrol.VersionTracker{}
 
-	ticker := time.NewTicker(100 * time.Millisecond) // Periodic "Gospel" broadcast
+	ticker := time.NewTicker(elev.BCAST_INTERVAL_OT * time.Millisecond) // Periodic "Gospel" broadcast
 
 	for {
 		select {
@@ -167,19 +167,23 @@ func TxOrderTableUDP(
 
 		case newOTP := <-ch_updateTX_OTP:
 			// Increment version before sending
+			var nextVersion uint64
 			isThisPrimary := thisRole == elev.ER_Primary
 
 			if isThisPrimary {
-				newOTP.Version = versionTracker.Increment()
+				nextVersion = versionTracker.Increment()
 			} else {
-				newOTP.Version = versionTracker.Get()
+				nextVersion = versionTracker.Get()
 			}
+
+			newOTP.Version = nextVersion
 
 			latestPacket = newOTP
 
 			// Send immediately
 			data, _ := json.Marshal(latestPacket)
 			conn.WriteTo(data, dst)
+			log.Printf("[TxOrderTableUDP] OTP sent | vNum = %d\n", nextVersion)
 
 		case <-ticker.C:
 			// Periodic rebroadcast of the last known state
@@ -207,7 +211,7 @@ func RxOrderTableUDP(
 
 	// Map to track the highest version seen from each Elevator ID
 	// key: ElevatorId, value: MaxVersion
-	versionsSeen := make(map[int]uint64)
+	var versionsSeen [elev.N_MAX_ELEVS]uint64
 
 	buf := make([]byte, 4096) // Larger buffer for the whole table
 
@@ -230,19 +234,20 @@ func RxOrderTableUDP(
 			//isRcvVersionEqual := rcvOTP.Version == versionsSeen[rcvOTP.Id]
 			isMsgNotFromSelf := rcvOTP.Id != thisId
 
-			if isThisPrimary && isMsgNotFromSelf { //&& (isRcvVersionNewer || isRcvVersionEqual)
-				versionsSeen[rcvOTP.Id] = rcvOTP.Version
-				ch_fromRX_OTP <- rcvOTP
-
-			} else if isRcvVersionNewer {
-				versionsSeen[rcvOTP.Id] = rcvOTP.Version
-				ch_fromRX_OTP <- rcvOTP
-
+			if isThisPrimary {
+				if isMsgNotFromSelf { //&& (isRcvVersionNewer || isRcvVersionEqual)
+					versionsSeen[rcvOTP.Id] = rcvOTP.Version
+					ch_fromRX_OTP <- rcvOTP
+					continue
+				}
+				// isThisBackup
 			} else {
-				// log.Println("[RxOrderTableUDP] Version Older (last else)")
+				if isRcvVersionNewer {
+					versionsSeen[rcvOTP.Id] = rcvOTP.Version
+					ch_fromRX_OTP <- rcvOTP
+					continue
+				}
 			}
-
 		}
-
 	}
 }
