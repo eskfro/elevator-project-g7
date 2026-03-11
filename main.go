@@ -59,7 +59,6 @@ func main() {
 	ch_fromMV_ClearOrders := make(chan elev.ClearOrders, 20)
 
 	// To OrderControl
-	ch_updateOC_AllOrderTables := make(chan elev.AllOrderTables, 20)
 	ch_updateOC_AliveList := make(chan elev.AliveList, 50)
 
 	// From OrderControl
@@ -88,7 +87,7 @@ func main() {
 
 	go movement.Movement(elevator, ch_updateMV_PhysicalInfo, ch_fromMV_LOT,
 		ch_fromMV_Movement, ch_fromMV_MotorDir, ch_fromMV_ClearOrders, ch_toMV_FloorArrival)
-	go ordercontrol.OrderControl(elevator, ch_updateOC_AllOrderTables, ch_updateOC_PhysicalInfo, ch_updateOC_AliveList, ch_fromRX_OrderTableP,
+	go ordercontrol.OrderControl(elevator, ch_updateOC_PhysicalInfo, ch_updateOC_AliveList, ch_fromRX_OrderTableP,
 		ch_fromOC_LOT, ch_fromOC_OrderTable, ch_updateTX_OTP, ch_fromMV_ClearOrders, ch_fromIO_BtnPress)
 	go rolemanager.RoleManager(elevator, ch_updateRM_PhysicalInfo, ch_fromRM_Role, ch_fromRM_DeadElevId, ch_fromRM_PrimaryId, ch_fromRX_PhysicalInfo, ch_fromRM_AliveList)
 	go network.TxHeartBeat(elevator, ports.HeartBeat, ch_updateTX_PhysicalInfo)

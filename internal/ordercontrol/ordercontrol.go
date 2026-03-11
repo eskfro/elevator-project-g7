@@ -13,6 +13,7 @@ import (
 	"elevator-project-g7/internal/elev"
 	"elevator-project-g7/internal/elevio"
 	"elevator-project-g7/internal/requests"
+	"fmt"
 	"log"
 	"math"
 	"sync"
@@ -20,7 +21,6 @@ import (
 
 func OrderControl(
 	initElev elev.Elevator,
-	ch_updateOC_AllOrderTables chan elev.AllOrderTables,
 	ch_updateOC_PhysicalInfo chan elev.ElevatorPhysicalInfo,
 	ch_updateOC_AliveList chan elev.AliveList,
 	ch_fromRX_OrderTableP chan elev.OrderTablePacket,
@@ -39,10 +39,6 @@ func OrderControl(
 	for {
 
 		select {
-
-		case newAllOrderTables := <-ch_updateOC_AllOrderTables:
-			log.Println("[OrderControl] AllOrderTables Update")
-			OC_AllOrderTables = newAllOrderTables
 
 		case newPhysicalInfo := <-ch_updateOC_PhysicalInfo:
 			log.Println("[OrderControl] PhysicalInfo Update")
@@ -64,7 +60,6 @@ func OrderControl(
 				log.Println("[OrderControl] Order Already Active")
 				continue
 			}
-
 			rcvOrderTable[OC_PhysicalInfo.Id][btnPress.Floor][btnPress.Button] = elev.OS_REQUESTED
 
 			// Update states and send
@@ -98,11 +93,14 @@ func OrderControl(
 			// Ignore message from self (This dont make sense for current TCP setup, but will change)
 			isMsgFromSelf := packet.Id == OC_PhysicalInfo.Id
 			// isNoChange := OC_AllOrderTables[packet.Id] == packet.OrderTable
-			isNoChange := OC_OrderTable == packet.OrderTable //Trying this
+			// isNoChange := OC_OrderTable == packet.OrderTable
+			isChange := OC_AllOrderTables[packet.Id] != packet.OrderTable
 
-			if isMsgFromSelf || isNoChange {
+			if isMsgFromSelf || !isChange {
 				continue
 			}
+			// AOT Update
+			OC_AllOrderTables[packet.Id] = packet.OrderTable
 
 			// Update states and send
 			OC_OrderTable = updateOrderTable(OC_OrderTable, packet.OrderTable, packet.Id, OC_AllOrderTables, OC_PhysicalInfo, OC_AliveList, ch_updateTX_OTP)
@@ -165,10 +163,10 @@ func updateOrderTable(
 
 	case elev.ER_Primary:
 		primaryOT := OrderTable
-		// clearOrder or btnPress from self
+
+		// ClearOrder or BtnPress from Self
 		if isMsgFromPrimary {
 			primaryOT = rcvOrderTable
-			AllOrderTables[PhysicalInfo.Id] = primaryOT
 
 			// FIRST TRANSITION
 			primaryOT = handlePrimaryStatusTransitions(primaryOT, primaryOT, rcvId, AliveList)
@@ -176,6 +174,7 @@ func updateOrderTable(
 
 			// SECOND TRANSITION [Find best elev and clear]
 			primaryOT = calculateNewPrimaryOrderTable2(primaryOT, AliveList, AllOrderTables, PhysicalInfo)
+
 			isOrderTableChanged := primaryOT != prevOrderTable
 
 			if isOrderTableChanged {
@@ -185,14 +184,11 @@ func updateOrderTable(
 
 			return primaryOT
 
-			//isMsgFromBackup
+			//isMsgFromBackup && isPrimary
 		} else {
-			AllOrderTables[rcvId] = rcvOrderTable
 
 			// FIRST TRANSITION
 			primaryOT = handlePrimaryStatusTransitions(primaryOT, rcvOrderTable, rcvId, AliveList)
-			AllOrderTables[PhysicalInfo.Id] = primaryOT
-			//AllOrderTables[rcvId] = primaryOT //*
 
 			// SECOND TRANSITION [Find best elev and clear]
 			primaryOT = calculateNewPrimaryOrderTable2(primaryOT, AliveList, AllOrderTables, PhysicalInfo)
@@ -452,8 +448,9 @@ func calculateNewPrimaryOrderTable2(
 					}
 
 					log.Println("->->->->->-> [OrderControl] Loop to check if requested or cleared by all")
-
-
+					fmt.Println(AllOrderTables[0][0][0][elevio.BT_HallUp])
+					fmt.Println(AllOrderTables[1][0][0][elevio.BT_HallUp])
+					fmt.Println(AllOrderTables[2][0][0][elevio.BT_HallUp])
 
 					if isRequestedByAll(AllOrderTables, AliveList, floor, btn, orderElevId) {
 						// Set the Primary OrderTable accordingly
@@ -519,13 +516,12 @@ func existStatusConfirmed(AliveList elev.AliveList, OrderTable elev.OrderTable, 
 		if isDeadElev {
 			continue
 		}
-		if OrderTable[e][floor][btn] != elev.OS_CONFIRMED {
-			return false
+		if OrderTable[e][floor][btn] == elev.OS_CONFIRMED {
+			return true
 		}
 	}
-	return true
+	return false
 }
-
 
 func isClearedByAll(
 	AllOrderTables elev.AllOrderTables,
@@ -610,23 +606,6 @@ func CalculateCost(orderFloor int, elevator elev.ElevatorPhysicalInfo, LocalOrde
 	}
 	return totalCost
 
-}
-
-func setAllRequested(
-	OrderTable elev.OrderTable,
-	floor int,
-	btn int,
-	AliveList elev.AliveList,
-) elev.OrderTable {
-
-	for elevIndex := 0; elevIndex < elev.N_MAX_ELEVS; elevIndex++ {
-		if AliveList[elevIndex].Role == elev.ER_Dead {
-			continue
-		}
-		OrderTable[elevIndex][floor][btn] = elev.OS_REQUESTED
-	}
-
-	return OrderTable
 }
 
 // cost++ antall floor unna target

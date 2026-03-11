@@ -10,7 +10,7 @@ import (
 const N_FLOORS = 4
 const N_BUTTONS = 3
 const N_MAX_ELEVS = 4
-const DOOR_OPEN_TIME = 1500 * time.Millisecond
+const DOOR_OPEN_TIME = 4000 * time.Millisecond
 const HEARTBEAT_TIMEOUT = 1 * time.Second
 const PRIMARY_ELECTION_DELAY = 450 * time.Millisecond
 const BCAST_INTERVAL_HB = 200 * time.Millisecond
