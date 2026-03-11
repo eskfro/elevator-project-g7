@@ -70,14 +70,13 @@ func main() {
 	ch_fromRM_Role := make(chan elev.ElevatorRole, 5)
 	ch_fromRM_DeadElevId := make(chan int, 5)
 	ch_fromRM_PrimaryId := make(chan int, 5)
-	ch_fromRM_PrimaryIp := make(chan string, 5)
 	ch_fromRM_AliveList := make(chan elev.AliveList, 10)
-	ch_fromRM_NumElevs := make(chan int, 20)
 
 	// To Network
 	ch_updateTX_OTP := make(chan elev.OrderTablePacket, 50)
 	updateTX_Role := make(chan elev.ElevatorRole, 5)
 	updateRX_Role := make(chan elev.ElevatorRole, 5)
+	updateRX_PrimaryId := make(chan int, 5)
 
 	// From Network
 	ch_fromRX_OrderTableP := make(chan elev.OrderTablePacket, 50)
@@ -91,11 +90,11 @@ func main() {
 		ch_fromMV_Movement, ch_fromMV_MotorDir, ch_fromMV_ClearOrders, ch_toMV_FloorArrival)
 	go ordercontrol.OrderControl(elevator, ch_updateOC_AllOrderTables, ch_updateOC_PhysicalInfo, ch_updateOC_AliveList, ch_fromRX_OrderTableP,
 		ch_fromOC_LOT, ch_fromOC_OrderTable, ch_updateTX_OTP, ch_fromMV_ClearOrders, ch_fromIO_BtnPress)
-	go rolemanager.RoleManager(elevator, ch_updateRM_PhysicalInfo, ch_fromRM_Role, ch_fromRM_DeadElevId, ch_fromRM_PrimaryId, ch_fromRM_PrimaryIp, ch_fromRX_PhysicalInfo, ch_fromRM_AliveList, ch_fromRM_NumElevs)
+	go rolemanager.RoleManager(elevator, ch_updateRM_PhysicalInfo, ch_fromRM_Role, ch_fromRM_DeadElevId, ch_fromRM_PrimaryId, ch_fromRX_PhysicalInfo, ch_fromRM_AliveList)
 	go network.TxHeartBeat(elevator, ports.HeartBeat, ch_updateTX_PhysicalInfo)
 	go network.RxHeartBeat(ports.HeartBeat, ch_fromRX_PhysicalInfo, elevator.PhysicalInfo.Id)
 	go network.TxOrderTableUDP(elevator, ports.OrderTableP, ch_updateTX_OTP, updateTX_Role)
-	go network.RxOrderTableUDP(elevator, ports.OrderTableP, ch_fromRX_OrderTableP, updateRX_Role)
+	go network.RxOrderTableUDP(elevator, ports.OrderTableP, ch_fromRX_OrderTableP, updateRX_Role, updateRX_PrimaryId)
 
 	// go func() {
 	// 	log.Println(http.ListenAndServe("localhost:6060", nil))
@@ -107,14 +106,18 @@ func main() {
 			case <-ticker_printElevator.C:
 				uptime := time.Since(timeStart).Seconds()
 				elev.PrintElevatorInfo(elevator, uptime)
-				elev.PrintOrderTableSlice(elevator.OrderTable, elevator.PhysicalInfo.Id)
+				//elev.PrintOrderTableSlice(elevator.OrderTable, elevator.PhysicalInfo.Id)
+
+				elev.PrintOrderTableSlice(elevator.OrderTable, 0)
+				elev.PrintOrderTableSlice(elevator.OrderTable, 1)
+				elev.PrintOrderTableSlice(elevator.OrderTable, 2)
 
 			// =========================== FROM HARDWARE ============================
 
 			case obst := <-ch_fromIO_Obstruction:
 				log.Println("[MAIN] FromIO obs")
 				elevator.PhysicalInfo.Obstructed = obst
-				sendPhysicalInfoUpdate(elevator.PhysicalInfo, ch_updateRM_PhysicalInfo, ch_updateOC_PhysicalInfo, ch_updateTX_PhysicalInfo)
+				sendPhysicalInfoUpdate(elevator.PhysicalInfo, ch_updateRM_PhysicalInfo, ch_updateOC_PhysicalInfo, ch_updateTX_PhysicalInfo, ch_updateMV_PhysicalInfo)
 
 			case floor := <-ch_fromIO_Floor:
 				log.Println("[MAIN] FromIO floor")
@@ -152,13 +155,6 @@ func main() {
 
 			// ========================== FROM ROLEMANAGER ============================
 
-			//This updates alivelist to init something. Forgot what it was heh.
-			case <-ticker_AliveList.C:
-				// log.Println("[MAIN] From RM: AliveList Ticker")
-				ch_updateRM_PhysicalInfo <- elevator.PhysicalInfo
-
-			case elevator.NumElevs = <-ch_fromRM_NumElevs:
-
 			case deadElevId := <-ch_fromRM_DeadElevId:
 				log.Println("[MAIN] From RM: Dead Elev ID")
 				elevator.AliveList[deadElevId].Role = elev.ER_Dead
@@ -175,15 +171,12 @@ func main() {
 				log.Println("[MAIN] From RM: Primary ID")
 				elevator.PhysicalInfo.PrimaryId = newPrimaryId
 				sendPhysicalInfoUpdate(elevator.PhysicalInfo, ch_updateMV_PhysicalInfo, ch_updateOC_PhysicalInfo, ch_updateTX_PhysicalInfo)
-
-			case newPrimaryIp := <-ch_fromRM_PrimaryIp:
-				log.Println("[MAIN] From RM: Primary IP")
-				elevator.PhysicalInfo.PrimaryIp = newPrimaryIp
-				sendPhysicalInfoUpdate(elevator.PhysicalInfo, ch_updateMV_PhysicalInfo, ch_updateOC_PhysicalInfo, ch_updateTX_PhysicalInfo)
+				updateRX_PrimaryId <- elevator.PhysicalInfo.PrimaryId
 
 			case newAliveList := <-ch_fromRM_AliveList:
 				log.Println("[MAIN] From RM: New AliveList")
 				elevator.AliveList = newAliveList
+				elevator.NumElevs = rolemanager.CountNumElevs(elevator.AliveList)
 				ch_updateOC_AliveList <- elevator.AliveList
 
 				// ========================= FROM NETWORK ============================

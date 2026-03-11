@@ -143,15 +143,16 @@ func updateOrderTable(
 		backupOT := OrderTable
 		// Backup stupid af 💀
 
+		// New Clear Order or BtnPress
 		if isMsgFromSelf {
 			backupOT = rcvOrderTable
 			ch_updateTX_OTP <- elev.OrderTablePacket{Id: PhysicalInfo.Id, OrderTable: backupOT}
 			return backupOT
+		}
 
-			// isMsgFromPrimary
-		} else {
-			backupOT = rcvOrderTable
-			return backupOT
+		if isMsgFromPrimary {
+			ch_updateTX_OTP <- elev.OrderTablePacket{Id: PhysicalInfo.Id, OrderTable: rcvOrderTable}
+			return rcvOrderTable
 		}
 
 		// This creates a network feedback loop
@@ -174,7 +175,7 @@ func updateOrderTable(
 			AllOrderTables[PhysicalInfo.Id] = primaryOT
 
 			// SECOND TRANSITION [Find best elev and clear]
-			primaryOT = calculateNewPrimaryOrderTable(primaryOT, AliveList, AllOrderTables, PhysicalInfo)
+			primaryOT = calculateNewPrimaryOrderTable2(primaryOT, AliveList, AllOrderTables, PhysicalInfo)
 			isOrderTableChanged := primaryOT != prevOrderTable
 
 			if isOrderTableChanged {
@@ -194,7 +195,7 @@ func updateOrderTable(
 			//AllOrderTables[rcvId] = primaryOT //*
 
 			// SECOND TRANSITION [Find best elev and clear]
-			primaryOT = calculateNewPrimaryOrderTable(primaryOT, AliveList, AllOrderTables, PhysicalInfo)
+			primaryOT = calculateNewPrimaryOrderTable2(primaryOT, AliveList, AllOrderTables, PhysicalInfo)
 			isOrderTableChanged := primaryOT != prevOrderTable
 
 			if isOrderTableChanged {
@@ -208,39 +209,6 @@ func updateOrderTable(
 
 	log.Println("[handleOrderTable] Bottom Return Case")
 	return OrderTable
-}
-
-func handleBackupStatusTransitions(
-	backupOT elev.OrderTable,
-	rcvOrderTable elev.OrderTable,
-	AliveList elev.AliveList,
-) elev.OrderTable {
-
-	for elevIndex := 0; elevIndex < elev.N_MAX_ELEVS; elevIndex++ {
-		isDeadElev := AliveList[elevIndex].Role == elev.ER_Dead
-		if isDeadElev {
-			continue
-		}
-		for floor := 0; floor < elev.N_FLOORS; floor++ {
-			for btn := 0; btn < elev.N_BUTTONS; btn++ {
-
-				backupStatus := backupOT[elevIndex][floor][btn]
-				primaryStatus := rcvOrderTable[elevIndex][floor][btn]
-
-				if primaryStatus == elev.OS_CONFIRMED {
-					backupOT[elevIndex][floor][btn] = elev.OS_CONFIRMED
-					continue
-				}
-
-				if backupStatus == elev.OS_REQUESTED && primaryStatus != elev.OS_REQUESTED {
-					continue
-				}
-
-				backupOT[elevIndex][floor][btn] = primaryStatus
-			}
-		}
-	}
-	return backupOT
 }
 
 func handlePrimaryStatusTransitions(
@@ -301,6 +269,13 @@ func orderStatusTransition(
 		if rcvStatus == elev.OS_REQUESTED {
 			return elev.OS_REQUESTED
 		}
+
+	// case elev.OS_NO_ORDER:
+	// 	if rcvStatus == elev.OS_REQUESTED {
+	// 		bestElevId := CalculateWhichElevator(floor, btn, primaryOT, AliveList)
+	// 		primaryOT[bestElevId][floor][btn] = elev.OS_REQUESTED
+	// 		primaryOT[elevIndex][floor][btn] = elev.OS_NO_ORDER
+	// 	}
 
 	case elev.OS_REQUESTED:
 		if rcvStatus == elev.OS_CLEAR { //La til denne, idk da
@@ -407,6 +382,7 @@ func calculateNewPrimaryOrderTable(
 				}
 				isStatusRequested := primaryOT[e][floor][btn] == elev.OS_REQUESTED
 				isStatusConfirmed := primaryOT[e][floor][btn] == elev.OS_CONFIRMED
+
 				if isStatusRequested || isStatusConfirmed {
 					isActiveOrder = true
 					break
@@ -416,7 +392,7 @@ func calculateNewPrimaryOrderTable(
 				continue
 			}
 
-			// reset ownership
+			// Rydding
 			for e := 0; e < elev.N_MAX_ELEVS; e++ {
 				isDeadElev := AliveList[e].Role == elev.ER_Dead
 				if isDeadElev {
@@ -425,7 +401,7 @@ func calculateNewPrimaryOrderTable(
 				primaryOT[e][floor][btn] = elev.OS_NO_ORDER
 			}
 
-			// choose best elevator
+			// Finn best heis
 			bestElevId := CalculateWhichElevator(floor, btn, primaryOT, AliveList)
 			log.Printf("[OrderControl] bestId = %d\n", bestElevId)
 			primaryOT[bestElevId][floor][btn] = elev.OS_CONFIRMED
@@ -474,17 +450,21 @@ func calculateNewPrimaryOrderTable2(
 					if isDeadElev {
 						continue
 					}
-					if isHallAndRequestedByAll(AllOrderTables, AliveList, floor, btn, orderElevId) {
+
+					log.Println("->->->->->-> [OrderControl] Loop to check if requested or cleared by all")
+
+
+
+					if isRequestedByAll(AllOrderTables, AliveList, floor, btn, orderElevId) {
 						// Set the Primary OrderTable accordingly
-						for e := 0; e < elev.N_MAX_ELEVS; e++ {
-							isDeadElev := AliveList[e].Role == elev.ER_Dead
-							if isDeadElev {
-								continue
-							}
-							primaryOT[e][floor][btn] = elev.OS_REQUESTED
+						// Calculate The Best Elevator
+
+						log.Println("->->->->->-> [OrderControl] isRequestedByAll")
+
+						if existStatusConfirmed(AliveList, primaryOT, floor, btn) {
+							continue
 						}
 
-						// Calculate The Best Elevator
 						bestElevId := CalculateWhichElevator(floor, btn, primaryOT, AliveList)
 						log.Printf("[OrderControl] bestId = %d\n", bestElevId)
 						primaryOT[bestElevId][floor][btn] = elev.OS_CONFIRMED
@@ -492,7 +472,7 @@ func calculateNewPrimaryOrderTable2(
 						continue
 					}
 
-					if isHallAndClearedByAll(AllOrderTables, AliveList, floor, btn) {
+					if isClearedByAll(AllOrderTables, AliveList, floor, btn) {
 						// Set the Primary OrderTable
 						for e := 0; e < elev.N_MAX_ELEVS; e++ {
 							isDeadElev := AliveList[e].Role == elev.ER_Dead
@@ -512,7 +492,7 @@ func calculateNewPrimaryOrderTable2(
 	return primaryOT
 }
 
-func isHallAndRequestedByAll(
+func isRequestedByAll(
 	AllOrderTables elev.AllOrderTables,
 	AliveList elev.AliveList,
 	floor int,
@@ -525,17 +505,29 @@ func isHallAndRequestedByAll(
 		if isDeadElev {
 			continue
 		}
-		isHallCall := elevio.ButtonType(btn) != elevio.BT_Cab
-		isNotRequested := AllOrderTables[elevIndex][orderElevId][floor][btn] != elev.OS_REQUESTED
-
-		if isNotRequested && isHallCall {
+		isRequested := AllOrderTables[elevIndex][orderElevId][floor][btn] == elev.OS_REQUESTED
+		if !isRequested {
 			return false
 		}
 	}
 	return true
 }
 
-func isHallAndClearedByAll(
+func existStatusConfirmed(AliveList elev.AliveList, OrderTable elev.OrderTable, floor int, btn int) bool {
+	for e := 0; e < elev.N_MAX_ELEVS; e++ {
+		isDeadElev := AliveList[e].Role == elev.ER_Dead
+		if isDeadElev {
+			continue
+		}
+		if OrderTable[e][floor][btn] != elev.OS_CONFIRMED {
+			return false
+		}
+	}
+	return true
+}
+
+
+func isClearedByAll(
 	AllOrderTables elev.AllOrderTables,
 	AliveList elev.AliveList,
 	floor int,
@@ -547,11 +539,10 @@ func isHallAndClearedByAll(
 		if isDeadElev {
 			continue
 		}
-		isHallCall := elevio.ButtonType(btn) != elevio.BT_Cab
 		isNotClear := AllOrderTables[elevIndex][elevIndex][floor][btn] != elev.OS_CLEAR
 		isNotNoOrder := AllOrderTables[elevIndex][elevIndex][floor][btn] != elev.OS_NO_ORDER
 
-		if isHallCall && isNotClear && isNotNoOrder {
+		if isNotClear && isNotNoOrder {
 			return false
 		}
 	}

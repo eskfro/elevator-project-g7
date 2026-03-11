@@ -121,9 +121,16 @@ func RxHeartBeat(
 			continue
 		}
 
-		isNotFromSelf := rcvPhysicalInfo.Id != thisElevId
+		isFromSelf := rcvPhysicalInfo.Id == thisElevId
 
-		if isNotFromSelf {
+		if !isFromSelf {
+			select {
+			case ch_fromRX_PhysicalInfo <- rcvPhysicalInfo:
+			default:
+				log.Println("[RxHeartBeat] fromRX_PhysicalInfo full!")
+			}
+			// Ja dette er bra kodekvalitet.
+		} else {
 			select {
 			case ch_fromRX_PhysicalInfo <- rcvPhysicalInfo:
 			default:
@@ -146,7 +153,7 @@ func TxOrderTableUDP(
 	updateTX_Role chan elev.ElevatorRole,
 ) {
 
-	thisRole := initElev.PhysicalInfo.Role
+	// thisRole := initElev.PhysicalInfo.Role
 
 	// 1. Setup Connection (Reusing your 'lc' logic)
 	address := "255.255.255.255:" + strconv.Itoa(port_ot)
@@ -158,23 +165,19 @@ func TxOrderTableUDP(
 	var latestPacket elev.OrderTablePacket
 	versionTracker := &ordercontrol.VersionTracker{}
 
-	ticker := time.NewTicker(elev.BCAST_INTERVAL_OT * time.Millisecond) // Periodic "Gospel" broadcast
+	ticker := time.NewTicker(elev.BCAST_INTERVAL_OT) // Periodic "Gospel" broadcast
 
 	for {
 		select {
 
-		case thisRole = <-updateTX_Role:
+		// case thisRole = <-updateTX_Role:
 
 		case newOTP := <-ch_updateTX_OTP:
 			// Increment version before sending
 			var nextVersion uint64
-			isThisPrimary := thisRole == elev.ER_Primary
+			// isThisPrimary := thisRole == elev.ER_Primary
 
-			if isThisPrimary {
-				nextVersion = versionTracker.Increment()
-			} else {
-				nextVersion = versionTracker.Get()
-			}
+			nextVersion = versionTracker.Increment()
 
 			newOTP.Version = nextVersion
 
@@ -188,10 +191,10 @@ func TxOrderTableUDP(
 		case <-ticker.C:
 			// Periodic rebroadcast of the last known state
 			// This helps elevators that were temporarily offline catch up
-			if latestPacket.Version > 0 {
-				data, _ := json.Marshal(latestPacket)
-				conn.WriteTo(data, dst)
-			}
+			data, _ := json.Marshal(latestPacket)
+			conn.WriteTo(data, dst)
+			// log.Printf("======== [TxOrderTableUDO] Periodic Bcast =======\n")
+
 		}
 	}
 }
@@ -200,11 +203,13 @@ func RxOrderTableUDP(
 	initElev elev.Elevator,
 	port_ot int,
 	ch_fromRX_OTP chan<- elev.OrderTablePacket,
-	updateRX_Role chan elev.ElevatorRole, // TODO: Make this channel update thisRole
+	updateRX_Role chan elev.ElevatorRole,
+	updateRX_PrimaryId chan int,
 ) {
 
 	thisRole := initElev.PhysicalInfo.Role
 	thisId := initElev.PhysicalInfo.Id
+	primaryId := initElev.PhysicalInfo.PrimaryId
 
 	addr := ":" + strconv.Itoa(port_ot)
 	conn, _ := lc.ListenPacket(context.Background(), "udp4", addr)
@@ -220,6 +225,8 @@ func RxOrderTableUDP(
 
 		case thisRole = <-updateRX_Role:
 
+		case primaryId = <-updateRX_PrimaryId:
+
 		default:
 			n, _, err := conn.ReadFrom(buf)
 			if err != nil {
@@ -232,17 +239,21 @@ func RxOrderTableUDP(
 			isThisPrimary := thisRole == elev.ER_Primary
 			isRcvVersionNewer := rcvOTP.Version > versionsSeen[rcvOTP.Id]
 			//isRcvVersionEqual := rcvOTP.Version == versionsSeen[rcvOTP.Id]
-			isMsgNotFromSelf := rcvOTP.Id != thisId
+			isMsgFromSelf := rcvOTP.Id == thisId
+			isMsgFromPrimary := rcvOTP.Id == primaryId
 
 			if isThisPrimary {
-				if isMsgNotFromSelf { //&& (isRcvVersionNewer || isRcvVersionEqual)
+				if !isMsgFromSelf && isRcvVersionNewer { //&& (isRcvVersionNewer || isRcvVersionEqual)
+
 					versionsSeen[rcvOTP.Id] = rcvOTP.Version
 					ch_fromRX_OTP <- rcvOTP
 					continue
 				}
+
 				// isThisBackup
 			} else {
-				if isRcvVersionNewer {
+				if isMsgFromPrimary && isRcvVersionNewer {
+					log.Println("[RxOrderTableP] Got message from primary")
 					versionsSeen[rcvOTP.Id] = rcvOTP.Version
 					ch_fromRX_OTP <- rcvOTP
 					continue

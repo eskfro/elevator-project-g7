@@ -1,0 +1,3 @@
+- 1 Alle heisene må lyse når det er en confirmed hall ordre i (floor, btn)
+- 2 Fjern ch_
+- 3 Heile oppsettet

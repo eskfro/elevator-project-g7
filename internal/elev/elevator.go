@@ -115,7 +115,6 @@ func CreatePhysicalElevator(_Id int, _Ip string) ElevatorPhysicalInfo {
 		Role:       ER_Backup,
 		Ip:         _Ip,
 		PrimaryId:  INVALID_ELEVATOR_ID,
-		PrimaryIp:  INVALID_PRIMARY_IP,
 		Floor:      elevio.GetFloor(),
 		MotorDir:   elevio.MD_Stop,
 		Movement:   EM_Idle,
