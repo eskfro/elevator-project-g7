@@ -293,120 +293,6 @@ func orderStatusTransition(
 	// return primaryStatus
 }
 
-// En mer aggresiv type, tror denne kan fungere like bra egentlig, så egentlig trenger vi ikke AllOrderTables LOL.
-func calculateNewPrimaryOrderTable(
-	OrderTable elev.OrderTable,
-	AliveList elev.AliveList,
-	AllOrderTables elev.AllOrderTables,
-	PhysicalInfo elev.ElevatorPhysicalInfo,
-) elev.OrderTable {
-
-	primaryOT := OrderTable
-
-	// reclaim hall orders from dead elevators
-	for e := 0; e < elev.N_MAX_ELEVS; e++ {
-		isDeadElev := AliveList[e].Role == elev.ER_Dead
-
-		if isDeadElev {
-			for f := 0; f < elev.N_FLOORS; f++ {
-				for b := 0; b < elev.N_BUTTONS; b++ {
-					isHall := elevio.ButtonType(b) != elevio.BT_Cab
-					isStatusConfirmed := primaryOT[e][f][b] == elev.OS_CONFIRMED
-
-					if isHall && isStatusConfirmed {
-						primaryOT[e][f][b] = elev.OS_REQUESTED
-					}
-				}
-			}
-		}
-	}
-
-	for floor := 0; floor < elev.N_FLOORS; floor++ {
-		for btn := 0; btn < elev.N_BUTTONS; btn++ {
-
-			isHall := elevio.ButtonType(btn) != elevio.BT_Cab
-			if isHall {
-
-				isAnyCleared := false
-
-				for e := 0; e < elev.N_MAX_ELEVS; e++ {
-					isDead := AliveList[e].Role == elev.ER_Dead
-					if isDead {
-						continue
-					}
-					isStatusClear := primaryOT[e][floor][btn] == elev.OS_CLEAR
-					if isStatusClear {
-						isAnyCleared = true
-						break
-					}
-				}
-
-				if isAnyCleared {
-					for e := 0; e < elev.N_MAX_ELEVS; e++ {
-						if AliveList[e].Role == elev.ER_Dead {
-							continue
-						}
-						primaryOT[e][floor][btn] = elev.OS_NO_ORDER
-					}
-					continue
-				}
-			}
-
-			isCab := elevio.ButtonType(btn) == elevio.BT_Cab
-			if isCab {
-				for e := 0; e < elev.N_MAX_ELEVS; e++ {
-					isDeadElev := AliveList[e].Role == elev.ER_Dead
-					if isDeadElev {
-						continue
-					}
-					if primaryOT[e][floor][btn] == elev.OS_REQUESTED {
-						primaryOT[e][floor][btn] = elev.OS_CONFIRMED
-					}
-					if primaryOT[e][floor][btn] == elev.OS_CLEAR {
-						primaryOT[e][floor][btn] = elev.OS_NO_ORDER
-					}
-				}
-				continue
-			}
-
-			// isHall
-			isActiveOrder := false
-			for e := 0; e < elev.N_MAX_ELEVS; e++ {
-				isDeadElev := AliveList[e].Role == elev.ER_Dead
-				if isDeadElev {
-					continue
-				}
-				isStatusRequested := primaryOT[e][floor][btn] == elev.OS_REQUESTED
-				isStatusConfirmed := primaryOT[e][floor][btn] == elev.OS_CONFIRMED
-
-				if isStatusRequested || isStatusConfirmed {
-					isActiveOrder = true
-					break
-				}
-			}
-			if !isActiveOrder {
-				continue
-			}
-
-			// Rydding
-			for e := 0; e < elev.N_MAX_ELEVS; e++ {
-				isDeadElev := AliveList[e].Role == elev.ER_Dead
-				if isDeadElev {
-					continue
-				}
-				primaryOT[e][floor][btn] = elev.OS_NO_ORDER
-			}
-
-			// Finn best heis
-			bestElevId := CalculateWhichElevator(floor, btn, primaryOT, AliveList)
-			log.Printf("[OrderControl] bestId = %d\n", bestElevId)
-			primaryOT[bestElevId][floor][btn] = elev.OS_CONFIRMED
-		}
-	}
-
-	return primaryOT
-}
-
 // TODO: skift navn på funksjon
 func calculateNewPrimaryOrderTable2(
 	OrderTable elev.OrderTable,
@@ -469,7 +355,7 @@ func calculateNewPrimaryOrderTable2(
 						continue
 					}
 
-					if isClearedByAll(AllOrderTables, AliveList, floor, btn) {
+					if isClearedByAll(AllOrderTables, AliveList, floor, btn, orderElevId) {
 						// Set the Primary OrderTable
 						for e := 0; e < elev.N_MAX_ELEVS; e++ {
 							isDeadElev := AliveList[e].Role == elev.ER_Dead
@@ -510,6 +396,28 @@ func isRequestedByAll(
 	return true
 }
 
+func isClearedByAll(
+	AllOrderTables elev.AllOrderTables,
+	AliveList elev.AliveList,
+	floor int,
+	btn int,
+	orderElevId int,
+) bool {
+
+	for elevIndex := 0; elevIndex < elev.N_MAX_ELEVS; elevIndex++ {
+		isDeadElev := AliveList[elevIndex].Role == elev.ER_Dead
+		if isDeadElev {
+			continue
+		}
+		isClear := AllOrderTables[elevIndex][orderElevId][floor][btn] == elev.OS_CLEAR
+
+		if !isClear {
+			return false
+		}
+	}
+	return true
+
+}
 func existStatusConfirmed(AliveList elev.AliveList, OrderTable elev.OrderTable, floor int, btn int) bool {
 	for e := 0; e < elev.N_MAX_ELEVS; e++ {
 		isDeadElev := AliveList[e].Role == elev.ER_Dead
@@ -521,28 +429,6 @@ func existStatusConfirmed(AliveList elev.AliveList, OrderTable elev.OrderTable, 
 		}
 	}
 	return false
-}
-
-func isClearedByAll(
-	AllOrderTables elev.AllOrderTables,
-	AliveList elev.AliveList,
-	floor int,
-	btn int,
-) bool {
-
-	for elevIndex := 0; elevIndex < elev.N_MAX_ELEVS; elevIndex++ {
-		isDeadElev := AliveList[elevIndex].Role == elev.ER_Dead
-		if isDeadElev {
-			continue
-		}
-		isNotClear := AllOrderTables[elevIndex][elevIndex][floor][btn] != elev.OS_CLEAR
-		isNotNoOrder := AllOrderTables[elevIndex][elevIndex][floor][btn] != elev.OS_NO_ORDER
-
-		if isNotClear && isNotNoOrder {
-			return false
-		}
-	}
-	return true
 }
 
 // Returnerer best heis
