@@ -10,14 +10,15 @@ import (
 const N_FLOORS = 4
 const N_BUTTONS = 3
 const N_MAX_ELEVS = 4
-const DOOR_OPEN_TIME = 4000 * time.Millisecond
-const HEARTBEAT_TIMEOUT = 1 * time.Second
-const PRIMARY_ELECTION_DELAY = 410 * time.Millisecond
+
+const DOOR_OPEN_TIME = 3000 * time.Millisecond
+const HEARTBEAT_TIMEOUT = 500 * time.Millisecond
+const PRIMARY_ELECTION_DELAY = 401 * time.Millisecond
 const BCAST_INTERVAL_HB = 50 * time.Millisecond
 const BCAST_INTERVAL_OT = 50 * time.Millisecond
+
 const INVALID_ELEVATOR_ID = N_MAX_ELEVS + 1
 const INVALID_PRIMARY_ID = N_MAX_ELEVS + 1
-const INVALID_PRIMARY_IP = "invalid_ip"
 
 // ================= ENUM TYPES ===============================
 
