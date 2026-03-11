@@ -46,7 +46,14 @@ func OrderControl(
 		// Directly from rolemanager
 		case newAliveList := <-ch_updateOC_AliveList:
 			log.Println("[OrderControl] AliveList Update")
+			isAliveListChanged := newAliveList != OC_AliveList
 			OC_AliveList = newAliveList
+			isPrimary := OC_PhysicalInfo.Role == elev.ER_Primary
+
+			if isPrimary && isAliveListChanged {
+				OC_OrderTable = assignAndClearOrders(OC_OrderTable, OC_AliveList, OC_AllOrderTables, OC_PhysicalInfo)
+				ch_updateTX_OTP <- elev.OrderTablePacket{Id: OC_PhysicalInfo.Id, OrderTable: OC_OrderTable}
+			}
 
 		// ============================================================================== BTN PRESS FROM IO
 		case btnPress := <-ch_fromIO_BtnPress:
@@ -155,8 +162,8 @@ func updateOrderTable(
 			primaryOT = handlePrimaryStatusTransitions(primaryOT, primaryOT, rcvId, AliveList)
 			AllOrderTables[PhysicalInfo.Id] = primaryOT
 
-			// SECOND TRANSITION [Find best elev and clear]
-			primaryOT = calculateNewPrimaryOrderTable2(primaryOT, AliveList, AllOrderTables, PhysicalInfo)
+			// SECOND TRANSITION
+			primaryOT = assignAndClearOrders(primaryOT, AliveList, AllOrderTables, PhysicalInfo)
 
 			isOrderTableChanged := primaryOT != prevOrderTable
 
@@ -173,8 +180,8 @@ func updateOrderTable(
 			// FIRST TRANSITION
 			primaryOT = handlePrimaryStatusTransitions(primaryOT, rcvOrderTable, rcvId, AliveList)
 
-			// SECOND TRANSITION [Find best elev and clear]
-			primaryOT = calculateNewPrimaryOrderTable2(primaryOT, AliveList, AllOrderTables, PhysicalInfo)
+			// SECOND TRANSITION
+			primaryOT = assignAndClearOrders(primaryOT, AliveList, AllOrderTables, PhysicalInfo)
 			isOrderTableChanged := primaryOT != prevOrderTable
 
 			if isOrderTableChanged {
@@ -190,94 +197,7 @@ func updateOrderTable(
 	return OrderTable
 }
 
-func handlePrimaryStatusTransitions(
-	OrderTable elev.OrderTable,
-	rcvOrderTable elev.OrderTable,
-	rcvId int,
-	AliveList elev.AliveList,
-) elev.OrderTable {
-
-	primaryOT := OrderTable
-	rcvOT := rcvOrderTable
-
-	for elevIndex := 0; elevIndex < elev.N_MAX_ELEVS; elevIndex++ {
-		// Skip if elevator is not on the network (ER_Dead)
-		isDeadElev := AliveList[elevIndex].Role == elev.ER_Dead
-		if isDeadElev {
-			continue
-		}
-		for floor := 0; floor < elev.N_FLOORS; floor++ {
-			for btn := 0; btn < elev.N_BUTTONS; btn++ {
-				// Define helpers
-				primaryStatus := primaryOT[elevIndex][floor][btn]
-				rcvStatus := rcvOT[elevIndex][floor][btn]
-				isCabCall := elevio.ButtonType(btn) == elevio.BT_Cab
-
-				if isCabCall {
-					if rcvStatus == elev.OS_REQUESTED {
-						primaryOT[elevIndex][floor][btn] = elev.OS_CONFIRMED
-						continue
-					}
-					if rcvStatus == elev.OS_CLEAR {
-						primaryOT[elevIndex][floor][btn] = elev.OS_NO_ORDER
-						continue
-					}
-					//isHallCall
-				} else {
-					// State machine logikk for OrderStatus transitions
-					primaryOT[elevIndex][floor][btn] = orderStatusTransition(elevIndex, primaryStatus, rcvStatus, rcvId)
-				}
-			}
-		}
-	}
-	return primaryOT
-}
-
-func orderStatusTransition(
-	elevIndex int,
-	primaryStatus elev.OrderStatus,
-	rcvStatus elev.OrderStatus,
-	rcvId int,
-) elev.OrderStatus {
-
-	isOwner := rcvId == elevIndex
-
-	switch primaryStatus {
-
-	case elev.OS_NO_ORDER:
-		if rcvStatus == elev.OS_REQUESTED {
-			return elev.OS_REQUESTED
-		}
-
-	// case elev.OS_NO_ORDER:
-	// 	if rcvStatus == elev.OS_REQUESTED {
-	// 		bestElevId := CalculateWhichElevator(floor, btn, primaryOT, AliveList)
-	// 		primaryOT[bestElevId][floor][btn] = elev.OS_REQUESTED
-	// 		primaryOT[elevIndex][floor][btn] = elev.OS_NO_ORDER
-	// 	}
-
-	case elev.OS_REQUESTED:
-		if rcvStatus == elev.OS_CLEAR { //La til denne, idk da
-			return elev.OS_CLEAR
-		}
-		return elev.OS_REQUESTED
-
-	case elev.OS_CONFIRMED:
-		if rcvStatus == elev.OS_CLEAR && isOwner {
-			return elev.OS_CLEAR
-		}
-
-	case elev.OS_CLEAR:
-		return elev.OS_CLEAR
-	}
-
-	// log.Printf("[orderStatusTransition] Base Case Hit\n")
-	return primaryStatus
-	// return primaryStatus
-}
-
-// TODO: skift navn på funksjon
-func calculateNewPrimaryOrderTable2(
+func assignAndClearOrders(
 	OrderTable elev.OrderTable,
 	AliveList elev.AliveList,
 	AllOrderTables elev.AllOrderTables,
@@ -285,7 +205,9 @@ func calculateNewPrimaryOrderTable2(
 ) elev.OrderTable {
 
 	thisId := PhysicalInfo.Id
-	primaryOT := OrderTable
+
+	primaryOT := resolveDeadElevators(OrderTable, AliveList) //Eskil 11.03
+	AllOrderTables[thisId] = primaryOT                       // Also this
 
 	// Assign Orders
 	for floor := 0; floor < elev.N_FLOORS; floor++ {
@@ -349,6 +271,115 @@ func calculateNewPrimaryOrderTable2(
 	}
 
 	return primaryOT
+}
+
+func resolveDeadElevators(
+	OrderTable elev.OrderTable,
+	AliveList elev.AliveList,
+) elev.OrderTable {
+
+	primaryOT := OrderTable
+
+	for elevId := 0; elevId < elev.N_MAX_ELEVS; elevId++ {
+		if AliveList[elevId].Role != elev.ER_Dead {
+			continue
+		}
+		for floor := 0; floor < elev.N_FLOORS; floor++ {
+			for btn := 0; btn < elev.N_BUTTONS; btn++ {
+
+				if elevio.ButtonType(btn) == elevio.BT_Cab {
+					continue
+				}
+
+				if primaryOT[elevId][floor][btn] == elev.OS_CONFIRMED {
+					primaryOT[elevId][floor][btn] = elev.OS_REQUESTED
+				}
+				if primaryOT[elevId][floor][btn] == elev.OS_CLEAR {
+					primaryOT[elevId][floor][btn] = elev.OS_NO_ORDER
+				}
+			}
+		}
+	}
+	return primaryOT
+}
+
+func handlePrimaryStatusTransitions(
+	OrderTable elev.OrderTable,
+	rcvOrderTable elev.OrderTable,
+	rcvId int,
+	AliveList elev.AliveList,
+) elev.OrderTable {
+
+	primaryOT := OrderTable
+	rcvOT := rcvOrderTable
+
+	for elevIndex := 0; elevIndex < elev.N_MAX_ELEVS; elevIndex++ {
+		// Skip if elevator is not on the network (ER_Dead)
+		isDeadElev := AliveList[elevIndex].Role == elev.ER_Dead
+		if isDeadElev {
+			continue
+		}
+		for floor := 0; floor < elev.N_FLOORS; floor++ {
+			for btn := 0; btn < elev.N_BUTTONS; btn++ {
+				// Define helpers
+				primaryStatus := primaryOT[elevIndex][floor][btn]
+				rcvStatus := rcvOT[elevIndex][floor][btn]
+				isCabCall := elevio.ButtonType(btn) == elevio.BT_Cab
+
+				if isCabCall {
+					if rcvStatus == elev.OS_REQUESTED {
+						primaryOT[elevIndex][floor][btn] = elev.OS_CONFIRMED
+						continue
+					}
+					if rcvStatus == elev.OS_CLEAR {
+						primaryOT[elevIndex][floor][btn] = elev.OS_NO_ORDER
+						continue
+					}
+					//isHallCall
+				} else {
+					// State machine logikk for OrderStatus transitions
+					primaryOT[elevIndex][floor][btn] = orderStatusTransition(elevIndex, primaryStatus, rcvStatus, rcvId)
+				}
+			}
+		}
+	}
+	return primaryOT
+}
+
+func orderStatusTransition(
+	elevIndex int,
+	primaryStatus elev.OrderStatus,
+	rcvStatus elev.OrderStatus,
+	rcvId int,
+) elev.OrderStatus {
+
+	isOwner := rcvId == elevIndex
+
+	switch primaryStatus {
+
+	case elev.OS_NO_ORDER:
+		if rcvStatus == elev.OS_REQUESTED {
+			return elev.OS_REQUESTED
+		}
+
+	case elev.OS_REQUESTED:
+		if rcvStatus == elev.OS_CLEAR { //La til denne, idk da
+			return elev.OS_CLEAR
+		}
+		return elev.OS_REQUESTED
+
+	case elev.OS_CONFIRMED:
+		if rcvStatus == elev.OS_CLEAR && isOwner {
+			return elev.OS_CLEAR
+		}
+
+	case elev.OS_CLEAR:
+		return elev.OS_CLEAR
+	}
+
+	// log.Printf("[orderStatusTransition] Base Case Hit\n")
+	return primaryStatus
+	// return primaryStatus
 }
 
 func isRequestedByAll(
