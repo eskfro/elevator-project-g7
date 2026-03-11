@@ -78,7 +78,12 @@ func FSM_OnTableUpdate(
 	ch_fromMV_LOT chan elev.LocalOrderTable,
 	ch_fromMV_Movement chan elev.ElevatorMovement,
 	ch_fromMV_MotorDir chan elevio.MotorDirection,
-	ch_fromMV_ClearOrder chan elev.ClearOrders) elev.ElevatorPhysicalInfo {
+	ch_fromMV_ClearOrder chan elev.ClearOrders,
+) elev.ElevatorPhysicalInfo {
+
+	prevMotorDir := PhysicalInfo.MotorDir
+	prevMovement := PhysicalInfo.Movement
+	prevLOT := PhysicalInfo.LocalOrderTable
 
 	switch PhysicalInfo.Movement {
 
@@ -98,8 +103,13 @@ func FSM_OnTableUpdate(
 			if anyOrderToClear(buttonsToClear) {
 				sendClearOrder(PhysicalInfo, buttonsToClear, ch_fromMV_ClearOrder)
 			}
-			ch_fromMV_LOT <- PhysicalInfo.LocalOrderTable
-			ch_fromMV_Movement <- PhysicalInfo.Movement
+			// Guard Added 11.03
+			if PhysicalInfo.LocalOrderTable != prevLOT {
+				ch_fromMV_LOT <- PhysicalInfo.LocalOrderTable
+			}
+			if PhysicalInfo.Movement != prevMovement {
+				ch_fromMV_Movement <- PhysicalInfo.Movement
+			}
 		}
 
 	case elev.EM_Moving:
@@ -109,8 +119,13 @@ func FSM_OnTableUpdate(
 		pair := requests.ChooseDirection(PhysicalInfo.LocalOrderTable, PhysicalInfo.Floor, PhysicalInfo.MotorDir)
 		PhysicalInfo.MotorDir = pair.MotorDir
 		PhysicalInfo.Movement = pair.Movement
-		ch_fromMV_MotorDir <- PhysicalInfo.MotorDir
-		ch_fromMV_Movement <- PhysicalInfo.Movement
+
+		if PhysicalInfo.MotorDir != prevMotorDir {
+			ch_fromMV_MotorDir <- PhysicalInfo.MotorDir
+		}
+		if PhysicalInfo.Movement != prevMovement {
+			ch_fromMV_Movement <- PhysicalInfo.Movement
+		}
 
 		// Stay idle
 		if PhysicalInfo.Movement == elev.EM_Idle {
@@ -134,7 +149,10 @@ func FSM_OnTableUpdate(
 			if anyOrderToClear(buttonsToClear) {
 				sendClearOrder(PhysicalInfo, buttonsToClear, ch_fromMV_ClearOrder)
 			}
-			ch_fromMV_LOT <- PhysicalInfo.LocalOrderTable
+
+			if PhysicalInfo.LocalOrderTable != prevLOT {
+				ch_fromMV_LOT <- PhysicalInfo.LocalOrderTable
+			}
 
 		case elev.EM_Moving:
 			elevio.SetDoorOpenLamp(false)
@@ -158,7 +176,11 @@ func FSM_OnFloorArrival(
 	doorTimer *timer.Timer,
 	ch_fromMV_LOT chan elev.LocalOrderTable,
 	ch_fromMV_Movement chan elev.ElevatorMovement,
-	ch_fromMV_ClearOrder chan elev.ClearOrders) elev.ElevatorPhysicalInfo {
+	ch_fromMV_ClearOrder chan elev.ClearOrders,
+) elev.ElevatorPhysicalInfo {
+
+	prevMovement := PhysicalInfo.Movement
+	prevLOT := PhysicalInfo.LocalOrderTable
 
 	elevio.SetFloorIndicator(PhysicalInfo.Floor)
 
@@ -184,8 +206,13 @@ func FSM_OnFloorArrival(
 	if anyOrderToClear(buttonsToClear) {
 		sendClearOrder(PhysicalInfo, buttonsToClear, ch_fromMV_ClearOrder)
 	}
-	ch_fromMV_LOT <- PhysicalInfo.LocalOrderTable
-	ch_fromMV_Movement <- elev.EM_DoorOpen
+
+	if PhysicalInfo.LocalOrderTable != prevLOT {
+		ch_fromMV_LOT <- PhysicalInfo.LocalOrderTable
+	}
+	if PhysicalInfo.Movement != prevMovement {
+		ch_fromMV_Movement <- PhysicalInfo.Movement
+	}
 
 	SetAllLights(PhysicalInfo.LocalOrderTable)
 	printElevatorMovement(PhysicalInfo.Movement)
@@ -202,6 +229,8 @@ func FSM_OnDoorTimeout(
 	ch_fromMV_ClearOrder chan elev.ClearOrders,
 ) elev.ElevatorPhysicalInfo {
 
+	prevMovement := PhysicalInfo.Movement
+	prevLOT := PhysicalInfo.LocalOrderTable
 	isObstructed := PhysicalInfo.Obstructed
 
 	if isObstructed {
@@ -213,8 +242,11 @@ func FSM_OnDoorTimeout(
 	pair := requests.ChooseDirection(PhysicalInfo.LocalOrderTable, PhysicalInfo.Floor, PhysicalInfo.MotorDir)
 	PhysicalInfo.Movement = pair.Movement
 	PhysicalInfo.MotorDir = pair.MotorDir
-	ch_fromMV_Movement <- PhysicalInfo.Movement
 	ch_fromMV_MotorDir <- PhysicalInfo.MotorDir
+
+	if PhysicalInfo.Movement != prevMovement {
+		ch_fromMV_Movement <- PhysicalInfo.Movement
+	}
 
 	switch PhysicalInfo.Movement {
 
@@ -231,7 +263,10 @@ func FSM_OnDoorTimeout(
 		if anyOrderToClear(buttonsToClear) {
 			sendClearOrder(PhysicalInfo, buttonsToClear, ch_fromMV_ClearOrder)
 		}
-		ch_fromMV_LOT <- PhysicalInfo.LocalOrderTable
+
+		if PhysicalInfo.LocalOrderTable != prevLOT {
+			ch_fromMV_LOT <- PhysicalInfo.LocalOrderTable
+		}
 
 	case elev.EM_Idle:
 		elevio.SetDoorOpenLamp(false)

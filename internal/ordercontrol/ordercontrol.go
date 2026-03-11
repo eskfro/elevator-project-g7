@@ -13,7 +13,6 @@ import (
 	"elevator-project-g7/internal/elev"
 	"elevator-project-g7/internal/elevio"
 	"elevator-project-g7/internal/requests"
-	"fmt"
 	"log"
 	"math"
 	"sync"
@@ -92,8 +91,7 @@ func OrderControl(
 		case packet := <-ch_fromRX_OrderTableP:
 			// Ignore message from self (This dont make sense for current TCP setup, but will change)
 			isMsgFromSelf := packet.Id == OC_PhysicalInfo.Id
-			// isNoChange := OC_AllOrderTables[packet.Id] == packet.OrderTable
-			// isNoChange := OC_OrderTable == packet.OrderTable
+
 			isChange := OC_AllOrderTables[packet.Id] != packet.OrderTable
 
 			if isMsgFromSelf || !isChange {
@@ -138,28 +136,13 @@ func updateOrderTable(
 	switch PhysicalInfo.Role {
 
 	case elev.ER_Backup:
-		backupOT := OrderTable
 		// Backup stupid af 💀
 
 		// New Clear Order or BtnPress
-		if isMsgFromSelf {
-			backupOT = rcvOrderTable
-			ch_updateTX_OTP <- elev.OrderTablePacket{Id: PhysicalInfo.Id, OrderTable: backupOT}
-			return backupOT
-		}
-
-		if isMsgFromPrimary {
+		if isMsgFromSelf || isMsgFromPrimary {
 			ch_updateTX_OTP <- elev.OrderTablePacket{Id: PhysicalInfo.Id, OrderTable: rcvOrderTable}
 			return rcvOrderTable
 		}
-
-		// This creates a network feedback loop
-		// Dont think we need it
-		// if isMsgFromPrimary {
-		// 	backupOT = handleBackupStatusTransitions(backupOT, rcvOrderTable, AliveList)
-		// 	ch_updateTX_OTP <- elev.OrderTablePacket{Id: PhysicalInfo.Id, OrderTable: backupOT}
-		// 	return backupOT
-		// }
 
 	case elev.ER_Primary:
 		primaryOT := OrderTable
@@ -333,16 +316,9 @@ func calculateNewPrimaryOrderTable2(
 						continue
 					}
 
-					log.Println("->->->->->-> [OrderControl] Loop to check if requested or cleared by all")
-					fmt.Println(AllOrderTables[0][0][0][elevio.BT_HallUp])
-					fmt.Println(AllOrderTables[1][0][0][elevio.BT_HallUp])
-					fmt.Println(AllOrderTables[2][0][0][elevio.BT_HallUp])
-
 					if isRequestedByAll(AllOrderTables, AliveList, floor, btn, orderElevId) {
 						// Set the Primary OrderTable accordingly
 						// Calculate The Best Elevator
-
-						log.Println("->->->->->-> [OrderControl] isRequestedByAll")
 
 						if existStatusConfirmed(AliveList, primaryOT, floor, btn) {
 							continue
@@ -355,7 +331,7 @@ func calculateNewPrimaryOrderTable2(
 						continue
 					}
 
-					if isClearedByAll(AllOrderTables, AliveList, floor, btn, orderElevId) {
+					if isClearedByAny(AllOrderTables, AliveList, floor, btn, orderElevId) {
 						// Set the Primary OrderTable
 						for e := 0; e < elev.N_MAX_ELEVS; e++ {
 							isDeadElev := AliveList[e].Role == elev.ER_Dead
@@ -416,8 +392,30 @@ func isClearedByAll(
 		}
 	}
 	return true
-
 }
+
+func isClearedByAny(
+	AllOrderTables elev.AllOrderTables,
+	AliveList elev.AliveList,
+	floor int,
+	btn int,
+	orderElevId int,
+) bool {
+
+	for elevIndex := 0; elevIndex < elev.N_MAX_ELEVS; elevIndex++ {
+		isDeadElev := AliveList[elevIndex].Role == elev.ER_Dead
+		if isDeadElev {
+			continue
+		}
+		isClear := AllOrderTables[elevIndex][orderElevId][floor][btn] == elev.OS_CLEAR
+
+		if isClear {
+			return true
+		}
+	}
+	return false
+}
+
 func existStatusConfirmed(AliveList elev.AliveList, OrderTable elev.OrderTable, floor int, btn int) bool {
 	for e := 0; e < elev.N_MAX_ELEVS; e++ {
 		isDeadElev := AliveList[e].Role == elev.ER_Dead

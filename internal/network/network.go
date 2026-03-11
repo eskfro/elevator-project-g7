@@ -183,10 +183,6 @@ func TxOrderTableUDP(
 
 			latestPacket = newOTP
 
-			// Send immediately
-			data, _ := json.Marshal(latestPacket)
-			conn.WriteTo(data, dst)
-			log.Printf("[TxOrderTableUDP] OTP sent | vNum = %d\n", nextVersion)
 
 		case <-ticker.C:
 			// Periodic rebroadcast of the last known state

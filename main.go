@@ -148,9 +148,11 @@ func main() {
 				elevator.OrderTable = newOrderTable
 
 			case newLocalOrderTable := <-ch_fromOC_LOT:
-				log.Println("[MAIN] From OC: LocalOrderTable")
-				elevator.PhysicalInfo.LocalOrderTable = newLocalOrderTable
-				sendPhysicalInfoUpdate(elevator.PhysicalInfo, ch_updateMV_PhysicalInfo, ch_updateRM_PhysicalInfo)
+				if elevator.PhysicalInfo.LocalOrderTable != newLocalOrderTable {
+					elevator.PhysicalInfo.LocalOrderTable = newLocalOrderTable
+					log.Println("[MAIN] From OC: LocalOrderTable")
+					sendPhysicalInfoUpdate(elevator.PhysicalInfo, ch_updateMV_PhysicalInfo, ch_updateRM_PhysicalInfo)
+				}
 
 			// ========================== FROM ROLEMANAGER ============================
 
