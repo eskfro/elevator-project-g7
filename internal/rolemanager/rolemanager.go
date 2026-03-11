@@ -12,7 +12,6 @@ func RoleManager(
 	initElev elev.Elevator,
 	ch_updateRM_PhysicalInfo chan elev.ElevatorPhysicalInfo,
 	ch_fromRM_Role chan elev.ElevatorRole,
-	ch_fromRM_DeadElevId chan int,
 	ch_fromRM_PrimaryId chan int,
 	ch_fromRX_PhysicalInfo chan elev.ElevatorPhysicalInfo,
 	ch_fromRM_AliveList chan elev.AliveList,
@@ -35,8 +34,6 @@ forLoop:
 
 		case timedOutID := <-ch_TimedOutId:
 			RM_AliveList[timedOutID].Role = elev.ER_Dead
-			ch_fromRM_DeadElevId <- timedOutID
-			RM_PhysicalInfo, RM_AliveList = handleAliveListUpdate(RM_PhysicalInfo, RM_AliveList, timeStart, ch_fromRM_AliveList, ch_fromRM_PrimaryId, ch_fromRM_Role)
 
 		// ============================================================================ HEARTBEAT RCV FROM NETWORK
 		case heartbeat := <-ch_fromRX_PhysicalInfo:
@@ -102,7 +99,6 @@ func handleAliveListUpdate(
 		// Update PrimaryId when we know this elevator will be a backup
 		if ShouldUpdatePrimaryId(AliveList, PhysicalInfo.PrimaryId, timeStart) {
 			log.Println("[RoleManager] Should Update PrimaryID")
-			// Set change
 			newPrimaryId := GetPrimaryId(AliveList)
 			PhysicalInfo.PrimaryId = newPrimaryId
 			AliveList[PhysicalInfo.Id] = PhysicalInfo
@@ -180,7 +176,7 @@ func GetPrimaryId(AliveList elev.AliveList) int {
 		}
 	}
 	if primaryId == elev.INVALID_ELEVATOR_ID {
-		log.Fatalf("GetPrimaryId failed: No primary in AliveList\n")
+		log.Fatalln("[GetPrimaryId] No Primary found in AliveList")
 	}
 	return primaryId
 

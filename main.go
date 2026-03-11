@@ -62,17 +62,16 @@ func main() {
 	ch_updateOC_AliveList := make(chan elev.AliveList, 50)
 
 	// From OrderControl
-	ch_fromOC_LOT := make(chan elev.LocalOrderTable, 10)
-	ch_fromOC_OrderTable := make(chan elev.OrderTable, 10)
+	ch_fromOC_LOT := make(chan elev.LocalOrderTable, 20)
+	ch_fromOC_OrderTable := make(chan elev.OrderTable, 20)
 
 	// From RoleManager
-	ch_fromRM_Role := make(chan elev.ElevatorRole, 5)
-	ch_fromRM_DeadElevId := make(chan int, 5)
-	ch_fromRM_PrimaryId := make(chan int, 5)
-	ch_fromRM_AliveList := make(chan elev.AliveList, 10)
+	ch_fromRM_Role := make(chan elev.ElevatorRole, 20)
+	ch_fromRM_PrimaryId := make(chan int, 20)
+	ch_fromRM_AliveList := make(chan elev.AliveList, 20)
 
 	// To Network
-	ch_updateTX_OTP := make(chan elev.OrderTablePacket, 50)
+	ch_updateTX_OTP := make(chan elev.OrderTablePacket, 100)
 	updateTX_Role := make(chan elev.ElevatorRole, 5)
 	updateRX_Role := make(chan elev.ElevatorRole, 5)
 	updateRX_PrimaryId := make(chan int, 5)
@@ -89,7 +88,7 @@ func main() {
 		ch_fromMV_Movement, ch_fromMV_MotorDir, ch_fromMV_ClearOrders, ch_toMV_FloorArrival)
 	go ordercontrol.OrderControl(elevator, ch_updateOC_PhysicalInfo, ch_updateOC_AliveList, ch_fromRX_OrderTableP,
 		ch_fromOC_LOT, ch_fromOC_OrderTable, ch_updateTX_OTP, ch_fromMV_ClearOrders, ch_fromIO_BtnPress)
-	go rolemanager.RoleManager(elevator, ch_updateRM_PhysicalInfo, ch_fromRM_Role, ch_fromRM_DeadElevId, ch_fromRM_PrimaryId, ch_fromRX_PhysicalInfo, ch_fromRM_AliveList)
+	go rolemanager.RoleManager(elevator, ch_updateRM_PhysicalInfo, ch_fromRM_Role, ch_fromRM_PrimaryId, ch_fromRX_PhysicalInfo, ch_fromRM_AliveList)
 	go network.TxHeartBeat(elevator, ports.HeartBeat, ch_updateTX_PhysicalInfo)
 	go network.RxHeartBeat(ports.HeartBeat, ch_fromRX_PhysicalInfo, elevator.PhysicalInfo.Id)
 	go network.TxOrderTableUDP(elevator, ports.OrderTableP, ch_updateTX_OTP, updateTX_Role)
@@ -155,11 +154,6 @@ func main() {
 				}
 
 			// ========================== FROM ROLEMANAGER ============================
-
-			case deadElevId := <-ch_fromRM_DeadElevId:
-				log.Println("[MAIN] From RM: Dead Elev ID")
-				elevator.AliveList[deadElevId].Role = elev.ER_Dead
-				ch_updateOC_AliveList <- elevator.AliveList
 
 			case newRole := <-ch_fromRM_Role:
 				log.Println("[MAIN] From RM: Role")
