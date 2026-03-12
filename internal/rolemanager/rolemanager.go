@@ -34,7 +34,7 @@ func RoleManager(
 		case timedOutID := <-ch_TimedOutId:
 			RM_AliveList[timedOutID].Role = elev.ER_Dead
 			ch_fromRM_AliveList <- RM_AliveList
-			RM_PhysicalInfo, RM_AliveList = handleAliveListUpdate(RM_PhysicalInfo, RM_AliveList, timeStart, true, ch_fromRM_AliveList, ch_fromRM_PrimaryId, ch_fromRM_Role)
+			RM_PhysicalInfo, RM_AliveList = handleAliveListUpdate(RM_PhysicalInfo, RM_AliveList, timeStart, true, ch_fromRM_AliveList, ch_fromRM_PrimaryId, ch_fromRM_Role, false)
 
 		// ============================================================================ HEARTBEAT RCV FROM NETWORK
 		case heartbeat := <-ch_fromRX_PhysicalInfo:
@@ -58,7 +58,7 @@ func RoleManager(
 			// log.Println("[RoleManager] New AliveList update to RoleManager")
 			RM_AliveList[heartbeat.Id] = heartbeat
 			ch_fromRM_AliveList <- RM_AliveList
-			RM_PhysicalInfo, RM_AliveList = handleAliveListUpdate(RM_PhysicalInfo, RM_AliveList, timeStart, false, ch_fromRM_AliveList, ch_fromRM_PrimaryId, ch_fromRM_Role)
+			RM_PhysicalInfo, RM_AliveList = handleAliveListUpdate(RM_PhysicalInfo, RM_AliveList, timeStart, false, ch_fromRM_AliveList, ch_fromRM_PrimaryId, ch_fromRM_Role, wasDead)
 
 		}
 	}
@@ -73,6 +73,7 @@ func handleAliveListUpdate(
 	ch_fromRM_AliveList chan elev.AliveList,
 	ch_fromRM_PrimaryId chan int,
 	ch_fromRM_Role chan elev.ElevatorRole,
+	wasDead bool,
 
 ) (elev.ElevatorPhysicalInfo, elev.AliveList) {
 
@@ -110,6 +111,11 @@ func handleAliveListUpdate(
 			ch_fromRM_AliveList <- AliveList
 			ch_fromRM_PrimaryId <- PhysicalInfo.PrimaryId
 
+		}
+
+		if wasDead {
+			ch_fromRM_AliveList <- AliveList
+			ch_fromRM_PrimaryId <- PhysicalInfo.PrimaryId //IDK ABOUT THIS
 		}
 
 		return PhysicalInfo, AliveList
@@ -184,14 +190,14 @@ func GetPrimaryId(AliveList elev.AliveList, recentTimeout bool) int {
 		log.Fatalln("[GetPrimaryId] AliveList Empty!")
 	}
 
-	primaryId := elev.INVALID_ELEVATOR_ID
+	primaryId := elev.INVALID_PRIMARY_ID
 	for elevId := 0; elevId < elev.N_MAX_ELEVS; elevId++ {
 		if AliveList[elevId].Role == elev.ER_Primary {
 			primaryId = elevId
 			break
 		}
 	}
-	if primaryId == elev.INVALID_ELEVATOR_ID {
+	if primaryId == elev.INVALID_PRIMARY_ID {
 		log.Fatalln("[GetPrimaryId] No Primary found in AliveList")
 	}
 	return primaryId
@@ -227,13 +233,13 @@ func ShouldBecomePrimary(thisId int, thisRole elev.ElevatorRole, AliveList elev.
 		CountPrimaries(AliveList) != 0 {
 		return false
 	}
-	smallestBackupId := elev.INVALID_ELEVATOR_ID
+	smallestBackupId := elev.N_MAX_ELEVS
 	for elevId := 0; elevId < elev.N_MAX_ELEVS; elevId++ {
 		if AliveList[elevId].Role == elev.ER_Backup && elevId < smallestBackupId {
 			smallestBackupId = elevId
 		}
 	}
-	if smallestBackupId == elev.INVALID_ELEVATOR_ID {
+	if smallestBackupId == elev.N_MAX_ELEVS {
 		log.Fatalln("No elevators in AliveList (Primary)")
 	}
 	return thisId == smallestBackupId
@@ -245,7 +251,7 @@ func ShouldBecomeBackup(thisId int, thisRole elev.ElevatorRole, AliveList elev.A
 		return false
 	}
 
-	smallestPrimaryId := elev.INVALID_ELEVATOR_ID
+	smallestPrimaryId := elev.N_MAX_ELEVS
 
 	for elevId := 0; elevId < elev.N_MAX_ELEVS; elevId++ {
 		if AliveList[elevId].Role == elev.ER_Primary {
@@ -253,7 +259,7 @@ func ShouldBecomeBackup(thisId int, thisRole elev.ElevatorRole, AliveList elev.A
 			break
 		}
 	}
-	if smallestPrimaryId == elev.INVALID_ELEVATOR_ID {
+	if smallestPrimaryId == elev.N_MAX_ELEVS {
 		log.Fatalln("[ShouldBecomeBackup] How did this even happen!")
 	}
 	return thisId != smallestPrimaryId
@@ -261,7 +267,7 @@ func ShouldBecomeBackup(thisId int, thisRole elev.ElevatorRole, AliveList elev.A
 
 func ShouldUpdatePrimaryId(aliveList elev.AliveList, primaryId int, timeStart time.Time) bool {
 
-	isInvalidPrimaryId := primaryId == elev.INVALID_ELEVATOR_ID
+	isInvalidPrimaryId := primaryId == elev.INVALID_PRIMARY_ID
 
 	if isInvalidPrimaryId {
 		if time.Since(timeStart) > elev.PRIMARY_ELECTION_DELAY {

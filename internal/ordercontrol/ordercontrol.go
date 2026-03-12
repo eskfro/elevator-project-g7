@@ -41,6 +41,7 @@ func OrderControl(
 			if !isAliveListChanged {
 				continue
 			}
+
 			var rcvOrderTable elev.OrderTable
 			var ordersToReassign elev.LocalOrderTable
 
@@ -54,11 +55,11 @@ func OrderControl(
 
 			// Update states and send
 			newOrderTable := updateOrderTable(OC_OrderTable, rcvOrderTable, OC_PhysicalInfo.Id, OC_AllOrderTables, OC_PhysicalInfo, OC_AliveList, ch_updateTX_OTP)
-			isOrderTableDifferent := OC_OrderTable != newOrderTable
+			isOrderTableChanged := OC_OrderTable != newOrderTable
 			OC_OrderTable = newOrderTable
 			OC_AllOrderTables[OC_PhysicalInfo.Id] = OC_OrderTable
 
-			if isOrderTableDifferent {
+			if isOrderTableChanged {
 				sendUpdateFromOC(OC_OrderTable, ch_fromOC_OrderTable)
 			}
 

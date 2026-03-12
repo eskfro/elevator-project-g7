@@ -89,10 +89,6 @@ func main() {
 	go network.TxOrderTableUDP(elevator, ports.OrderTableP, updateTX_OTP, updateTX_Role)
 	go network.RxOrderTableUDP(elevator, ports.OrderTableP, fromRX_OrderTableP, updateRX_Role, updateRX_PrimaryId)
 
-	// go func() {
-	// 	log.Println(http.ListenAndServe("localhost:6060", nil))
-	// }()
-
 	go func() {
 		for {
 			select {
