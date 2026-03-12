@@ -10,40 +10,40 @@ import (
 
 func RoleManager(
 	initElev elev.Elevator,
-	ch_updateRM_PhysicalInfo chan elev.ElevatorPhysicalInfo,
-	ch_fromRM_Role chan elev.ElevatorRole,
-	ch_fromRM_PrimaryId chan int,
-	ch_fromRX_PhysicalInfo chan elev.ElevatorPhysicalInfo,
-	ch_fromRM_AliveList chan elev.AliveList,
+	updateRM_PhysicalInfo chan elev.ElevatorPhysicalInfo,
+	fromRM_Role chan elev.ElevatorRole,
+	fromRM_PrimaryId chan int,
+	fromRX_PhysicalInfo chan elev.ElevatorPhysicalInfo,
+	fromRM_AliveList chan elev.AliveList,
 	fromRM_ResetVersion chan int,
 ) {
-	ch_HeartBeatId := make(chan int, 50)
-	ch_TimedOutId := make(chan int, 50)
+	HeartBeatId := make(chan int, 50)
+	TimedOutId := make(chan int, 50)
 
 	RM_AliveList := initElev.AliveList
 	RM_PhysicalInfo := initElev.PhysicalInfo
 	timeStart := time.Now()
 
-	go MonitorHeartBeats(ch_HeartBeatId, ch_TimedOutId)
+	go MonitorHeartBeats(HeartBeatId, TimedOutId)
 
 	for {
 		select {
 
-		case newPhysicalInfo := <-ch_updateRM_PhysicalInfo:
+		case newPhysicalInfo := <-updateRM_PhysicalInfo:
 			RM_PhysicalInfo = newPhysicalInfo
 
-		case timedOutID := <-ch_TimedOutId:
+		case timedOutID := <-TimedOutId:
 			RM_AliveList[timedOutID].Role = elev.ER_Dead
-			ch_fromRM_AliveList <- RM_AliveList
+			fromRM_AliveList <- RM_AliveList
 			fromRM_ResetVersion <- timedOutID
-			RM_PhysicalInfo, RM_AliveList = handleAliveListUpdate(RM_PhysicalInfo, RM_AliveList, timeStart, true, ch_fromRM_AliveList, ch_fromRM_PrimaryId, ch_fromRM_Role, false)
+			RM_PhysicalInfo, RM_AliveList = handleAliveListUpdate(RM_PhysicalInfo, RM_AliveList, timeStart, true, fromRM_AliveList, fromRM_PrimaryId, fromRM_Role, false)
 
 		// ============================================================================ HEARTBEAT RCV FROM NETWORK
-		case heartbeat := <-ch_fromRX_PhysicalInfo:
+		case heartbeat := <-fromRX_PhysicalInfo:
 
 			// Always update watchdog timer
 			select {
-			case ch_HeartBeatId <- heartbeat.Id:
+			case HeartBeatId <- heartbeat.Id:
 			default:
 				log.Println("[RoleManager] Sending Heartbeat Default Case")
 			}
@@ -59,8 +59,8 @@ func RoleManager(
 
 			// log.Println("[RoleManager] New AliveList update to RoleManager")
 			RM_AliveList[heartbeat.Id] = heartbeat
-			ch_fromRM_AliveList <- RM_AliveList
-			RM_PhysicalInfo, RM_AliveList = handleAliveListUpdate(RM_PhysicalInfo, RM_AliveList, timeStart, false, ch_fromRM_AliveList, ch_fromRM_PrimaryId, ch_fromRM_Role, wasDead)
+			fromRM_AliveList <- RM_AliveList
+			RM_PhysicalInfo, RM_AliveList = handleAliveListUpdate(RM_PhysicalInfo, RM_AliveList, timeStart, false, fromRM_AliveList, fromRM_PrimaryId, fromRM_Role, wasDead)
 
 		}
 	}
@@ -72,9 +72,9 @@ func handleAliveListUpdate(
 	AliveList elev.AliveList,
 	timeStart time.Time,
 	recentTimeout bool,
-	ch_fromRM_AliveList chan elev.AliveList,
-	ch_fromRM_PrimaryId chan int,
-	ch_fromRM_Role chan elev.ElevatorRole,
+	fromRM_AliveList chan elev.AliveList,
+	fromRM_PrimaryId chan int,
+	fromRM_Role chan elev.ElevatorRole,
 	wasDead bool,
 
 ) (elev.ElevatorPhysicalInfo, elev.AliveList) {
@@ -95,9 +95,9 @@ func handleAliveListUpdate(
 			AliveList[PhysicalInfo.Id] = PhysicalInfo
 
 			// Send update
-			ch_fromRM_AliveList <- AliveList
-			ch_fromRM_PrimaryId <- PhysicalInfo.PrimaryId
-			ch_fromRM_Role <- PhysicalInfo.Role
+			fromRM_AliveList <- AliveList
+			fromRM_PrimaryId <- PhysicalInfo.PrimaryId
+			fromRM_Role <- PhysicalInfo.Role
 
 			return PhysicalInfo, AliveList
 		}
@@ -110,14 +110,14 @@ func handleAliveListUpdate(
 			AliveList[PhysicalInfo.Id] = PhysicalInfo
 
 			// Send update
-			ch_fromRM_AliveList <- AliveList
-			ch_fromRM_PrimaryId <- PhysicalInfo.PrimaryId
+			fromRM_AliveList <- AliveList
+			fromRM_PrimaryId <- PhysicalInfo.PrimaryId
 
 		}
 
 		if wasDead {
-			ch_fromRM_AliveList <- AliveList
-			ch_fromRM_PrimaryId <- PhysicalInfo.PrimaryId //IDK ABOUT THIS
+			fromRM_AliveList <- AliveList
+			fromRM_PrimaryId <- PhysicalInfo.PrimaryId //IDK ABOUT THIS
 		}
 
 		return PhysicalInfo, AliveList
@@ -133,9 +133,9 @@ func handleAliveListUpdate(
 			AliveList[PhysicalInfo.Id] = PhysicalInfo
 
 			// Send update
-			ch_fromRM_AliveList <- AliveList
-			ch_fromRM_PrimaryId <- PhysicalInfo.PrimaryId
-			ch_fromRM_Role <- PhysicalInfo.Role
+			fromRM_AliveList <- AliveList
+			fromRM_PrimaryId <- PhysicalInfo.PrimaryId
+			fromRM_Role <- PhysicalInfo.Role
 
 		}
 		return PhysicalInfo, AliveList
@@ -144,11 +144,11 @@ func handleAliveListUpdate(
 	return PhysicalInfo, AliveList
 }
 
-func MonitorHeartBeats(ch_HeartBeatId chan int, ch_TimedOutId chan int) {
+func MonitorHeartBeats(HeartBeatId chan int, TimedOutId chan int) {
 	// Initialize a fixed-size array of pointers to your custom Timer
 	var elevTimers [elev.N_MAX_ELEVS]*timer.Timer
 
-	for id := range ch_HeartBeatId {
+	for id := range HeartBeatId {
 		isIndexInvalid := id < 0 || id >= elev.N_MAX_ELEVS
 
 		if isIndexInvalid {
@@ -172,7 +172,7 @@ func MonitorHeartBeats(ch_HeartBeatId chan int, ch_TimedOutId chan int) {
 					timeoutChan <- id
 					fmt.Printf("[MonitorHeartBeats] Timeout triggered on elev id = %d\n", id)
 				}
-			}(id, ch_TimedOutId, t.C)
+			}(id, TimedOutId, t.C)
 		}
 
 		t.Start()

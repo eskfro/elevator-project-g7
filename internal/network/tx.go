@@ -13,7 +13,7 @@ import (
 func TxHeartBeat(
 	initElev elev.Elevator,
 	port_hb int,
-	ch_updateTX_PhysicalInfo chan elev.ElevatorPhysicalInfo) {
+	updateTX_PhysicalInfo chan elev.ElevatorPhysicalInfo) {
 
 	message := initElev.PhysicalInfo
 	address := BCAST_RCV_IP + ":" + strconv.Itoa(port_hb)
@@ -48,7 +48,7 @@ func TxHeartBeat(
 	for {
 		select {
 
-		case newPhysicalInfo := <-ch_updateTX_PhysicalInfo:
+		case newPhysicalInfo := <-updateTX_PhysicalInfo:
 			message = newPhysicalInfo
 			broadcast()
 			ticker.Reset(BCAST_INTERVAL_HB)
@@ -63,7 +63,7 @@ func TxHeartBeat(
 func TxOrderTableUDP(
 	initElev elev.Elevator,
 	port_ot int,
-	ch_updateTX_OTP <-chan elev.OrderTablePacket,
+	updateTX_OTP <-chan elev.OrderTablePacket,
 	updateTX_Role chan elev.ElevatorRole,
 ) {
 
@@ -82,7 +82,7 @@ func TxOrderTableUDP(
 
 		// case thisRole = <-updateTX_Role:
 
-		case newOTP := <-ch_updateTX_OTP:
+		case newOTP := <-updateTX_OTP:
 			// Increment version before sending
 			var nextVersion uint64
 			// isThisPrimary := thisRole == elev.ER_Primary

@@ -11,7 +11,7 @@ type DirnMovementPair struct {
 	Movement elev.ElevatorMovement
 }
 
-func RequestAbove(LocalOrderTable [elev.N_FLOORS][elev.N_BUTTONS]bool, currentFloor int) bool {
+func RequestAbove(LocalOrderTable elev.LocalOrderTable, currentFloor int) bool {
 
 	for f := currentFloor + 1; f < elev.N_FLOORS; f++ {
 		for b := 0; b < elev.N_BUTTONS; b++ {
@@ -23,7 +23,7 @@ func RequestAbove(LocalOrderTable [elev.N_FLOORS][elev.N_BUTTONS]bool, currentFl
 	return false
 }
 
-func RequestBelow(LocalOrderTable [elev.N_FLOORS][elev.N_BUTTONS]bool, currentFloor int) bool {
+func RequestBelow(LocalOrderTable elev.LocalOrderTable, currentFloor int) bool {
 
 	for f := 0; f < currentFloor; f++ {
 		for b := 0; b < elev.N_BUTTONS; b++ {
@@ -35,7 +35,7 @@ func RequestBelow(LocalOrderTable [elev.N_FLOORS][elev.N_BUTTONS]bool, currentFl
 	return false
 }
 
-func RequestHere(LocalOrderTable [elev.N_FLOORS][elev.N_BUTTONS]bool, currentFloor int) bool {
+func RequestHere(LocalOrderTable elev.LocalOrderTable, currentFloor int) bool {
 
 	for b := 0; b < elev.N_BUTTONS; b++ {
 		if LocalOrderTable[currentFloor][b] {
@@ -45,7 +45,7 @@ func RequestHere(LocalOrderTable [elev.N_FLOORS][elev.N_BUTTONS]bool, currentFlo
 	return false
 }
 
-func ChooseDirection(LocalOrderTable [elev.N_FLOORS][elev.N_BUTTONS]bool, currentFloor int, dir elevio.MotorDirection) DirnMovementPair {
+func ChooseDirection(LocalOrderTable elev.LocalOrderTable, currentFloor int, dir elevio.MotorDirection) DirnMovementPair {
 	switch dir {
 	case elevio.MD_Up:
 		if RequestAbove(LocalOrderTable, currentFloor) {
@@ -191,7 +191,7 @@ func ClearCurrentFloor(LocalOrderTable elev.LocalOrderTable,
 	return LOT, buttonsToClear
 }
 
-func PrintLOT(LocalOrderTable [elev.N_FLOORS][elev.N_BUTTONS]bool) {
+func PrintLOT(LocalOrderTable elev.LocalOrderTable) {
 	for i := 0; i < elev.N_FLOORS; i++ {
 		for j := 0; j < elev.N_BUTTONS; j++ {
 			if LocalOrderTable[i][j] {
