@@ -54,9 +54,13 @@ func OrderControl(
 
 			// Update states and send
 			newOrderTable := updateOrderTable(OC_OrderTable, rcvOrderTable, OC_PhysicalInfo.Id, OC_AllOrderTables, OC_PhysicalInfo, OC_AliveList, ch_updateTX_OTP)
+			isOrderTableDifferent := OC_OrderTable != newOrderTable
 			OC_OrderTable = newOrderTable
 			OC_AllOrderTables[OC_PhysicalInfo.Id] = OC_OrderTable
-			sendUpdateFromOC(OC_OrderTable, ch_fromOC_OrderTable)
+
+			if isOrderTableDifferent {
+				sendUpdateFromOC(OC_OrderTable, ch_fromOC_OrderTable)
+			}
 
 		// ============================================================================== BTN PRESS FROM IO
 		case btnPress := <-ch_fromIO_BtnPress:
@@ -71,9 +75,13 @@ func OrderControl(
 			rcvOrderTable[OC_PhysicalInfo.Id][btnPress.Floor][btnPress.Button] = elev.OS_REQUESTED
 			// Update states and send
 			newOrderTable := updateOrderTable(OC_OrderTable, rcvOrderTable, OC_PhysicalInfo.Id, OC_AllOrderTables, OC_PhysicalInfo, OC_AliveList, ch_updateTX_OTP)
+			isOrderTableDifferent := OC_OrderTable != newOrderTable
 			OC_OrderTable = newOrderTable
 			OC_AllOrderTables[OC_PhysicalInfo.Id] = OC_OrderTable
-			sendUpdateFromOC(OC_OrderTable, ch_fromOC_OrderTable)
+
+			if isOrderTableDifferent {
+				sendUpdateFromOC(OC_OrderTable, ch_fromOC_OrderTable)
+			}
 
 		// =========================================================================== CLEAR ORDER FROM MV
 		case clearOrders := <-ch_fromMV_ClearOrders:
@@ -90,9 +98,13 @@ func OrderControl(
 			}
 			// Update states and send
 			newOrderTable := updateOrderTable(OC_OrderTable, rcvOrderTable, OC_PhysicalInfo.Id, OC_AllOrderTables, OC_PhysicalInfo, OC_AliveList, ch_updateTX_OTP)
+			isOrderTableDifferent := OC_OrderTable != newOrderTable
 			OC_OrderTable = newOrderTable
 			OC_AllOrderTables[OC_PhysicalInfo.Id] = OC_OrderTable
-			sendUpdateFromOC(OC_OrderTable, ch_fromOC_OrderTable)
+
+			if isOrderTableDifferent {
+				sendUpdateFromOC(OC_OrderTable, ch_fromOC_OrderTable)
+			}
 
 		// =========================================================================== PACKET FROM NETWORK [RX]
 		case packet := <-ch_fromRX_OrderTableP:
@@ -106,9 +118,13 @@ func OrderControl(
 			OC_AllOrderTables[packet.Id] = packet.OrderTable
 			// Update states and send
 			newOrderTable := updateOrderTable(OC_OrderTable, packet.OrderTable, packet.Id, OC_AllOrderTables, OC_PhysicalInfo, OC_AliveList, ch_updateTX_OTP)
+			isOrderTableDifferent := OC_OrderTable != newOrderTable
 			OC_OrderTable = newOrderTable
 			OC_AllOrderTables[OC_PhysicalInfo.Id] = OC_OrderTable
-			sendUpdateFromOC(OC_OrderTable, ch_fromOC_OrderTable)
+
+			if isOrderTableDifferent {
+				sendUpdateFromOC(OC_OrderTable, ch_fromOC_OrderTable)
+			}
 		}
 	}
 }

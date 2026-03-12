@@ -48,9 +48,10 @@ func RoleManager(
 
 			isHeartbeatUnchanged := RM_AliveList[heartbeat.Id] == heartbeat
 			isValidPrimaryId := heartbeat.PrimaryId != elev.INVALID_PRIMARY_ID
+			wasDead := RM_AliveList[heartbeat.Id].Role == elev.ER_Dead
 
 			//I starten settes PrimaryId til INVALID. Da bryr man seg ikke om isHeartBeatUnchanged fordi man må uansett oppdatere PrimaryId
-			if isHeartbeatUnchanged && isValidPrimaryId {
+			if isHeartbeatUnchanged && isValidPrimaryId && !wasDead {
 				continue
 			}
 
@@ -110,6 +111,7 @@ func handleAliveListUpdate(
 			ch_fromRM_PrimaryId <- PhysicalInfo.PrimaryId
 
 		}
+
 		return PhysicalInfo, AliveList
 
 	case elev.ER_Primary:
@@ -142,7 +144,7 @@ func MonitorHeartBeats(ch_HeartBeatId chan int, ch_TimedOutId chan int) {
 		isIndexInvalid := id < 0 || id >= elev.N_MAX_ELEVS
 
 		if isIndexInvalid {
-			fmt.Printf("[MonitorHeartBeats] Error: ID %d out of bounds\n", id)
+			log.Fatalf("[MonitorHeartBeats] Error: ID %d out of bounds\n", id)
 			continue
 		}
 

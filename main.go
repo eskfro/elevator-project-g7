@@ -37,9 +37,7 @@ func main() {
 	// Time for debugging
 	timeStart := time.Now()
 	ticker_printElevator := time.NewTicker(1000 * time.Millisecond)
-	ticker_AliveList := time.NewTicker(500 * time.Millisecond)
 	defer ticker_printElevator.Stop()
-	defer ticker_AliveList.Stop()
 
 	// PhysicalInfo updates [critical]
 	updateMV_PhysicalInfo := make(chan elev.ElevatorPhysicalInfo, 20)
@@ -83,10 +81,8 @@ func main() {
 	go elevio.PollFloorSensor(fromIO_Floor)
 	go elevio.PollButtons(fromIO_BtnPress)
 
-	go movement.Movement(elevator, updateMV_PhysicalInfo, fromMV_LOT,
-		fromMV_Movement, fromMV_MotorDir, fromMV_ClearOrders, toMV_FloorArrival)
-	go ordercontrol.OrderControl(elevator, updateOC_PhysicalInfo, updateOC_AliveList, fromRX_OrderTableP,
-		fromOC_OrderTable, updateTX_OTP, fromMV_ClearOrders, fromIO_BtnPress)
+	go movement.Movement(elevator, updateMV_PhysicalInfo, fromMV_LOT, fromMV_Movement, fromMV_MotorDir, fromMV_ClearOrders, toMV_FloorArrival)
+	go ordercontrol.OrderControl(elevator, updateOC_PhysicalInfo, updateOC_AliveList, fromRX_OrderTableP, fromOC_OrderTable, updateTX_OTP, fromMV_ClearOrders, fromIO_BtnPress)
 	go rolemanager.RoleManager(elevator, updateRM_PhysicalInfo, fromRM_Role, fromRM_PrimaryId, fromRX_PhysicalInfo, fromRM_AliveList)
 	go network.TxHeartBeat(elevator, ports.HeartBeat, updateTX_PhysicalInfo)
 	go network.RxHeartBeat(ports.HeartBeat, fromRX_PhysicalInfo, elevator.PhysicalInfo.Id)
@@ -105,9 +101,9 @@ func main() {
 				elev.PrintElevatorInfo(elevator, uptime)
 				//elev.PrintOrderTableSlice(elevator.OrderTable, elevator.PhysicalInfo.Id)
 
-				elev.PrintOrderTableSlice(elevator.OrderTable, 0)
-				elev.PrintOrderTableSlice(elevator.OrderTable, 1)
-				elev.PrintOrderTableSlice(elevator.OrderTable, 2)
+				elev.PrintOrderTableSlice(elevator.OrderTable, elevator.PhysicalInfo.Id)
+				// elev.PrintOrderTableSlice(elevator.OrderTable, 1)
+				// elev.PrintOrderTableSlice(elevator.OrderTable, 2)
 
 			// =========================== FROM HARDWARE ============================
 
