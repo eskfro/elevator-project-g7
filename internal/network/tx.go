@@ -1,0 +1,105 @@
+package network
+
+import (
+	"context"
+	"elevator-project-g7/internal/elev"
+	"encoding/json"
+	"log"
+	"net"
+	"strconv"
+	"time"
+)
+
+func TxHeartBeat(
+	initElev elev.Elevator,
+	port_hb int,
+	ch_updateTX_PhysicalInfo chan elev.ElevatorPhysicalInfo) {
+
+	message := initElev.PhysicalInfo
+	address := BCAST_RCV_IP + ":" + strconv.Itoa(port_hb)
+
+	// Establish udp "connection"
+	conn, err := lc.ListenPacket(context.Background(), "udp4", ":0")
+	if err != nil {
+		log.Printf("TxHeartBeat conn failed! port_hb = %d\n", port_hb)
+		log.Printf("TxHeartBeat failed: %v\n", err)
+	}
+	defer conn.Close()
+
+	dst, err := net.ResolveUDPAddr("udp4", address)
+	if err != nil {
+		log.Printf("Failed to resolve bcast adress: %v \n", err)
+	}
+
+	broadcast := func() {
+		data, err := json.Marshal(message)
+		if err != nil {
+			log.Println("JSON Marshal error:", err)
+		}
+		_, err = conn.WriteTo(data, dst)
+		if err != nil {
+			log.Println("Error sending message: ", err)
+		}
+	}
+
+	ticker := time.NewTicker(BCAST_INTERVAL_HB)
+	defer ticker.Stop()
+
+	for {
+		select {
+
+		case newPhysicalInfo := <-ch_updateTX_PhysicalInfo:
+			message = newPhysicalInfo
+			broadcast()
+			ticker.Reset(BCAST_INTERVAL_HB)
+
+		case <-ticker.C:
+			broadcast()
+			ticker.Reset(BCAST_INTERVAL_HB)
+		}
+	}
+}
+
+func TxOrderTableUDP(
+	initElev elev.Elevator,
+	port_ot int,
+	ch_updateTX_OTP <-chan elev.OrderTablePacket,
+	updateTX_Role chan elev.ElevatorRole,
+) {
+
+	address := BCAST_RCV_IP + ":" + strconv.Itoa(port_ot)
+	conn, _ := lc.ListenPacket(context.Background(), "udp4", ":0")
+	defer conn.Close()
+	dst, _ := net.ResolveUDPAddr("udp4", address)
+
+	var latestPacket elev.OrderTablePacket
+	versionTracker := &VersionTracker{}
+
+	ticker := time.NewTicker(BCAST_INTERVAL_OT)
+
+	for {
+		select {
+
+		// case thisRole = <-updateTX_Role:
+
+		case newOTP := <-ch_updateTX_OTP:
+			// Increment version before sending
+			var nextVersion uint64
+			// isThisPrimary := thisRole == elev.ER_Primary
+
+			nextVersion = versionTracker.Increment()
+
+			newOTP.Version = nextVersion
+
+			latestPacket = newOTP
+
+		case <-ticker.C:
+			// Periodic rebroadcast of the last known state
+			// This helps elevators that were temporarily offline catch up
+			data, _ := json.Marshal(latestPacket)
+			conn.WriteTo(data, dst)
+			// log.Printf("======== [TxOrderTableUDO] Periodic Bcast =======\n")
+
+		}
+	}
+}

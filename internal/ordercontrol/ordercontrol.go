@@ -6,7 +6,6 @@ import (
 	"elevator-project-g7/internal/requests"
 	"log"
 	"math"
-	"sync"
 )
 
 func OrderControl(
@@ -420,27 +419,6 @@ func isRequestedByAll(
 	return true
 }
 
-func isClearedByAll(
-	AllOrderTables elev.AllOrderTables,
-	AliveList elev.AliveList,
-	floor int,
-	btn int,
-	orderElevId int,
-) bool {
-
-	for elevIndex := 0; elevIndex < elev.N_MAX_ELEVS; elevIndex++ {
-		isDeadElev := AliveList[elevIndex].Role == elev.ER_Dead
-		if isDeadElev {
-			continue
-		}
-		isClear := AllOrderTables[elevIndex][orderElevId][floor][btn] == elev.OS_CLEAR
-		if !isClear {
-			return false
-		}
-	}
-	return true
-}
-
 func isClearedByAny(
 	AllOrderTables elev.AllOrderTables,
 	AliveList elev.AliveList,
@@ -550,22 +528,4 @@ func OrderTableToLOT(OrderTable elev.OrderTable, elevId int) elev.LocalOrderTabl
 		}
 	}
 	return LOT
-}
-
-type VersionTracker struct {
-	sync.Mutex
-	currentVersion uint64
-}
-
-func (v *VersionTracker) Increment() uint64 {
-	v.Lock()
-	defer v.Unlock()
-	v.currentVersion++
-	return v.currentVersion
-}
-
-func (v *VersionTracker) Get() uint64 {
-	v.Lock()
-	defer v.Unlock()
-	return v.currentVersion
 }

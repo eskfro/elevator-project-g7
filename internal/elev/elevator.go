@@ -14,8 +14,6 @@ const N_MAX_ELEVS = 4
 const DOOR_OPEN_TIME = 3000 * time.Millisecond
 const HEARTBEAT_TIMEOUT = 500 * time.Millisecond
 const PRIMARY_ELECTION_DELAY = 401 * time.Millisecond
-const BCAST_INTERVAL_HB = 50 * time.Millisecond
-const BCAST_INTERVAL_OT = 50 * time.Millisecond
 
 const INVALID_ELEVATOR_ID = N_MAX_ELEVS + 1
 const INVALID_PRIMARY_ID = N_MAX_ELEVS + 1
@@ -55,20 +53,10 @@ type Order struct {
 	ButtonType elevio.ButtonType
 }
 
-type RoleIdPair struct {
-	Id   int
-	Role ElevatorRole
-}
-
 type OrderTablePacket struct {
 	Id         int
 	Version    uint64
 	OrderTable OrderTable
-}
-
-type NetworkPacket struct {
-	OrderTableP  OrderTablePacket
-	PhysicalInfo ElevatorPhysicalInfo
 }
 
 // ============ ELEVATOR CORE =======================================
