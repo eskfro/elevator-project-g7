@@ -62,7 +62,6 @@ func main() {
 	ch_updateOC_AliveList := make(chan elev.AliveList, 50)
 
 	// From OrderControl
-	ch_fromOC_LOT := make(chan elev.LocalOrderTable, 20)
 	ch_fromOC_OrderTable := make(chan elev.OrderTable, 20)
 
 	// From RoleManager
@@ -87,7 +86,7 @@ func main() {
 	go movement.Movement(elevator, ch_updateMV_PhysicalInfo, ch_fromMV_LOT,
 		ch_fromMV_Movement, ch_fromMV_MotorDir, ch_fromMV_ClearOrders, ch_toMV_FloorArrival)
 	go ordercontrol.OrderControl(elevator, ch_updateOC_PhysicalInfo, ch_updateOC_AliveList, ch_fromRX_OrderTableP,
-		ch_fromOC_LOT, ch_fromOC_OrderTable, ch_updateTX_OTP, ch_fromMV_ClearOrders, ch_fromIO_BtnPress)
+		ch_fromOC_OrderTable, ch_updateTX_OTP, ch_fromMV_ClearOrders, ch_fromIO_BtnPress)
 	go rolemanager.RoleManager(elevator, ch_updateRM_PhysicalInfo, ch_fromRM_Role, ch_fromRM_PrimaryId, ch_fromRX_PhysicalInfo, ch_fromRM_AliveList)
 	go network.TxHeartBeat(elevator, ports.HeartBeat, ch_updateTX_PhysicalInfo)
 	go network.RxHeartBeat(ports.HeartBeat, ch_fromRX_PhysicalInfo, elevator.PhysicalInfo.Id)
@@ -144,13 +143,13 @@ func main() {
 
 			case newOrderTable := <-ch_fromOC_OrderTable:
 				log.Println("[MAIN] From OC: OrderTable")
+				prevLOT := elevator.PhysicalInfo.LocalOrderTable
 				elevator.OrderTable = newOrderTable
+				elevator.PhysicalInfo.LocalOrderTable = ordercontrol.OrderTableToLOT(elevator.OrderTable, elevator.PhysicalInfo.Id)
+				isChange := prevLOT != elevator.PhysicalInfo.LocalOrderTable
 
-			case newLocalOrderTable := <-ch_fromOC_LOT:
-				if elevator.PhysicalInfo.LocalOrderTable != newLocalOrderTable {
-					elevator.PhysicalInfo.LocalOrderTable = newLocalOrderTable
-					log.Println("[MAIN] From OC: LocalOrderTable")
-					sendPhysicalInfoUpdate(elevator.PhysicalInfo, ch_updateMV_PhysicalInfo, ch_updateRM_PhysicalInfo)
+				if isChange {
+					sendPhysicalInfoUpdate(elevator.PhysicalInfo, ch_updateMV_PhysicalInfo)
 				}
 
 			// ========================== FROM ROLEMANAGER ============================
