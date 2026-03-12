@@ -15,6 +15,7 @@ func RoleManager(
 	ch_fromRM_PrimaryId chan int,
 	ch_fromRX_PhysicalInfo chan elev.ElevatorPhysicalInfo,
 	ch_fromRM_AliveList chan elev.AliveList,
+	fromRM_ResetVersion chan int,
 ) {
 	ch_HeartBeatId := make(chan int, 50)
 	ch_TimedOutId := make(chan int, 50)
@@ -34,6 +35,7 @@ func RoleManager(
 		case timedOutID := <-ch_TimedOutId:
 			RM_AliveList[timedOutID].Role = elev.ER_Dead
 			ch_fromRM_AliveList <- RM_AliveList
+			fromRM_ResetVersion <- timedOutID
 			RM_PhysicalInfo, RM_AliveList = handleAliveListUpdate(RM_PhysicalInfo, RM_AliveList, timeStart, true, ch_fromRM_AliveList, ch_fromRM_PrimaryId, ch_fromRM_Role, false)
 
 		// ============================================================================ HEARTBEAT RCV FROM NETWORK

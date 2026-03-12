@@ -12,7 +12,7 @@ import (
 
 func RxHeartBeat(
 	port_hb int,
-	ch_fromRX_PhysicalInfo chan elev.ElevatorPhysicalInfo,
+	fromRX_PhysicalInfo chan elev.ElevatorPhysicalInfo,
 	thisElevId int) {
 
 	addr := ":" + strconv.Itoa(port_hb)
@@ -50,21 +50,12 @@ func RxHeartBeat(
 			continue
 		}
 
-		isFromSelf := rcvPhysicalInfo.Id == thisElevId
+		// Før ignorerte vi meldinger fra oss selv, vi slutta med det
 
-		if !isFromSelf {
-			select {
-			case ch_fromRX_PhysicalInfo <- rcvPhysicalInfo:
-			default:
-				log.Println("[RxHeartBeat] fromRX_PhysicalInfo full!")
-			}
-			// Ja dette er bra kodekvalitet.
-		} else {
-			select {
-			case ch_fromRX_PhysicalInfo <- rcvPhysicalInfo:
-			default:
-				log.Println("[RxHeartBeat] fromRX_PhysicalInfo full!")
-			}
+		select {
+		case fromRX_PhysicalInfo <- rcvPhysicalInfo:
+		default:
+			log.Println("[RxHeartBeat] fromRX_PhysicalInfo full!")
 		}
 
 	}
@@ -73,9 +64,10 @@ func RxHeartBeat(
 func RxOrderTableUDP(
 	initElev elev.Elevator,
 	port_ot int,
-	ch_fromRX_OTP chan<- elev.OrderTablePacket,
+	fromRX_OTP chan<- elev.OrderTablePacket,
 	updateRX_Role chan elev.ElevatorRole,
 	updateRX_PrimaryId chan int,
+	fromRM_ResetVersion chan int,
 ) {
 
 	thisRole := initElev.PhysicalInfo.Role
@@ -96,6 +88,9 @@ func RxOrderTableUDP(
 
 		case primaryId = <-updateRX_PrimaryId:
 
+		case resetIndex := <-fromRM_ResetVersion: //Eskil 12.03
+			versionsSeen[resetIndex] = 0
+
 		default:
 			n, _, err := conn.ReadFrom(buf)
 			if err != nil {
@@ -115,19 +110,18 @@ func RxOrderTableUDP(
 			if isThisPrimary && !isMsgFromSelf {
 
 				if isRcvVersionOne || isRcvVersionNewer { //Eskil 12.03 -> reset when a dead elev spawns
+					log.Println("[RxOrderTableP] Got message from backup")
 					versionsSeen[rcvOTP.Id] = rcvOTP.Version
-					ch_fromRX_OTP <- rcvOTP
+					fromRX_OTP <- rcvOTP
 					continue
-
 				}
-
 				// isThisBackup
 			} else {
 
 				if isMsgFromPrimary && isRcvVersionNewer {
 					log.Println("[RxOrderTableP] Got message from primary")
 					versionsSeen[rcvOTP.Id] = rcvOTP.Version
-					ch_fromRX_OTP <- rcvOTP
+					fromRX_OTP <- rcvOTP
 					continue
 				}
 			}

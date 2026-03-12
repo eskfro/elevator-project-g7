@@ -66,6 +66,7 @@ func main() {
 	fromRM_Role := make(chan elev.ElevatorRole, 20)
 	fromRM_PrimaryId := make(chan int, 20)
 	fromRM_AliveList := make(chan elev.AliveList, 20)
+	fromRM_ResetVersion := make(chan int, 10)
 
 	// To Network
 	updateTX_OTP := make(chan elev.OrderTablePacket, 100)
@@ -83,11 +84,11 @@ func main() {
 
 	go movement.Movement(elevator, updateMV_PhysicalInfo, fromMV_LOT, fromMV_Movement, fromMV_MotorDir, fromMV_ClearOrders, toMV_FloorArrival)
 	go ordercontrol.OrderControl(elevator, updateOC_PhysicalInfo, updateOC_AliveList, fromRX_OrderTableP, fromOC_OrderTable, updateTX_OTP, fromMV_ClearOrders, fromIO_BtnPress)
-	go rolemanager.RoleManager(elevator, updateRM_PhysicalInfo, fromRM_Role, fromRM_PrimaryId, fromRX_PhysicalInfo, fromRM_AliveList)
+	go rolemanager.RoleManager(elevator, updateRM_PhysicalInfo, fromRM_Role, fromRM_PrimaryId, fromRX_PhysicalInfo, fromRM_AliveList, fromRM_ResetVersion)
 	go network.TxHeartBeat(elevator, ports.HeartBeat, updateTX_PhysicalInfo)
 	go network.RxHeartBeat(ports.HeartBeat, fromRX_PhysicalInfo, elevator.PhysicalInfo.Id)
 	go network.TxOrderTableUDP(elevator, ports.OrderTableP, updateTX_OTP, updateTX_Role)
-	go network.RxOrderTableUDP(elevator, ports.OrderTableP, fromRX_OrderTableP, updateRX_Role, updateRX_PrimaryId)
+	go network.RxOrderTableUDP(elevator, ports.OrderTableP, fromRX_OrderTableP, updateRX_Role, updateRX_PrimaryId, fromRM_ResetVersion)
 
 	go func() {
 		for {
