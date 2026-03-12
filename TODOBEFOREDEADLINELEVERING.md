@@ -1,3 +1,4 @@
 - 1 Alle heisene må lyse når det er en confirmed hall ordre i (floor, btn)
-- 2 Fjern ch_
-- 3 Heile oppsettet
+- 2 Fjern ch_ // DONE
+- 3 Heile oppsettet // DONE
+- 4 Fikse <-chan eller chan<- som parameter i ALLE funksjoner

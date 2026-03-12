@@ -5,6 +5,20 @@ import (
 	"strconv"
 )
 
+// Making channels for the inputs
+func Inputs() (chan ButtonEvent, chan int, chan bool) {
+
+	fromIO_BtnPress := make(chan ButtonEvent, 50)
+	fromIO_Floor := make(chan int, 20)
+	fromIO_Obstruction := make(chan bool, 20)
+
+	go PollButtons(fromIO_BtnPress)
+	go PollFloorSensor(fromIO_Floor)
+	go PollObstructionSwitch(fromIO_Obstruction)
+
+	return fromIO_BtnPress, fromIO_Floor, fromIO_Obstruction
+}
+
 func PrintStopButton(chanStopButton chan bool) {
 	counter := 0
 	for press := range chanStopButton {
