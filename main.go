@@ -6,16 +6,8 @@ import (
 	"elevator-project-g7/internal/elevio"
 	"elevator-project-g7/internal/network"
 	"elevator-project-g7/internal/parser"
-	_ "net/http/pprof"
 	"os"
-	"os/signal"
-	"syscall"
 )
-func WaitForInterrupt() {
-	sig := make(chan os.Signal, 1)
-	signal.Notify(sig, os.Interrupt, syscall.SIGTERM)
-	<-sig
-}
 
 const sim bool = false
 
@@ -32,6 +24,6 @@ func main() {
 
 	coordinator.Start(elevator, ports, fromIO_BtnPress, fromIO_Floor, fromIO_Obstruction)
 
-	// WaitForInterrupt()
 }
 
+// TODO: Av og til når en ny heis kommer på nettverket så fungerer ikke ordre får en cab trykk på sin egen.

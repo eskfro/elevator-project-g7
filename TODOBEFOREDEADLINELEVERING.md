@@ -2,3 +2,5 @@
 - 2 Fjern ch_ // DONE
 - 3 Heile oppsettet // DONE
 - 4 Fikse <-chan eller chan<- som parameter i ALLE funksjoner
+- 5 Timer som redistribuerer ordre dersom ikke tidsfrist nås -> primary kan gjøre dette
+- 6 Fjerne funksjoner vi ikke bruker

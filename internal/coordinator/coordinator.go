@@ -28,10 +28,12 @@ func Start(
 	fromIO_Floor chan int,
 	fromIO_Obstruction chan bool,
 ) {
+	// Ticker for debugging
 	timeStart := time.Now()
 	ticker_printElevator := time.NewTicker(1000 * time.Millisecond)
 	defer ticker_printElevator.Stop()
-
+	// =================================================================== CHANNELS
+	// Movement
 	updateMV_PhysicalInfo := make(chan elev.ElevatorPhysicalInfo, 20)
 	toMV_FloorArrival := make(chan int, 5)
 	fromMV_LOT := make(chan elev.LocalOrderTable, 20)
@@ -39,25 +41,30 @@ func Start(
 	fromMV_Movement := make(chan elev.ElevatorMovement, 20)
 	fromMV_ClearOrders := make(chan elev.ClearOrders, 20)
 
+	// OrderControl
 	updateOC_PhysicalInfo := make(chan elev.ElevatorPhysicalInfo, 20)
 	updateOC_AliveList := make(chan elev.AliveList, 50)
 	fromOC_OrderTable := make(chan elev.OrderTable, 20)
 
+	// RoleManager
 	updateRM_PhysicalInfo := make(chan elev.ElevatorPhysicalInfo, 20)
 	fromRM_Role := make(chan elev.ElevatorRole, 20)
 	fromRM_PrimaryId := make(chan int, 20)
 	fromRM_AliveList := make(chan elev.AliveList, 20)
 	fromRM_ResetVersion := make(chan int, 10)
 
+	// Transmitter
 	updateTX_PhysicalInfo := make(chan elev.ElevatorPhysicalInfo, 20)
 	updateTX_OTP := make(chan elev.OrderTablePacket, 100)
 	updateTX_Role := make(chan elev.ElevatorRole, 5)
 
+	// Reciever
 	updateRX_Role := make(chan elev.ElevatorRole, 5)
 	updateRX_PrimaryId := make(chan int, 5)
 	fromRX_OrderTableP := make(chan elev.OrderTablePacket, 50)
 	fromRX_PhysicalInfo := make(chan elev.ElevatorPhysicalInfo, 50)
 
+	// Modules
 	go movement.Movement(elevator, updateMV_PhysicalInfo, fromMV_LOT, fromMV_Movement, fromMV_MotorDir, fromMV_ClearOrders, toMV_FloorArrival)
 	go ordercontrol.OrderControl(elevator, updateOC_PhysicalInfo, updateOC_AliveList, fromRX_OrderTableP, fromOC_OrderTable, updateTX_OTP, fromMV_ClearOrders, fromIO_BtnPress)
 	go rolemanager.RoleManager(elevator, updateRM_PhysicalInfo, fromRM_Role, fromRM_PrimaryId, fromRX_PhysicalInfo, fromRM_AliveList, fromRM_ResetVersion)
