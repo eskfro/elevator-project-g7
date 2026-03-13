@@ -1,5 +1,5 @@
 # elevator-project-g7
-Elevator project where the goal is to make fault tolerant code for a distributed system. Under no circumstances orders should not be lost.
+Elevator project where the goal is to make fault tolerant code for a distributed system. Under no circumstances orders should be lost.
 
 ### Info
 - Course: TTK4154 Real Time Programming
