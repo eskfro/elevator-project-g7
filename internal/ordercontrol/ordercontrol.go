@@ -84,7 +84,7 @@ func OrderControl(
 				sendUpdateFromOC(OrderTable, fromOC_OrderTable)
 			}
 
-		// =========================================================================== CLEAR ORDER FROM MV
+		// =========================================================================== CLEAR ORDER FROM MOVEMENT
 		case clearOrders := <-fromMV_ClearOrders:
 			log.Println("[OrderControl] Clear Order")
 			rcvOrderTable := OrderTable
@@ -107,7 +107,7 @@ func OrderControl(
 				sendUpdateFromOC(OrderTable, fromOC_OrderTable)
 			}
 
-		// =========================================================================== PACKET FROM NETWORK [RX]
+		// =========================================================================== PACKET FROM RECIEVER
 		case packet := <-fromRX_OrderTableP:
 			isMsgFromSelf := packet.Id == PhysicalInfo.Id
 			isChange := AllOrderTables[packet.Id] != packet.OrderTable
@@ -178,7 +178,7 @@ func updateOrderTable(
 			primaryOT = reassignHallOrders(primaryOT, PhysicalInfo.Id, ordersToReassign) // Eskil 13.03
 
 			// OrderStatus transitions
-			primaryOT = handlePrimaryStatusTransitions(primaryOT, primaryOT, rcvId, AliveList)
+			primaryOT = handlePrimaryStatusTransitions(primaryOT, primaryOT, AliveList)
 			AllOrderTables[PhysicalInfo.Id] = primaryOT
 
 			primaryOT = assignAndClearOrders(primaryOT, AliveList, AllOrderTables, PhysicalInfo)
@@ -199,7 +199,7 @@ func updateOrderTable(
 			primaryOT = reassignHallOrders(primaryOT, PhysicalInfo.Id, ordersToReassign) // Eskil 13.03
 
 			// OrderStatus transitions
-			primaryOT = handlePrimaryStatusTransitions(primaryOT, rcvOrderTable, rcvId, AliveList)
+			primaryOT = handlePrimaryStatusTransitions(primaryOT, rcvOrderTable, AliveList)
 
 			primaryOT = assignAndClearOrders(primaryOT, AliveList, AllOrderTables, PhysicalInfo)
 			isOrderTableChanged := primaryOT != prevOrderTable
@@ -345,7 +345,6 @@ func resolveDeadElevators(
 func handlePrimaryStatusTransitions(
 	OrderTable elev.OrderTable,
 	rcvOrderTable elev.OrderTable,
-	rcvId int,
 	AliveList elev.AliveList,
 ) elev.OrderTable {
 
@@ -376,7 +375,7 @@ func handlePrimaryStatusTransitions(
 					//isHallCall
 				} else {
 					// State machine logikk for OrderStatus transitions
-					primaryOT[elevIndex][floor][btn] = orderStatusTransition(elevIndex, primaryStatus, rcvStatus, rcvId)
+					primaryOT[elevIndex][floor][btn] = orderStatusTransition(primaryStatus, rcvStatus)
 				}
 			}
 		}
@@ -385,13 +384,9 @@ func handlePrimaryStatusTransitions(
 }
 
 func orderStatusTransition(
-	elevIndex int,
 	primaryStatus elev.OrderStatus,
 	rcvStatus elev.OrderStatus,
-	rcvId int,
 ) elev.OrderStatus {
-
-	//isOwner := rcvId == elevIndex
 
 	switch primaryStatus {
 
@@ -405,11 +400,6 @@ func orderStatusTransition(
 			return elev.OS_CLEAR
 		}
 		return elev.OS_REQUESTED
-
-	// case elev.OS_CONFIRMED:
-	// 	if rcvStatus == elev.OS_CLEAR && isOwner {
-	// 		return elev.OS_CLEAR
-	// 	}
 
 	case elev.OS_CONFIRMED:
 		if rcvStatus == elev.OS_CLEAR { // Eskil 13.03 -> Alle kan cleare en confirmed -> Litt usikker men gir mening

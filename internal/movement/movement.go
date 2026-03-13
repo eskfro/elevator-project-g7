@@ -7,7 +7,6 @@ import (
 	"elevator-project-g7/internal/timer"
 	"fmt"
 	"log"
-	"time"
 )
 
 // [X]
@@ -29,10 +28,11 @@ func Movement(
 		case newPhysicalInfo := <-updateMV_PhysicalInfo:
 			log.Println("[Movement] PhysicalInfo Update")
 			PhysicalInfo = newPhysicalInfo
-			// TODO: maybe remove ts
+
 			if PhysicalInfo.LocalOrderTable == prevLOT {
 				continue
 			}
+
 			PhysicalInfo = FSM_OnTableUpdate(PhysicalInfo, doorTimer, fromMV_LOT, fromMV_Movement, fromMV_MotorDir, fromMV_ClearOrder)
 			prevLOT = PhysicalInfo.LocalOrderTable
 
@@ -262,7 +262,6 @@ func FSM_OnDoorTimeout(
 		if anyOrderToClear(buttonsToClear) {
 			sendClearOrder(PhysicalInfo, buttonsToClear, fromMV_ClearOrder)
 		}
-
 		if PhysicalInfo.LocalOrderTable != prevLOT {
 			fromMV_LOT <- PhysicalInfo.LocalOrderTable
 		}
@@ -282,7 +281,7 @@ func FSM_OnDoorTimeout(
 	return PhysicalInfo
 }
 
-// Make this elevio maybe
+// TODO: Make this elevio maybe
 func SetAllLights(localOrderTable elev.LocalOrderTable) {
 	for f := 0; f < elev.N_FLOORS; f++ {
 		for b := 0; b < elev.N_BUTTONS; b++ {
@@ -291,7 +290,6 @@ func SetAllLights(localOrderTable elev.LocalOrderTable) {
 	}
 }
 
-// [X]
 func printElevatorMovement(state elev.ElevatorMovement) {
 
 	switch state {
@@ -306,17 +304,7 @@ func printElevatorMovement(state elev.ElevatorMovement) {
 	}
 }
 
-// TODO: slett før vi levera
-func GeneratePrintTimerEvents(printTimer chan<- bool) {
-	ticker := time.NewTicker(2000 * time.Millisecond)
-	defer ticker.Stop()
-	for range ticker.C {
-		printTimer <- true
-		fmt.Printf("timer\n")
-	}
-
-}
-
+// TODO: Lag slike funksjoner for fault tolerance kanskjer. Men vi setter aldri floor til (-1) da.
 func AT_IsValidCombination(floor int, movement elev.ElevatorMovement, doorOpen bool) {
 
 	movingWithOpenDoor := movement == elev.EM_Moving && doorOpen
@@ -324,8 +312,8 @@ func AT_IsValidCombination(floor int, movement elev.ElevatorMovement, doorOpen b
 
 	if movingWithOpenDoor || betweenFloorsWithOpenDoor {
 		// TODO: bytt til log.Fatalln() når vi vet at systemete fungerer
-		log.Println("AT_IsValidCombination triggered!")
 		log.Printf("floor = %d | movement = %d | doorOpen = %t \n", floor, movement, doorOpen)
+		log.Fatalln("AT_IsValidCombination triggered!")
 
 	}
 }

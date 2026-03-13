@@ -32,6 +32,7 @@ func Start(
 	timeStart := time.Now()
 	ticker_printElevator := time.NewTicker(1000 * time.Millisecond)
 	defer ticker_printElevator.Stop()
+	
 	// =================================================================== CHANNELS
 	// Movement
 	updateMV_PhysicalInfo := make(chan elev.ElevatorPhysicalInfo, 20)

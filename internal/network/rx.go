@@ -85,10 +85,13 @@ func RxOrderTableUDP(
 		select {
 
 		case thisRole = <-updateRX_Role:
+			log.Println("[RxOrderTableUDP] Role Update")
 
 		case primaryId = <-updateRX_PrimaryId:
+			log.Println("[RxOrderTableUDP] PrimaryId Update")
 
 		case resetIndex := <-fromRM_ResetVersion: //Eskil 12.03
+			log.Println("[RxOrderTableUDP] Version Reset")
 			versionsSeen[resetIndex] = 0
 
 		default:
@@ -115,6 +118,7 @@ func RxOrderTableUDP(
 					fromRX_OTP <- rcvOTP
 					continue
 				}
+				
 				// isThisBackup
 			} else {
 

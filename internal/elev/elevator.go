@@ -12,13 +12,13 @@ const N_BUTTONS = 3
 const N_MAX_ELEVS = 4
 
 const DOOR_OPEN_TIME = 3000 * time.Millisecond
-const HEARTBEAT_TIMEOUT = 500 * time.Millisecond
+const HEARTBEAT_TIMEOUT = 501 * time.Millisecond
 const PRIMARY_ELECTION_DELAY = 401 * time.Millisecond
 
 const INVALID_ELEVATOR_ID = N_MAX_ELEVS + 1
 const INVALID_PRIMARY_ID = N_MAX_ELEVS + 1
 
-// ================= ENUM TYPES ===============================
+// ==================================== CUSTOM TYPES
 
 type OrderStatus uint8
 
@@ -45,7 +45,13 @@ const (
 	ER_Primary ElevatorRole = 2
 )
 
-// ================ Helper Structs ===========================
+type LocalOrderTable [N_FLOORS][N_BUTTONS]bool
+type OrderTable [N_MAX_ELEVS][N_FLOORS][N_BUTTONS]OrderStatus
+type AllOrderTables [N_MAX_ELEVS]OrderTable
+type AliveList [N_MAX_ELEVS]ElevatorPhysicalInfo
+type ClearOrders [N_BUTTONS]Order
+
+// ===================================== STRUCTS
 
 type Order struct {
 	ElevId     int
@@ -58,15 +64,6 @@ type OrderTablePacket struct {
 	Version    uint64
 	OrderTable OrderTable
 }
-
-// ============ ELEVATOR CORE =======================================
-
-// Custom types
-type LocalOrderTable [N_FLOORS][N_BUTTONS]bool
-type OrderTable [N_MAX_ELEVS][N_FLOORS][N_BUTTONS]OrderStatus
-type AllOrderTables [N_MAX_ELEVS]OrderTable
-type AliveList [N_MAX_ELEVS]ElevatorPhysicalInfo
-type ClearOrders [N_BUTTONS]Order
 
 // Info about single elevator
 type ElevatorPhysicalInfo struct {
@@ -84,12 +81,14 @@ type ElevatorPhysicalInfo struct {
 
 // ELEVATOR
 type Elevator struct {
-	PhysicalInfo   ElevatorPhysicalInfo // Info about the single elevator
+	PhysicalInfo   ElevatorPhysicalInfo
 	OrderTable     OrderTable
 	AllOrderTables AllOrderTables
 	AliveList      AliveList
 	NumElevs       int
 }
+
+// ========================================= HELPER FUNCTIONS (TODO: slett eller flytt i egen fil)
 
 func CreateElevator(_Id int, _Port int, _Ip string) Elevator {
 	e := Elevator{PhysicalInfo: CreatePhysicalElevator(_Id, _Ip)}

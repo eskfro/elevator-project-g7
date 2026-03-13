@@ -39,9 +39,7 @@ func RoleManager(
 			fromRM_ResetVersion <- timedOutID
 			PhysicalInfo, AliveList = handleAliveListUpdate(PhysicalInfo, AliveList, timeStart, fromRM_AliveList, fromRM_PrimaryId, fromRM_Role, true, false)
 
-		// ============================================================================ HEARTBEAT RCV FROM NETWORK
 		case heartbeat := <-fromRX_PhysicalInfo:
-
 			// Always update watchdog timer
 			select {
 			case HeartBeatId <- heartbeat.Id:
@@ -53,7 +51,8 @@ func RoleManager(
 			isValidPrimaryId := heartbeat.PrimaryId != elev.INVALID_PRIMARY_ID
 			wasDead := AliveList[heartbeat.Id].Role == elev.ER_Dead
 
-			//I starten settes PrimaryId til INVALID. Da bryr man seg ikke om isHeartBeatUnchanged fordi man må uansett oppdatere PrimaryId
+			// I starten settes PrimaryId til INVALID.
+			// Da bryr man seg ikke om isHeartBeatUnchanged fordi man må uansett oppdatere PrimaryId
 			if isHeartbeatUnchanged && isValidPrimaryId && !wasDead {
 				continue
 			}
@@ -142,6 +141,13 @@ func handleAliveListUpdate(
 			fromRM_Role <- PhysicalInfo.Role
 
 		}
+
+		if wasDead {
+			fromRM_AliveList <- AliveList
+			fromRM_PrimaryId <- PhysicalInfo.PrimaryId
+			fromRM_Role <- PhysicalInfo.Role //IDK ABOUT THIS
+		}
+
 		return PhysicalInfo, AliveList
 	}
 	log.Println("[handleAliveListUpdate] Bottom Return Case")

@@ -80,25 +80,17 @@ func TxOrderTableUDP(
 	for {
 		select {
 
-		// case thisRole = <-updateTX_Role:
-
 		case newOTP := <-updateTX_OTP:
-			// Increment version before sending
+			// Increment version before updating packet info
 			var nextVersion uint64
-			// isThisPrimary := thisRole == elev.ER_Primary
-
 			nextVersion = versionTracker.Increment()
-
+			
 			newOTP.Version = nextVersion
-
 			latestPacket = newOTP
 
 		case <-ticker.C:
-			// Periodic rebroadcast of the last known state
-			// This helps elevators that were temporarily offline catch up
 			data, _ := json.Marshal(latestPacket)
 			conn.WriteTo(data, dst)
-			// log.Printf("======== [TxOrderTableUDO] Periodic Bcast =======\n")
 
 		}
 	}
