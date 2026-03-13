@@ -37,24 +37,24 @@ func Movement(
 				continue
 			}
 
-			physicalInfo = FSM_OnTableUpdate(physicalInfo, orderTable, aliveList, doorTimer, fromMV_LOT, fromMV_Movement, fromMV_MotorDir, fromMV_ClearOrder)
+			physicalInfo = fsm_OnTableUpdate(physicalInfo, orderTable, aliveList, doorTimer, fromMV_LOT, fromMV_Movement, fromMV_MotorDir, fromMV_ClearOrder)
 			prevLOT = physicalInfo.LocalOrderTable
 
 		case orderTable = <-updateMV_OrderTable:
-			SetAllLights(physicalInfo.LocalOrderTable, orderTable, aliveList)
+			setAllLights(physicalInfo.LocalOrderTable, orderTable, aliveList)
 
 		case aliveList = <-updateMV_AliveList:
-			SetAllLights(physicalInfo.LocalOrderTable, orderTable, aliveList)
+			setAllLights(physicalInfo.LocalOrderTable, orderTable, aliveList)
 
 		case <-doorTimer.C:
 			log.Println("[Movement] Doortimer Event")
-			physicalInfo = FSM_OnDoorTimeout(physicalInfo, orderTable, aliveList, doorTimer, fromMV_LOT, fromMV_Movement, fromMV_MotorDir, fromMV_ClearOrder)
+			physicalInfo = fsm_OnDoorTimeout(physicalInfo, orderTable, aliveList, doorTimer, fromMV_LOT, fromMV_Movement, fromMV_MotorDir, fromMV_ClearOrder)
 			prevLOT = physicalInfo.LocalOrderTable
 
 		case newFloor := <-toMV_FloorArrival:
 			fmt.Printf("[Movement]: Arrived at Floor = %d\n", newFloor)
 			physicalInfo.Floor = newFloor
-			physicalInfo = FSM_OnFloorArrival(physicalInfo, orderTable, aliveList, doorTimer, fromMV_LOT, fromMV_Movement, fromMV_ClearOrder)
+			physicalInfo = fsm_OnFloorArrival(physicalInfo, orderTable, aliveList, doorTimer, fromMV_LOT, fromMV_Movement, fromMV_ClearOrder)
 			prevLOT = physicalInfo.LocalOrderTable
 
 		}
@@ -82,7 +82,7 @@ func sendClearOrder(PhysicalInfo elev.ElevatorPhysicalInfo, buttonsToClear [elev
 	fromMV_ClearOrder <- clearOrder
 }
 
-func FSM_OnTableUpdate(
+func fsm_OnTableUpdate(
 	PhysicalInfo elev.ElevatorPhysicalInfo,
 	orderTable elev.OrderTable,
 	aliveList elev.AliveList,
@@ -109,7 +109,7 @@ func FSM_OnTableUpdate(
 
 			updated_LOT, buttonsToClear := requests.ClearCurrentFloor(PhysicalInfo.LocalOrderTable, PhysicalInfo.Floor, PhysicalInfo.MotorDir)
 			PhysicalInfo.LocalOrderTable = updated_LOT
-			SetAllLights(PhysicalInfo.LocalOrderTable, orderTable, aliveList)
+			setAllLights(PhysicalInfo.LocalOrderTable, orderTable, aliveList)
 
 			// Updates from MV
 			if anyOrderToClear(buttonsToClear) {
@@ -125,7 +125,7 @@ func FSM_OnTableUpdate(
 		}
 
 	case elev.EM_Moving:
-		SetAllLights(PhysicalInfo.LocalOrderTable, orderTable, aliveList)
+		setAllLights(PhysicalInfo.LocalOrderTable, orderTable, aliveList)
 
 	case elev.EM_Idle:
 		pair := requests.ChooseDirection(PhysicalInfo.LocalOrderTable, PhysicalInfo.Floor, PhysicalInfo.MotorDir)
@@ -141,7 +141,7 @@ func FSM_OnTableUpdate(
 
 		// Stay idle
 		if PhysicalInfo.Movement == elev.EM_Idle {
-			SetAllLights(PhysicalInfo.LocalOrderTable, orderTable, aliveList)
+			setAllLights(PhysicalInfo.LocalOrderTable, orderTable, aliveList)
 			return PhysicalInfo
 		}
 
@@ -155,7 +155,7 @@ func FSM_OnTableUpdate(
 
 			updated_LOT, buttonsToClear := requests.ClearCurrentFloor(PhysicalInfo.LocalOrderTable, PhysicalInfo.Floor, PhysicalInfo.MotorDir)
 			PhysicalInfo.LocalOrderTable = updated_LOT
-			SetAllLights(PhysicalInfo.LocalOrderTable, orderTable, aliveList)
+			setAllLights(PhysicalInfo.LocalOrderTable, orderTable, aliveList)
 
 			// Updates from MV
 			if anyOrderToClear(buttonsToClear) {
@@ -176,13 +176,13 @@ func FSM_OnTableUpdate(
 
 	}
 
-	SetAllLights(PhysicalInfo.LocalOrderTable, orderTable, aliveList)
+	setAllLights(PhysicalInfo.LocalOrderTable, orderTable, aliveList)
 	printElevatorMovement(PhysicalInfo.Movement)
 	return PhysicalInfo
 
 }
 
-func FSM_OnFloorArrival(
+func fsm_OnFloorArrival(
 	PhysicalInfo elev.ElevatorPhysicalInfo,
 	orderTable elev.OrderTable,
 	aliveList elev.AliveList,
@@ -213,7 +213,7 @@ func FSM_OnFloorArrival(
 	// Clear current floor
 	updated_LOT, buttonsToClear := requests.ClearCurrentFloor(PhysicalInfo.LocalOrderTable, PhysicalInfo.Floor, PhysicalInfo.MotorDir)
 	PhysicalInfo.LocalOrderTable = updated_LOT
-	SetAllLights(PhysicalInfo.LocalOrderTable, maskedOrderTable(orderTable, PhysicalInfo.Floor, buttonsToClear), aliveList)
+	setAllLights(PhysicalInfo.LocalOrderTable, maskedOrderTable(orderTable, PhysicalInfo.Floor, buttonsToClear), aliveList)
 
 	// Updates from MV
 	if anyOrderToClear(buttonsToClear) {
@@ -227,13 +227,13 @@ func FSM_OnFloorArrival(
 		fromMV_Movement <- PhysicalInfo.Movement
 	}
 
-	SetAllLights(PhysicalInfo.LocalOrderTable, orderTable, aliveList)
+	setAllLights(PhysicalInfo.LocalOrderTable, orderTable, aliveList)
 	printElevatorMovement(PhysicalInfo.Movement)
 	return PhysicalInfo
 
 }
 
-func FSM_OnDoorTimeout(
+func fsm_OnDoorTimeout(
 	PhysicalInfo elev.ElevatorPhysicalInfo,
 	orderTable elev.OrderTable,
 	aliveList elev.AliveList,
@@ -272,7 +272,7 @@ func FSM_OnDoorTimeout(
 		// Clear current floor
 		updated_LOT, buttonsToClear := requests.ClearCurrentFloor(PhysicalInfo.LocalOrderTable, PhysicalInfo.Floor, PhysicalInfo.MotorDir)
 		PhysicalInfo.LocalOrderTable = updated_LOT
-		SetAllLights(PhysicalInfo.LocalOrderTable, maskedOrderTable(orderTable, PhysicalInfo.Floor, buttonsToClear), aliveList)
+		setAllLights(PhysicalInfo.LocalOrderTable, maskedOrderTable(orderTable, PhysicalInfo.Floor, buttonsToClear), aliveList)
 
 		// Updates from MV
 		if anyOrderToClear(buttonsToClear) {
@@ -292,7 +292,7 @@ func FSM_OnDoorTimeout(
 
 	}
 
-	SetAllLights(PhysicalInfo.LocalOrderTable, orderTable, aliveList)
+	setAllLights(PhysicalInfo.LocalOrderTable, orderTable, aliveList)
 	printElevatorMovement(PhysicalInfo.Movement)
 	return PhysicalInfo
 }
@@ -310,7 +310,7 @@ func maskedOrderTable(orderTable elev.OrderTable, floor int, buttonsToClear [ele
 }
 
 // Føkka opp import-greier når eg flytta til elevio
-func SetAllLights(localOrderTable elev.LocalOrderTable, orderTable elev.OrderTable, aliveList elev.AliveList) {
+func setAllLights(localOrderTable elev.LocalOrderTable, orderTable elev.OrderTable, aliveList elev.AliveList) {
 	for floor := 0; floor < elev.N_FLOORS; floor++ {
 		for btn := 0; btn < elev.N_BUTTONS; btn++ {
 			shouldLightUp := false

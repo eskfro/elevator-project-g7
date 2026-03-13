@@ -6,15 +6,15 @@ import (
 )
 
 // Making channels for the inputs
-func Inputs() (chan ButtonEvent, chan int, chan bool) {
+func Inputs() (<-chan ButtonEvent, <-chan int, <-chan bool) {
 
 	fromIO_BtnPress := make(chan ButtonEvent, 50)
 	fromIO_Floor := make(chan int, 20)
 	fromIO_Obstruction := make(chan bool, 20)
 
-	go PollButtons(fromIO_BtnPress)
-	go PollFloorSensor(fromIO_Floor)
-	go PollObstructionSwitch(fromIO_Obstruction)
+	go pollButtons(fromIO_BtnPress)
+	go pollFloorSensor(fromIO_Floor)
+	go pollObstructionSwitch(fromIO_Obstruction)
 
 	return fromIO_BtnPress, fromIO_Floor, fromIO_Obstruction
 }

@@ -13,7 +13,7 @@ import (
 func TxHeartBeat(
 	initElev elev.Elevator,
 	port_hb int,
-	updateTX_PhysicalInfo chan elev.ElevatorPhysicalInfo) {
+	updateTX_PhysicalInfo <-chan elev.ElevatorPhysicalInfo) {
 
 	message := initElev.PhysicalInfo
 	address := BCAST_RCV_IP + ":" + strconv.Itoa(port_hb)
@@ -60,11 +60,11 @@ func TxHeartBeat(
 	}
 }
 
-func TxOrderTableUDP(
+func TxOrderTable(
 	initElev elev.Elevator,
 	port_ot int,
 	updateTX_OTP <-chan elev.OrderTablePacket,
-	updateTX_Role chan elev.ElevatorRole,
+	updateTX_Role <-chan elev.ElevatorRole,
 ) {
 
 	address := BCAST_RCV_IP + ":" + strconv.Itoa(port_ot)
@@ -83,8 +83,8 @@ func TxOrderTableUDP(
 		case newOTP := <-updateTX_OTP:
 			// Increment version before updating packet info
 			var nextVersion uint64
-			nextVersion = versionTracker.Increment()
-			
+			nextVersion = versionTracker.increment()
+
 			newOTP.Version = nextVersion
 			latestPacket = newOTP
 

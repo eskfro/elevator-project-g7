@@ -13,10 +13,11 @@ func OrderControl(
 	updateOC_PhysicalInfo <-chan elev.ElevatorPhysicalInfo,
 	updateOC_AliveList <-chan elev.AliveList,
 	fromRX_OrderTableP <-chan elev.OrderTablePacket,
+	fromMV_ClearOrders <-chan elev.ClearOrders,
+	fromIO_BtnPress <-chan elevio.ButtonEvent,
 	fromOC_OrderTable chan<- elev.OrderTable,
 	updateTX_OTP chan<- elev.OrderTablePacket,
-	fromMV_ClearOrders <-chan elev.ClearOrders,
-	fromIO_BtnPress <-chan elevio.ButtonEvent) {
+) {
 
 	// Local to OrderControl
 	orderTable := initElev.OrderTable
@@ -139,11 +140,12 @@ func OrderControl(
 	}
 }
 
+// TODO: Er det nødvendig å ha denne funksjonen?
 func sendUpdateFromOC(
-	OrderTable elev.OrderTable,
+	orderTable elev.OrderTable,
 	fromOC_OrderTable chan<- elev.OrderTable,
 ) {
-	fromOC_OrderTable <- OrderTable
+	fromOC_OrderTable <- orderTable
 }
 
 // Her oppdaterer man OrderTable. Det er tre måter OrderTable oppdateres:
@@ -154,24 +156,24 @@ func updateOrderTable(
 	OrderTable elev.OrderTable,
 	rcvOrderTable elev.OrderTable,
 	rcvId int,
-	AllOrderTables elev.AllOrderTables,
-	PhysicalInfo elev.ElevatorPhysicalInfo,
-	AliveList elev.AliveList,
+	allOrderTables elev.AllOrderTables,
+	physicalInfo elev.ElevatorPhysicalInfo,
+	aliveList elev.AliveList,
 	updateTX_OTP chan<- elev.OrderTablePacket,
 ) elev.OrderTable {
 
 	prevOrderTable := OrderTable
-	isMsgFromSelf := rcvId == PhysicalInfo.Id
-	isMsgFromPrimary := rcvId == PhysicalInfo.PrimaryId
+	isMsgFromSelf := rcvId == physicalInfo.Id
+	isMsgFromPrimary := rcvId == physicalInfo.PrimaryId
 
-	switch PhysicalInfo.Role {
+	switch physicalInfo.Role {
 
 	case elev.ER_Backup:
 		// Backup stupid af 💀
 
 		// New Clear Order or BtnPress
 		if isMsgFromSelf || isMsgFromPrimary {
-			updateTX_OTP <- elev.OrderTablePacket{Id: PhysicalInfo.Id, OrderTable: rcvOrderTable}
+			updateTX_OTP <- elev.OrderTablePacket{Id: physicalInfo.Id, OrderTable: rcvOrderTable}
 			return rcvOrderTable
 		}
 
@@ -183,19 +185,19 @@ func updateOrderTable(
 			primaryOT = rcvOrderTable
 
 			// Resolve dead elevators
-			primaryOT, ordersToReassign := resolveDeadElevators(primaryOT, AliveList)
-			primaryOT = reassignHallOrders(primaryOT, PhysicalInfo.Id, ordersToReassign) // Eskil 13.03
+			primaryOT, ordersToReassign := resolveDeadElevators(primaryOT, aliveList)
+			primaryOT = reassignHallOrders(primaryOT, physicalInfo.Id, ordersToReassign) // Eskil 13.03
 
 			// OrderStatus transitions
-			primaryOT = handlePrimaryStatusTransitions(primaryOT, primaryOT, AliveList)
-			AllOrderTables[PhysicalInfo.Id] = primaryOT
+			primaryOT = handlePrimaryStatusTransitions(primaryOT, primaryOT, aliveList)
+			allOrderTables[physicalInfo.Id] = primaryOT
 
-			primaryOT = assignAndClearOrders(primaryOT, AliveList, AllOrderTables, PhysicalInfo)
+			primaryOT = assignAndClearOrders(primaryOT, aliveList, allOrderTables, physicalInfo.Id)
 			isOrderTableChanged := primaryOT != prevOrderTable
 
 			if isOrderTableChanged {
 				// Send to network
-				updateTX_OTP <- elev.OrderTablePacket{Id: PhysicalInfo.Id, OrderTable: primaryOT}
+				updateTX_OTP <- elev.OrderTablePacket{Id: physicalInfo.Id, OrderTable: primaryOT}
 			}
 
 			return primaryOT
@@ -204,18 +206,18 @@ func updateOrderTable(
 		} else {
 
 			// Resolve dead elevators
-			primaryOT, ordersToReassign := resolveDeadElevators(primaryOT, AliveList)
-			primaryOT = reassignHallOrders(primaryOT, PhysicalInfo.Id, ordersToReassign) // Eskil 13.03
+			primaryOT, ordersToReassign := resolveDeadElevators(primaryOT, aliveList)
+			primaryOT = reassignHallOrders(primaryOT, physicalInfo.Id, ordersToReassign) // Eskil 13.03
 
 			// OrderStatus transitions
-			primaryOT = handlePrimaryStatusTransitions(primaryOT, rcvOrderTable, AliveList)
+			primaryOT = handlePrimaryStatusTransitions(primaryOT, rcvOrderTable, aliveList)
 
-			primaryOT = assignAndClearOrders(primaryOT, AliveList, AllOrderTables, PhysicalInfo)
+			primaryOT = assignAndClearOrders(primaryOT, aliveList, allOrderTables, physicalInfo.Id)
 			isOrderTableChanged := primaryOT != prevOrderTable
 
 			if isOrderTableChanged {
 				// Send to network
-				updateTX_OTP <- elev.OrderTablePacket{Id: PhysicalInfo.Id, OrderTable: primaryOT}
+				updateTX_OTP <- elev.OrderTablePacket{Id: physicalInfo.Id, OrderTable: primaryOT}
 			}
 
 			return primaryOT
@@ -227,23 +229,19 @@ func updateOrderTable(
 }
 
 func assignAndClearOrders(
-	OrderTable elev.OrderTable,
-	AliveList elev.AliveList,
-	AllOrderTables elev.AllOrderTables,
-	PhysicalInfo elev.ElevatorPhysicalInfo,
+	primaryOT elev.OrderTable,
+	aliveList elev.AliveList,
+	allOrderTables elev.AllOrderTables,
+	thisID int,
 ) elev.OrderTable {
 
-	thisId := PhysicalInfo.Id
-	primaryOT := OrderTable
-
-	// Assign Orders
 	for floor := 0; floor < elev.N_FLOORS; floor++ {
 		for btn := 0; btn < elev.N_BUTTONS; btn++ {
 			isCab := elevio.ButtonType(btn) == elevio.BT_Cab
 
 			if isCab {
 				for elevId := 0; elevId < elev.N_MAX_ELEVS; elevId++ {
-					isDeadElev := AliveList[elevId].Role == elev.ER_Dead
+					isDeadElev := aliveList[elevId].Role == elev.ER_Dead
 					if isDeadElev {
 						continue
 					}
@@ -254,41 +252,41 @@ func assignAndClearOrders(
 						primaryOT[elevId][floor][btn] = elev.OS_NO_ORDER
 					}
 				}
-				AllOrderTables[thisId] = primaryOT
+				allOrderTables[thisID] = primaryOT
 				continue
 
 				//isHall
 			} else {
 				for orderElevId := 0; orderElevId < elev.N_MAX_ELEVS; orderElevId++ {
-					isDeadElev := AliveList[orderElevId].Role == elev.ER_Dead
+					isDeadElev := aliveList[orderElevId].Role == elev.ER_Dead
 					if isDeadElev {
 						continue
 					}
 
-					if isRequestedByAll(AllOrderTables, AliveList, floor, btn, orderElevId) {
+					if isRequestedByAll(allOrderTables, aliveList, floor, btn, orderElevId) {
 
-						if isAlreadyConfirmed(AliveList, primaryOT, floor, btn) {
+						if isAlreadyConfirmed(aliveList, primaryOT, floor, btn) {
 							continue
 						}
 
-						bestElevId := calculateBestElevator(floor, primaryOT, AliveList)
+						bestElevId := calculateBestElevator(floor, primaryOT, aliveList)
 						log.Printf("[OrderControl] bestId = %d\n", bestElevId)
 
 						primaryOT[bestElevId][floor][btn] = elev.OS_CONFIRMED
-						AllOrderTables[thisId] = primaryOT
+						allOrderTables[thisID] = primaryOT
 						continue
 					}
 
-					if isClearedByAny(AllOrderTables, AliveList, floor, btn, orderElevId) {
+					if isClearedByAny(allOrderTables, aliveList, floor, btn, orderElevId) {
 						// Set the Primary OrderTable
 						for elevID := 0; elevID < elev.N_MAX_ELEVS; elevID++ {
-							isDeadElev := AliveList[elevID].Role == elev.ER_Dead
+							isDeadElev := aliveList[elevID].Role == elev.ER_Dead
 							if isDeadElev {
 								continue
 							}
 							primaryOT[elevID][floor][btn] = elev.OS_NO_ORDER
 						}
-						AllOrderTables[thisId] = primaryOT
+						allOrderTables[thisID] = primaryOT
 					}
 				}
 			}
@@ -317,15 +315,14 @@ func reassignHallOrders(
 }
 
 func resolveDeadElevators(
-	OrderTable elev.OrderTable,
-	AliveList elev.AliveList,
+	primaryOT elev.OrderTable,
+	aliveList elev.AliveList,
 ) (elev.OrderTable, elev.LocalOrderTable) {
 
-	primaryOT := OrderTable
 	var ordersToReassign elev.LocalOrderTable
 
 	for elevID := 0; elevID < elev.N_MAX_ELEVS; elevID++ {
-		isDeadElev := AliveList[elevID].Role == elev.ER_Dead
+		isDeadElev := aliveList[elevID].Role == elev.ER_Dead
 		if !isDeadElev {
 			continue
 		}
@@ -352,13 +349,10 @@ func resolveDeadElevators(
 }
 
 func handlePrimaryStatusTransitions(
-	OrderTable elev.OrderTable,
-	rcvOrderTable elev.OrderTable,
+	primaryOT elev.OrderTable,
+	rcvOT elev.OrderTable,
 	AliveList elev.AliveList,
 ) elev.OrderTable {
-
-	primaryOT := OrderTable
-	rcvOT := rcvOrderTable
 
 	for elevIndex := 0; elevIndex < elev.N_MAX_ELEVS; elevIndex++ {
 		isDeadElev := AliveList[elevIndex].Role == elev.ER_Dead
@@ -425,19 +419,19 @@ func orderStatusTransition(
 }
 
 func isRequestedByAll(
-	AllOrderTables elev.AllOrderTables,
-	AliveList elev.AliveList,
+	allOrderTables elev.AllOrderTables,
+	aliveList elev.AliveList,
 	floor int,
 	btn int,
 	orderElevId int,
 ) bool {
 
 	for elevIndex := 0; elevIndex < elev.N_MAX_ELEVS; elevIndex++ {
-		isDeadElev := AliveList[elevIndex].Role == elev.ER_Dead
+		isDeadElev := aliveList[elevIndex].Role == elev.ER_Dead
 		if isDeadElev {
 			continue
 		}
-		isRequested := AllOrderTables[elevIndex][orderElevId][floor][btn] == elev.OS_REQUESTED
+		isRequested := allOrderTables[elevIndex][orderElevId][floor][btn] == elev.OS_REQUESTED
 		if !isRequested {
 			return false
 		}
@@ -446,20 +440,20 @@ func isRequestedByAll(
 }
 
 func isClearedByAny(
-	AllOrderTables elev.AllOrderTables,
-	AliveList elev.AliveList,
+	allOrderTables elev.AllOrderTables,
+	aliveList elev.AliveList,
 	floor int,
 	btn int,
 	orderElevId int,
 ) bool {
 
 	for elevIndex := 0; elevIndex < elev.N_MAX_ELEVS; elevIndex++ {
-		isDeadElev := AliveList[elevIndex].Role == elev.ER_Dead
+		isDeadElev := aliveList[elevIndex].Role == elev.ER_Dead
 		if isDeadElev {
 			continue
 		}
 
-		if AllOrderTables[elevIndex][orderElevId][floor][btn] == elev.OS_CLEAR {
+		if allOrderTables[elevIndex][orderElevId][floor][btn] == elev.OS_CLEAR {
 			return true
 		}
 	}

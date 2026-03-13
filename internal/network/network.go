@@ -31,7 +31,7 @@ var lc = net.ListenConfig{
 }
 
 func GetLocalIP() string {
-	addr, _ := LocalIP()
+	addr, _ := localIP()
 	return addr
 }
 
@@ -40,15 +40,9 @@ type VersionTracker struct {
 	currentVersion uint64
 }
 
-func (v *VersionTracker) Increment() uint64 {
+func (v *VersionTracker) increment() uint64 {
 	v.Lock()
 	defer v.Unlock()
 	v.currentVersion++
-	return v.currentVersion
-}
-
-func (v *VersionTracker) Get() uint64 {
-	v.Lock()
-	defer v.Unlock()
 	return v.currentVersion
 }

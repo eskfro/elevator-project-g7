@@ -70,7 +70,7 @@ func SetStopLamp(value bool) {
 	write([4]byte{5, toByte(value), 0, 0})
 }
 
-func PollButtons(receiver chan<- ButtonEvent) {
+func pollButtons(receiver chan<- ButtonEvent) {
 	prev := make([][3]bool, _numFloors)
 	for {
 		time.Sleep(_pollRate)
@@ -86,7 +86,7 @@ func PollButtons(receiver chan<- ButtonEvent) {
 	}
 }
 
-func PollFloorSensor(receiver chan<- int) {
+func pollFloorSensor(receiver chan<- int) {
 	prev := -1
 	for {
 		time.Sleep(_pollRate)
@@ -98,7 +98,7 @@ func PollFloorSensor(receiver chan<- int) {
 	}
 }
 
-func PollStopButton(receiver chan<- bool) {
+func pollStopButton(receiver chan<- bool) {
 	prev := false
 	for {
 		time.Sleep(_pollRate)
@@ -110,7 +110,7 @@ func PollStopButton(receiver chan<- bool) {
 	}
 }
 
-func PollObstructionSwitch(receiver chan<- bool) {
+func pollObstructionSwitch(receiver chan<- bool) {
 	prev := false
 	for {
 		time.Sleep(_pollRate)

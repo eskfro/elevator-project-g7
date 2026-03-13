@@ -5,16 +5,16 @@ import (
 	"strings"
 )
 
-var localIP string
+var localIP_addr string
 
-func LocalIP() (string, error) {
-	if localIP == "" {
+func localIP() (string, error) {
+	if localIP_addr == "" {
 		conn, err := net.DialTCP("tcp4", nil, &net.TCPAddr{IP: []byte{8, 8, 8, 8}, Port: 53})
 		if err != nil {
 			return "", err
 		}
 		defer conn.Close()
-		localIP = strings.Split(conn.LocalAddr().String(), ":")[0]
+		localIP_addr = strings.Split(conn.LocalAddr().String(), ":")[0]
 	}
-	return localIP, nil
+	return localIP_addr, nil
 }

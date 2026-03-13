@@ -12,7 +12,7 @@ import (
 
 func RxHeartBeat(
 	port_hb int,
-	fromRX_PhysicalInfo chan elev.ElevatorPhysicalInfo,
+	fromRX_PhysicalInfo chan<- elev.ElevatorPhysicalInfo,
 	thisElevId int) {
 
 	addr := ":" + strconv.Itoa(port_hb)
@@ -61,13 +61,13 @@ func RxHeartBeat(
 	}
 }
 
-func RxOrderTableUDP(
+func RxOrderTable(
 	initElev elev.Elevator,
 	port_ot int,
+	updateRX_Role <-chan elev.ElevatorRole,
+	updateRX_PrimaryId <-chan int,
+	fromRM_ResetVersion <-chan int,
 	fromRX_OTP chan<- elev.OrderTablePacket,
-	updateRX_Role chan elev.ElevatorRole,
-	updateRX_PrimaryId chan int,
-	fromRM_ResetVersion chan int,
 ) {
 
 	thisRole := initElev.PhysicalInfo.Role
@@ -119,7 +119,7 @@ func RxOrderTableUDP(
 					continue
 				}
 
-				// isThisBackup
+				// isThisBackup //TODO: Denne kommentaren stemmer vel ikkje heilt?
 			} else {
 
 				if isMsgFromPrimary && isRcvVersionNewer {

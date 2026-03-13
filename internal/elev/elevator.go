@@ -88,16 +88,16 @@ type Elevator struct {
 	NumElevs       int
 }
 
-// ========================================= HELPER FUNCTIONS (TODO: slett eller flytt i egen fil)
+// ========================================= HELPER FUNCTIONS (TODO: slett eller flytt i egen fil [Koffor d🤔?]) 
 
 func CreateElevator(_Id int, _Port int, _Ip string) Elevator {
-	elevator := Elevator{PhysicalInfo: CreatePhysicalElevator(_Id, _Ip)}
+	elevator := Elevator{PhysicalInfo: createPhysicalElevator(_Id, _Ip)}
 	elevator.AliveList[_Id] = elevator.PhysicalInfo
 	elevator.NumElevs = 1
 	return elevator
 }
 
-func CreatePhysicalElevator(_Id int, _Ip string) ElevatorPhysicalInfo {
+func createPhysicalElevator(_Id int, _Ip string) ElevatorPhysicalInfo {
 	physicalElevator := ElevatorPhysicalInfo{
 		Id:         _Id,
 		Role:       ER_Backup,

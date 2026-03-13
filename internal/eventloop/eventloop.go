@@ -69,12 +69,12 @@ func Start(
 
 	// Start modules
 	go movement.Movement(elevator, updateMV_PhysicalInfo, updateMV_OrderTable, updateMV_AliveList, fromMV_LOT, fromMV_Movement, fromMV_MotorDir, fromMV_ClearOrders, toMV_FloorArrival)
-	go ordercontrol.OrderControl(elevator, updateOC_PhysicalInfo, updateOC_AliveList, fromRX_OrderTableP, fromOC_OrderTable, updateTX_OTP, fromMV_ClearOrders, fromIO_BtnPress)
+	go ordercontrol.OrderControl(elevator, updateOC_PhysicalInfo, updateOC_AliveList, fromRX_OrderTableP, fromMV_ClearOrders, fromIO_BtnPress, fromOC_OrderTable, updateTX_OTP)
 	go rolemanager.RoleManager(elevator, fromRX_PhysicalInfo, updateRM_PhysicalInfo, fromRM_Role, fromRM_PrimaryId, fromRM_AliveList, fromRM_ResetVersion)
 	go network.TxHeartBeat(elevator, ports.HeartBeat, updateTX_PhysicalInfo)
 	go network.RxHeartBeat(ports.HeartBeat, fromRX_PhysicalInfo, elevator.PhysicalInfo.Id)
-	go network.TxOrderTableUDP(elevator, ports.OrderTableP, updateTX_OTP, updateTX_Role)
-	go network.RxOrderTableUDP(elevator, ports.OrderTableP, fromRX_OrderTableP, updateRX_Role, updateRX_PrimaryId, fromRM_ResetVersion)
+	go network.TxOrderTable(elevator, ports.OrderTableP, updateTX_OTP, updateTX_Role)
+	go network.RxOrderTable(elevator, ports.OrderTableP, updateRX_Role, updateRX_PrimaryId, fromRM_ResetVersion, fromRX_OrderTableP)
 
 	// ========================================================================= PRINT DEBUGGING
 	go func() {
