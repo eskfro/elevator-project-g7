@@ -1,8 +1,8 @@
 - 1 Alle heisene må lyse når det er en confirmed hall ordre i (floor, btn) //DONE (Tok masse lengre tid enn vi trudde)
 - 2 Fjern ch_ // DONE
 - 3 Heile oppsettet // DONE
-- 4 Fikse <-chan eller chan<- som parameter i ALLE funksjoner //DONE (Trur eg)
+- 4 Fikse <-chan eller chan<- som parameter i ALLE funksjoner //DONE
 - 5 Timer som redistribuerer ordre dersom ikke tidsfrist nås -> primary kan gjøre dette, evt heisen som tar ordren, mange måter sikkert. Tipper den beste måten er å gjøre dette mellom hver floor, da det er den casen der motoren stopper mellom floor som testes tipper jeg.
 - 6 Fjerne funksjoner vi ikke bruker // DONE (ish)
-- 7 Ordne snakeCase: AliveList -> aliveList, utenom i structs der vi vil det skal være public
+- 7 Ordne snakeCase: AliveList -> aliveList, utenom i structs der vi vil det skal være public //Har ikkje sett på medlemsvariable i structs, ellers done
 - 8 Når en ny primary velges blir det noen ganger en stuck ordre som står confirmed og ikke vil cleares. Sikkert noe med clearingen å gjøre //DONE
