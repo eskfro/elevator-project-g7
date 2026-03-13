@@ -12,7 +12,6 @@ type DirnMovementPair struct {
 }
 
 func RequestAbove(LocalOrderTable elev.LocalOrderTable, currentFloor int) bool {
-
 	for f := currentFloor + 1; f < elev.N_FLOORS; f++ {
 		for b := 0; b < elev.N_BUTTONS; b++ {
 			if LocalOrderTable[f][b] {
@@ -24,7 +23,6 @@ func RequestAbove(LocalOrderTable elev.LocalOrderTable, currentFloor int) bool {
 }
 
 func RequestBelow(LocalOrderTable elev.LocalOrderTable, currentFloor int) bool {
-
 	for f := 0; f < currentFloor; f++ {
 		for b := 0; b < elev.N_BUTTONS; b++ {
 			if LocalOrderTable[f][b] {
@@ -36,7 +34,6 @@ func RequestBelow(LocalOrderTable elev.LocalOrderTable, currentFloor int) bool {
 }
 
 func RequestHere(LocalOrderTable elev.LocalOrderTable, currentFloor int) bool {
-
 	for b := 0; b < elev.N_BUTTONS; b++ {
 		if LocalOrderTable[currentFloor][b] {
 			return true

@@ -2,5 +2,7 @@
 - 2 Fjern ch_ // DONE
 - 3 Heile oppsettet // DONE
 - 4 Fikse <-chan eller chan<- som parameter i ALLE funksjoner
-- 5 Timer som redistribuerer ordre dersom ikke tidsfrist nås -> primary kan gjøre dette
-- 6 Fjerne funksjoner vi ikke bruker
+- 5 Timer som redistribuerer ordre dersom ikke tidsfrist nås -> primary kan gjøre dette, evt heisen som tar ordren, mange måter sikkert.
+- 6 Fjerne funksjoner vi ikke bruker // DONE (ish)
+- 7 Ordne snakeCase: AliveList -> aliveList, utenom i structs der vi vil det skal være public
+- 8 Når en ny primary velges blir det noen ganger en stuck ordre som står confirmed og ikke vil cleares. Sikkert noe med clearingen å gjøre

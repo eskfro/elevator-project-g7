@@ -1,4 +1,4 @@
-package coordinator
+package eventloop
 
 import (
 	"elevator-project-g7/internal/elev"
@@ -64,7 +64,7 @@ func Start(
 	fromRX_OrderTableP := make(chan elev.OrderTablePacket, 50)
 	fromRX_PhysicalInfo := make(chan elev.ElevatorPhysicalInfo, 50)
 
-	// Modules
+	// Start modules
 	go movement.Movement(elevator, updateMV_PhysicalInfo, fromMV_LOT, fromMV_Movement, fromMV_MotorDir, fromMV_ClearOrders, toMV_FloorArrival)
 	go ordercontrol.OrderControl(elevator, updateOC_PhysicalInfo, updateOC_AliveList, fromRX_OrderTableP, fromOC_OrderTable, updateTX_OTP, fromMV_ClearOrders, fromIO_BtnPress)
 	go rolemanager.RoleManager(elevator, updateRM_PhysicalInfo, fromRM_Role, fromRM_PrimaryId, fromRX_PhysicalInfo, fromRM_AliveList, fromRM_ResetVersion)

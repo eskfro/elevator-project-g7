@@ -20,32 +20,32 @@ func Movement(
 	fromMV_ClearOrder chan elev.ClearOrders,
 	toMV_FloorArrival chan int) {
 
-	MV_PhysicalInfo := initElev.PhysicalInfo
-	MV_prevLOT := initElev.PhysicalInfo.LocalOrderTable
+	PhysicalInfo := initElev.PhysicalInfo
+	prevLOT := initElev.PhysicalInfo.LocalOrderTable
 	doorTimer := timer.New(elev.DOOR_OPEN_TIME)
 
 	for {
 		select {
 		case newPhysicalInfo := <-updateMV_PhysicalInfo:
 			log.Println("[Movement] PhysicalInfo Update")
-			MV_PhysicalInfo = newPhysicalInfo
+			PhysicalInfo = newPhysicalInfo
 			// TODO: maybe remove ts
-			if MV_PhysicalInfo.LocalOrderTable == MV_prevLOT {
+			if PhysicalInfo.LocalOrderTable == prevLOT {
 				continue
 			}
-			MV_PhysicalInfo = FSM_OnTableUpdate(MV_PhysicalInfo, doorTimer, fromMV_LOT, fromMV_Movement, fromMV_MotorDir, fromMV_ClearOrder)
-			MV_prevLOT = MV_PhysicalInfo.LocalOrderTable
+			PhysicalInfo = FSM_OnTableUpdate(PhysicalInfo, doorTimer, fromMV_LOT, fromMV_Movement, fromMV_MotorDir, fromMV_ClearOrder)
+			prevLOT = PhysicalInfo.LocalOrderTable
 
 		case <-doorTimer.C:
 			log.Println("[Movement] Doortimer Event")
-			MV_PhysicalInfo = FSM_OnDoorTimeout(MV_PhysicalInfo, doorTimer, fromMV_LOT, fromMV_Movement, fromMV_MotorDir, fromMV_ClearOrder)
-			MV_prevLOT = MV_PhysicalInfo.LocalOrderTable
+			PhysicalInfo = FSM_OnDoorTimeout(PhysicalInfo, doorTimer, fromMV_LOT, fromMV_Movement, fromMV_MotorDir, fromMV_ClearOrder)
+			prevLOT = PhysicalInfo.LocalOrderTable
 
 		case newFloor := <-toMV_FloorArrival:
 			fmt.Printf("[Movement]: Arrived at Floor = %d\n", newFloor)
-			MV_PhysicalInfo.Floor = newFloor
-			MV_PhysicalInfo = FSM_OnFloorArrival(MV_PhysicalInfo, doorTimer, fromMV_LOT, fromMV_Movement, fromMV_ClearOrder)
-			MV_prevLOT = MV_PhysicalInfo.LocalOrderTable
+			PhysicalInfo.Floor = newFloor
+			PhysicalInfo = FSM_OnFloorArrival(PhysicalInfo, doorTimer, fromMV_LOT, fromMV_Movement, fromMV_ClearOrder)
+			prevLOT = PhysicalInfo.LocalOrderTable
 
 		}
 	}
@@ -149,7 +149,6 @@ func FSM_OnTableUpdate(
 			if anyOrderToClear(buttonsToClear) {
 				sendClearOrder(PhysicalInfo, buttonsToClear, fromMV_ClearOrder)
 			}
-
 			if PhysicalInfo.LocalOrderTable != prevLOT {
 				fromMV_LOT <- PhysicalInfo.LocalOrderTable
 			}

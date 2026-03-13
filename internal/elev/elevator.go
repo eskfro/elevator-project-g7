@@ -86,7 +86,7 @@ type ElevatorPhysicalInfo struct {
 type Elevator struct {
 	PhysicalInfo   ElevatorPhysicalInfo // Info about the single elevator
 	OrderTable     OrderTable
-	AllOrderTables AllOrderTables //Primary
+	AllOrderTables AllOrderTables
 	AliveList      AliveList
 	NumElevs       int
 }
