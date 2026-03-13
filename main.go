@@ -25,5 +25,3 @@ func main() {
 	eventloop.Start(elevator, ports, fromIO_BtnPress, fromIO_Floor, fromIO_Obstruction)
 
 }
-
-// TODO: Av og til når en ny heis kommer på nettverket så fungerer ikke ordre får en cab trykk på sin egen.
