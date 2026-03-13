@@ -1,5 +1,5 @@
 # elevator-project-g7
-Elevator project 
+Elevator project where the goal is to make fault tolerant code for a distributed system. Under no circumstances orders should not be lost.
 
 ### Info
 - Course: TTK4154 Real Time Programming
@@ -14,10 +14,10 @@ Elevator project
 - make build
 
 ### Run simulator
-- ./out <id> <hardwarePort> <ordertablePort> <heartbeatPort>
-- ./SimElevatorServer --port <hardwarePort>
-or
-- make sim1 || make sim2 || make sim3
+- ./out id hardwarePort ordertablePort heartbeatPort
+- ./SimElevatorServer --port hardwarePort <br>
+or <br>
+- make sim0, make sim1, make sim2
 - make simall
 
 ### Kill simulator 
