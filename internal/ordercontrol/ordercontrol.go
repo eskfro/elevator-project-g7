@@ -35,6 +35,16 @@ func OrderControl(
 		// Directly from rolemanager
 		case newAliveList := <-updateOC_AliveList:
 			log.Println("[OrderControl] AliveList Update")
+
+			// Remove old data from dead elevators
+			for elevId := 0; elevId < elev.N_MAX_ELEVS; elevId++ {
+				wasDead := AliveList[elevId].Role == elev.ER_Dead
+				isAlive := newAliveList[elevId].Role != elev.ER_Dead
+				if wasDead && isAlive {
+					AllOrderTables[elevId] = elev.OrderTable{}
+				}
+			}
+
 			isAliveListChanged := newAliveList != AliveList
 			AliveList = newAliveList
 

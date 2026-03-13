@@ -105,20 +105,20 @@ func RxOrderTableUDP(
 
 			isThisPrimary := thisRole == elev.ER_Primary
 			isRcvVersionNewer := rcvOTP.Version > versionsSeen[rcvOTP.Id]
-			isRcvVersionOne := rcvOTP.Version == 1
+			isRcvVersionInit := rcvOTP.Version <= 1
 
 			isMsgFromSelf := rcvOTP.Id == thisId
 			isMsgFromPrimary := rcvOTP.Id == primaryId
 
 			if isThisPrimary && !isMsgFromSelf {
 
-				if isRcvVersionOne || isRcvVersionNewer { //Eskil 12.03 -> reset when a dead elev spawns
+				if isRcvVersionInit || isRcvVersionNewer { //Eskil 12.03 -> reset when a dead elev spawns
 					log.Println("[RxOrderTableP] Got message from backup")
 					versionsSeen[rcvOTP.Id] = rcvOTP.Version
 					fromRX_OTP <- rcvOTP
 					continue
 				}
-				
+
 				// isThisBackup
 			} else {
 
