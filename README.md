@@ -1,7 +1,25 @@
 # elevator-project-g7
-- Group 7 - 2026V
-- Elevator project TTK4154 Real Time Programming
-- This is repo no2 - we are investigating multiple ways to make the intended modules in golang.
-# Project so far
-<img width="521" height="505" alt="git_funny" src="https://github.com/user-attachments/assets/0eaf33ce-0bb0-42f0-a908-c74d748e8b42" />
+Elevator project 
+
+### Info
+- Course: TTK4154 Real Time Programming
+- Group: 7 
+- Semester: 2026V
+- Collaborators: Marius and Eskil
+
+### Dependencies 
+- Golang 1.20
+
+### Build
+- make build
+
+### Run simulator
+- ./out <id> <hardwarePort> <ordertablePort> <heartbeatPort>
+- ./SimElevatorServer --port <hardwarePort>
+or
+- make sim1 || make sim2 || make sim3
+- make simall
+
+### Kill simulator 
+- make kill
 
