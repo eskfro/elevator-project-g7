@@ -19,7 +19,7 @@ func Inputs() (chan ButtonEvent, chan int, chan bool) {
 	return fromIO_BtnPress, fromIO_Floor, fromIO_Obstruction
 }
 
-func PrintStopButton(chanStopButton chan bool) {
+func PrintStopButton(chanStopButton <-chan bool) {
 	counter := 0
 	for press := range chanStopButton {
 

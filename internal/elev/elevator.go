@@ -126,12 +126,12 @@ func PrintElevatorInfo(elevator Elevator, uptime float64) {
 
 	fmt.Printf("--------------------------------\n")
 	fmt.Printf("ELEVATOR %d ", elevator.PhysicalInfo.Id)
-	fmt.Printf(" [ " + ElevatorRoleToString(elevator.PhysicalInfo.Role) + " ] ")
+	fmt.Printf(" [ %s ] ", elevator.PhysicalInfo.Role)
 	fmt.Printf(" < " + elevator.PhysicalInfo.Ip + " > |")
 	fmt.Printf(" t = " + uptimeString + "s |")
 	fmt.Printf(" primaryId = %d\n", elevator.PhysicalInfo.PrimaryId)
 	fmt.Printf("--------------------------------\n")
-	fmt.Printf("STATE = " + ElevatorMovementToString(elevator.PhysicalInfo.Movement) + "\n")
+	fmt.Printf("STATE = %s\n", elevator.PhysicalInfo.Movement)
 	fmt.Printf("--------------------------------\n")
 
 	// Print floor row
@@ -193,32 +193,30 @@ func PrintElevatorInfo(elevator Elevator, uptime float64) {
 
 }
 
-func ElevatorRoleToString(elevRole ElevatorRole) string {
-	var roleString string
-
+func (elevRole ElevatorRole) String() string {
 	switch elevRole {
 	case ER_Backup:
-		roleString = "Backup"
+		return "Backup"
 	case ER_Primary:
-		roleString = "Primary"
+		return "Primary"
 	case ER_Dead:
-		roleString = "Dead"
+		return "Dead"
+	default:
+		return "Unknown"
 	}
-	return roleString
 }
 
-func ElevatorMovementToString(movement ElevatorMovement) string {
-	var movementString string
-
+func (movement ElevatorMovement) String() string {
 	switch movement {
 	case EM_DoorOpen:
-		movementString = "DoorOpen"
+		return "DoorOpen"
 	case EM_Moving:
-		movementString = "Moving"
+		return "Moving"
 	case EM_Idle:
-		movementString = "Idle"
+		return "Idle"
+	default:
+		return "Unknown"
 	}
-	return movementString
 
 }
 

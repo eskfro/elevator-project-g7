@@ -24,9 +24,9 @@ func sendPhysicalInfoUpdate(info elev.ElevatorPhysicalInfo, channels ...chan<- e
 func Start(
 	elevator elev.Elevator,
 	ports network.Ports,
-	fromIO_BtnPress chan elevio.ButtonEvent,
-	fromIO_Floor chan int,
-	fromIO_Obstruction chan bool,
+	fromIO_BtnPress <-chan elevio.ButtonEvent,
+	fromIO_Floor <-chan int,
+	fromIO_Obstruction <-chan bool,
 ) {
 	// Ticker for debugging
 	timeStart := time.Now()
@@ -70,7 +70,7 @@ func Start(
 	// Start modules
 	go movement.Movement(elevator, updateMV_PhysicalInfo, updateMV_OrderTable, updateMV_AliveList, fromMV_LOT, fromMV_Movement, fromMV_MotorDir, fromMV_ClearOrders, toMV_FloorArrival)
 	go ordercontrol.OrderControl(elevator, updateOC_PhysicalInfo, updateOC_AliveList, fromRX_OrderTableP, fromOC_OrderTable, updateTX_OTP, fromMV_ClearOrders, fromIO_BtnPress)
-	go rolemanager.RoleManager(elevator, updateRM_PhysicalInfo, fromRM_Role, fromRM_PrimaryId, fromRX_PhysicalInfo, fromRM_AliveList, fromRM_ResetVersion)
+	go rolemanager.RoleManager(elevator, fromRX_PhysicalInfo, updateRM_PhysicalInfo, fromRM_Role, fromRM_PrimaryId, fromRM_AliveList, fromRM_ResetVersion)
 	go network.TxHeartBeat(elevator, ports.HeartBeat, updateTX_PhysicalInfo)
 	go network.RxHeartBeat(ports.HeartBeat, fromRX_PhysicalInfo, elevator.PhysicalInfo.Id)
 	go network.TxOrderTableUDP(elevator, ports.OrderTableP, updateTX_OTP, updateTX_Role)

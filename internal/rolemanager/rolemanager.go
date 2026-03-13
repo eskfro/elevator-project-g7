@@ -10,12 +10,12 @@ import (
 
 func RoleManager(
 	initElev elev.Elevator,
-	updateRM_PhysicalInfo chan elev.ElevatorPhysicalInfo,
-	fromRM_Role chan elev.ElevatorRole,
-	fromRM_PrimaryId chan int,
-	fromRX_PhysicalInfo chan elev.ElevatorPhysicalInfo,
-	fromRM_AliveList chan elev.AliveList,
-	fromRM_ResetVersion chan int,
+	fromRX_PhysicalInfo <-chan elev.ElevatorPhysicalInfo,
+	updateRM_PhysicalInfo <-chan elev.ElevatorPhysicalInfo,
+	fromRM_Role chan<- elev.ElevatorRole,
+	fromRM_PrimaryId chan<- int,
+	fromRM_AliveList chan<- elev.AliveList,
+	fromRM_ResetVersion chan<- int,
 ) {
 	HeartBeatId := make(chan int, 50)
 	TimedOutId := make(chan int, 50)
@@ -72,9 +72,9 @@ func handleAliveListUpdate(
 	PhysicalInfo elev.ElevatorPhysicalInfo,
 	AliveList elev.AliveList,
 	timeStart time.Time,
-	fromRM_AliveList chan elev.AliveList,
-	fromRM_PrimaryId chan int,
-	fromRM_Role chan elev.ElevatorRole,
+	fromRM_AliveList chan<- elev.AliveList,
+	fromRM_PrimaryId chan<- int,
+	fromRM_Role chan<- elev.ElevatorRole,
 	recentTimeout bool,
 	wasDead bool,
 
@@ -154,7 +154,7 @@ func handleAliveListUpdate(
 	return PhysicalInfo, AliveList
 }
 
-func MonitorHeartBeats(HeartBeatId chan int, TimedOutId chan int) {
+func MonitorHeartBeats(HeartBeatId <-chan int, TimedOutId chan<- int) {
 	// Array of timers accessed by id
 	var elevTimers [elev.N_MAX_ELEVS]*timer.Timer
 

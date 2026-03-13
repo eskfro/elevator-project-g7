@@ -10,13 +10,13 @@ import (
 
 func OrderControl(
 	initElev elev.Elevator,
-	updateOC_PhysicalInfo chan elev.ElevatorPhysicalInfo,
-	updateOC_AliveList chan elev.AliveList,
-	fromRX_OrderTableP chan elev.OrderTablePacket,
-	fromOC_OrderTable chan elev.OrderTable,
-	updateTX_OTP chan elev.OrderTablePacket,
-	fromMV_ClearOrders chan elev.ClearOrders,
-	fromIO_BtnPress chan elevio.ButtonEvent) {
+	updateOC_PhysicalInfo <-chan elev.ElevatorPhysicalInfo,
+	updateOC_AliveList <-chan elev.AliveList,
+	fromRX_OrderTableP <-chan elev.OrderTablePacket,
+	fromOC_OrderTable chan<- elev.OrderTable,
+	updateTX_OTP chan<- elev.OrderTablePacket,
+	fromMV_ClearOrders <-chan elev.ClearOrders,
+	fromIO_BtnPress <-chan elevio.ButtonEvent) {
 
 	// Local to OrderControl
 	OrderTable := initElev.OrderTable
@@ -142,7 +142,7 @@ func OrderControl(
 
 func sendUpdateFromOC(
 	OrderTable elev.OrderTable,
-	fromOC_OrderTable chan elev.OrderTable,
+	fromOC_OrderTable chan<- elev.OrderTable,
 ) {
 	fromOC_OrderTable <- OrderTable
 }
@@ -158,7 +158,7 @@ func updateOrderTable(
 	AllOrderTables elev.AllOrderTables,
 	PhysicalInfo elev.ElevatorPhysicalInfo,
 	AliveList elev.AliveList,
-	updateTX_OTP chan elev.OrderTablePacket,
+	updateTX_OTP chan<- elev.OrderTablePacket,
 ) elev.OrderTable {
 
 	prevOrderTable := OrderTable
