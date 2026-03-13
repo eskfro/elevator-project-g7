@@ -32,10 +32,12 @@ func Start(
 	timeStart := time.Now()
 	ticker_printElevator := time.NewTicker(1000 * time.Millisecond)
 	defer ticker_printElevator.Stop()
-	
+
 	// =================================================================== CHANNELS
 	// Movement
 	updateMV_PhysicalInfo := make(chan elev.ElevatorPhysicalInfo, 20)
+	updateMV_OrderTable := make(chan elev.OrderTable, 20)
+	updateMV_AliveList := make(chan elev.AliveList, 20)
 	toMV_FloorArrival := make(chan int, 5)
 	fromMV_LOT := make(chan elev.LocalOrderTable, 20)
 	fromMV_MotorDir := make(chan elevio.MotorDirection, 20)
@@ -66,7 +68,7 @@ func Start(
 	fromRX_PhysicalInfo := make(chan elev.ElevatorPhysicalInfo, 50)
 
 	// Start modules
-	go movement.Movement(elevator, updateMV_PhysicalInfo, fromMV_LOT, fromMV_Movement, fromMV_MotorDir, fromMV_ClearOrders, toMV_FloorArrival)
+	go movement.Movement(elevator, updateMV_PhysicalInfo, updateMV_OrderTable, updateMV_AliveList, fromMV_LOT, fromMV_Movement, fromMV_MotorDir, fromMV_ClearOrders, toMV_FloorArrival)
 	go ordercontrol.OrderControl(elevator, updateOC_PhysicalInfo, updateOC_AliveList, fromRX_OrderTableP, fromOC_OrderTable, updateTX_OTP, fromMV_ClearOrders, fromIO_BtnPress)
 	go rolemanager.RoleManager(elevator, updateRM_PhysicalInfo, fromRM_Role, fromRM_PrimaryId, fromRX_PhysicalInfo, fromRM_AliveList, fromRM_ResetVersion)
 	go network.TxHeartBeat(elevator, ports.HeartBeat, updateTX_PhysicalInfo)
@@ -128,6 +130,8 @@ func Start(
 				if isChange {
 					sendPhysicalInfoUpdate(elevator.PhysicalInfo, updateMV_PhysicalInfo)
 				}
+				updateMV_OrderTable <- elevator.OrderTable
+				updateMV_AliveList <- elevator.AliveList
 
 			// =================================================================== FROM ROLEMANAGER
 
@@ -149,6 +153,7 @@ func Start(
 				elevator.AliveList = newAliveList
 				elevator.NumElevs = rolemanager.CountNumElevs(elevator.AliveList)
 				updateOC_AliveList <- elevator.AliveList
+				updateMV_AliveList <- elevator.AliveList
 			}
 		}
 	}()

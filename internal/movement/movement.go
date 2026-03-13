@@ -13,6 +13,8 @@ import (
 func Movement(
 	initElev elev.Elevator,
 	updateMV_PhysicalInfo chan elev.ElevatorPhysicalInfo,
+	updateMV_OrderTable chan elev.OrderTable,
+	updateMV_AliveList chan elev.AliveList,
 	fromMV_LOT chan elev.LocalOrderTable,
 	fromMV_Movement chan elev.ElevatorMovement,
 	fromMV_MotorDir chan elevio.MotorDirection,
@@ -20,6 +22,8 @@ func Movement(
 	toMV_FloorArrival chan int) {
 
 	PhysicalInfo := initElev.PhysicalInfo
+	orderTable := initElev.OrderTable
+	aliveList := initElev.AliveList
 	prevLOT := initElev.PhysicalInfo.LocalOrderTable
 	doorTimer := timer.New(elev.DOOR_OPEN_TIME)
 
@@ -33,18 +37,24 @@ func Movement(
 				continue
 			}
 
-			PhysicalInfo = FSM_OnTableUpdate(PhysicalInfo, doorTimer, fromMV_LOT, fromMV_Movement, fromMV_MotorDir, fromMV_ClearOrder)
+			PhysicalInfo = FSM_OnTableUpdate(PhysicalInfo, orderTable, aliveList, doorTimer, fromMV_LOT, fromMV_Movement, fromMV_MotorDir, fromMV_ClearOrder)
 			prevLOT = PhysicalInfo.LocalOrderTable
+
+		case orderTable = <-updateMV_OrderTable:
+			SetAllLights(PhysicalInfo.LocalOrderTable, orderTable, aliveList)
+
+		case aliveList = <-updateMV_AliveList:
+			SetAllLights(PhysicalInfo.LocalOrderTable, orderTable, aliveList)
 
 		case <-doorTimer.C:
 			log.Println("[Movement] Doortimer Event")
-			PhysicalInfo = FSM_OnDoorTimeout(PhysicalInfo, doorTimer, fromMV_LOT, fromMV_Movement, fromMV_MotorDir, fromMV_ClearOrder)
+			PhysicalInfo = FSM_OnDoorTimeout(PhysicalInfo, orderTable, aliveList, doorTimer, fromMV_LOT, fromMV_Movement, fromMV_MotorDir, fromMV_ClearOrder)
 			prevLOT = PhysicalInfo.LocalOrderTable
 
 		case newFloor := <-toMV_FloorArrival:
 			fmt.Printf("[Movement]: Arrived at Floor = %d\n", newFloor)
 			PhysicalInfo.Floor = newFloor
-			PhysicalInfo = FSM_OnFloorArrival(PhysicalInfo, doorTimer, fromMV_LOT, fromMV_Movement, fromMV_ClearOrder)
+			PhysicalInfo = FSM_OnFloorArrival(PhysicalInfo, orderTable, aliveList, doorTimer, fromMV_LOT, fromMV_Movement, fromMV_ClearOrder)
 			prevLOT = PhysicalInfo.LocalOrderTable
 
 		}
@@ -74,6 +84,8 @@ func sendClearOrder(PhysicalInfo elev.ElevatorPhysicalInfo, buttonsToClear [elev
 
 func FSM_OnTableUpdate(
 	PhysicalInfo elev.ElevatorPhysicalInfo,
+	orderTable elev.OrderTable,
+	aliveList elev.AliveList,
 	doorTimer *timer.Timer,
 	fromMV_LOT chan elev.LocalOrderTable,
 	fromMV_Movement chan elev.ElevatorMovement,
@@ -97,7 +109,7 @@ func FSM_OnTableUpdate(
 
 			updated_LOT, buttonsToClear := requests.ClearCurrentFloor(PhysicalInfo.LocalOrderTable, PhysicalInfo.Floor, PhysicalInfo.MotorDir)
 			PhysicalInfo.LocalOrderTable = updated_LOT
-			SetAllLights(PhysicalInfo.LocalOrderTable)
+			SetAllLights(PhysicalInfo.LocalOrderTable, orderTable, aliveList)
 
 			// Updates from MV
 			if anyOrderToClear(buttonsToClear) {
@@ -113,7 +125,7 @@ func FSM_OnTableUpdate(
 		}
 
 	case elev.EM_Moving:
-		SetAllLights(PhysicalInfo.LocalOrderTable)
+		SetAllLights(PhysicalInfo.LocalOrderTable, orderTable, aliveList)
 
 	case elev.EM_Idle:
 		pair := requests.ChooseDirection(PhysicalInfo.LocalOrderTable, PhysicalInfo.Floor, PhysicalInfo.MotorDir)
@@ -129,7 +141,7 @@ func FSM_OnTableUpdate(
 
 		// Stay idle
 		if PhysicalInfo.Movement == elev.EM_Idle {
-			SetAllLights(PhysicalInfo.LocalOrderTable)
+			SetAllLights(PhysicalInfo.LocalOrderTable, orderTable, aliveList)
 			return PhysicalInfo
 		}
 
@@ -143,7 +155,7 @@ func FSM_OnTableUpdate(
 
 			updated_LOT, buttonsToClear := requests.ClearCurrentFloor(PhysicalInfo.LocalOrderTable, PhysicalInfo.Floor, PhysicalInfo.MotorDir)
 			PhysicalInfo.LocalOrderTable = updated_LOT
-			SetAllLights(PhysicalInfo.LocalOrderTable)
+			SetAllLights(PhysicalInfo.LocalOrderTable, orderTable, aliveList)
 
 			// Updates from MV
 			if anyOrderToClear(buttonsToClear) {
@@ -164,7 +176,7 @@ func FSM_OnTableUpdate(
 
 	}
 
-	SetAllLights(PhysicalInfo.LocalOrderTable)
+	SetAllLights(PhysicalInfo.LocalOrderTable, orderTable, aliveList)
 	printElevatorMovement(PhysicalInfo.Movement)
 	return PhysicalInfo
 
@@ -172,6 +184,8 @@ func FSM_OnTableUpdate(
 
 func FSM_OnFloorArrival(
 	PhysicalInfo elev.ElevatorPhysicalInfo,
+	orderTable elev.OrderTable,
+	aliveList elev.AliveList,
 	doorTimer *timer.Timer,
 	fromMV_LOT chan elev.LocalOrderTable,
 	fromMV_Movement chan elev.ElevatorMovement,
@@ -199,7 +213,7 @@ func FSM_OnFloorArrival(
 	// Clear current floor
 	updated_LOT, buttonsToClear := requests.ClearCurrentFloor(PhysicalInfo.LocalOrderTable, PhysicalInfo.Floor, PhysicalInfo.MotorDir)
 	PhysicalInfo.LocalOrderTable = updated_LOT
-	SetAllLights(PhysicalInfo.LocalOrderTable)
+	SetAllLights(PhysicalInfo.LocalOrderTable, maskedOrderTable(orderTable, PhysicalInfo.Floor, buttonsToClear), aliveList)
 
 	// Updates from MV
 	if anyOrderToClear(buttonsToClear) {
@@ -213,7 +227,7 @@ func FSM_OnFloorArrival(
 		fromMV_Movement <- PhysicalInfo.Movement
 	}
 
-	SetAllLights(PhysicalInfo.LocalOrderTable)
+	SetAllLights(PhysicalInfo.LocalOrderTable, orderTable, aliveList)
 	printElevatorMovement(PhysicalInfo.Movement)
 	return PhysicalInfo
 
@@ -221,6 +235,8 @@ func FSM_OnFloorArrival(
 
 func FSM_OnDoorTimeout(
 	PhysicalInfo elev.ElevatorPhysicalInfo,
+	orderTable elev.OrderTable,
+	aliveList elev.AliveList,
 	doorTimer *timer.Timer,
 	fromMV_LOT chan elev.LocalOrderTable,
 	fromMV_Movement chan elev.ElevatorMovement,
@@ -256,7 +272,7 @@ func FSM_OnDoorTimeout(
 		// Clear current floor
 		updated_LOT, buttonsToClear := requests.ClearCurrentFloor(PhysicalInfo.LocalOrderTable, PhysicalInfo.Floor, PhysicalInfo.MotorDir)
 		PhysicalInfo.LocalOrderTable = updated_LOT
-		SetAllLights(PhysicalInfo.LocalOrderTable)
+		SetAllLights(PhysicalInfo.LocalOrderTable, maskedOrderTable(orderTable, PhysicalInfo.Floor, buttonsToClear), aliveList)
 
 		// Updates from MV
 		if anyOrderToClear(buttonsToClear) {
@@ -276,16 +292,47 @@ func FSM_OnDoorTimeout(
 
 	}
 
-	SetAllLights(PhysicalInfo.LocalOrderTable)
+	SetAllLights(PhysicalInfo.LocalOrderTable, orderTable, aliveList)
 	printElevatorMovement(PhysicalInfo.Movement)
 	return PhysicalInfo
 }
 
-// TODO: Make this elevio maybe
-func SetAllLights(localOrderTable elev.LocalOrderTable) {
+func maskedOrderTable(orderTable elev.OrderTable, floor int, buttonsToClear [elev.N_BUTTONS]bool) elev.OrderTable {
+	masked := orderTable
+	for id := range masked {
+		for btn := 0; btn < elev.N_BUTTONS; btn++ {
+			if buttonsToClear[btn] {
+				masked[id][floor][btn] = elev.OS_NO_ORDER
+			}
+		}
+	}
+	return masked
+}
+
+// Føkka opp import-greier når eg flytta til elevio
+func SetAllLights(localOrderTable elev.LocalOrderTable, orderTable elev.OrderTable, aliveList elev.AliveList) {
 	for f := 0; f < elev.N_FLOORS; f++ {
 		for b := 0; b < elev.N_BUTTONS; b++ {
-			elevio.SetButtonLamp(elevio.ButtonType(b), f, localOrderTable[f][b])
+			shouldLightUp := false
+			btnType := elevio.ButtonType(b)
+
+			if btnType == elevio.BT_Cab {
+				if localOrderTable[f][b] {
+					shouldLightUp = true
+				}
+			} else {
+				for id, phys := range aliveList {
+					if phys.Role == elev.ER_Dead {
+						continue
+					}
+					if orderTable[id][f][b] == elev.OS_CONFIRMED {
+						shouldLightUp = true
+						break
+					}
+				}
+			}
+
+			elevio.SetButtonLamp(btnType, f, shouldLightUp)
 		}
 	}
 }
