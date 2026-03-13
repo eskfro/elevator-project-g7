@@ -91,14 +91,14 @@ type Elevator struct {
 // ========================================= HELPER FUNCTIONS (TODO: slett eller flytt i egen fil)
 
 func CreateElevator(_Id int, _Port int, _Ip string) Elevator {
-	e := Elevator{PhysicalInfo: CreatePhysicalElevator(_Id, _Ip)}
-	e.AliveList[_Id] = e.PhysicalInfo
-	e.NumElevs = 1
-	return e
+	elevator := Elevator{PhysicalInfo: CreatePhysicalElevator(_Id, _Ip)}
+	elevator.AliveList[_Id] = elevator.PhysicalInfo
+	elevator.NumElevs = 1
+	return elevator
 }
 
 func CreatePhysicalElevator(_Id int, _Ip string) ElevatorPhysicalInfo {
-	pe := ElevatorPhysicalInfo{
+	physicalElevator := ElevatorPhysicalInfo{
 		Id:         _Id,
 		Role:       ER_Backup,
 		Ip:         _Ip,
@@ -108,21 +108,20 @@ func CreatePhysicalElevator(_Id int, _Ip string) ElevatorPhysicalInfo {
 		Movement:   EM_Idle,
 		Obstructed: false,
 	}
-	return pe
+	return physicalElevator
 }
 
 func PrintElevatorInit(id int, port_HW int) {
 	fmt.Printf("\nelevator starting | id = %d | port.Hardware = %d\n\n", id, port_HW)
-
 }
 
 func PrintElevatorInfo(elevator Elevator, uptime float64) {
 
-	Active := "  #  "
-	Inactive := "  -  "
+	confirmed := "  #  "
+	inactive := "  -  "
 	uptimeString := fmt.Sprintf("%.1f", uptime)
 
-	LOT := elevator.PhysicalInfo.LocalOrderTable
+	localOT := elevator.PhysicalInfo.LocalOrderTable
 
 	fmt.Printf("--------------------------------\n")
 	fmt.Printf("ELEVATOR %d ", elevator.PhysicalInfo.Id)
@@ -144,9 +143,9 @@ func PrintElevatorInfo(elevator Elevator, uptime float64) {
 	// Hall Up
 	fmt.Printf("Hall Up	  |")
 	for floor := 0; floor < N_FLOORS; floor++ {
-		s := Inactive
-		if LOT[floor][elevio.BT_HallUp] {
-			s = Active
+		s := inactive
+		if localOT[floor][elevio.BT_HallUp] {
+			s = confirmed
 		}
 		fmt.Printf(s)
 	}
@@ -155,22 +154,22 @@ func PrintElevatorInfo(elevator Elevator, uptime float64) {
 	// Hall Up
 	fmt.Printf("Hall Down |")
 	for floor := 0; floor < N_FLOORS; floor++ {
-		s := Inactive
-		if LOT[floor][elevio.BT_HallDown] {
-			s = Active
+		status := inactive
+		if localOT[floor][elevio.BT_HallDown] {
+			status = confirmed
 		}
-		fmt.Printf(s)
+		fmt.Printf(status)
 	}
 	fmt.Printf("|\n")
 
 	// Hall Up
 	fmt.Printf("Cab       |")
 	for floor := 0; floor < N_FLOORS; floor++ {
-		s := Inactive
-		if LOT[floor][elevio.BT_Cab] {
-			s = Active
+		status := inactive
+		if localOT[floor][elevio.BT_Cab] {
+			status = confirmed
 		}
-		fmt.Printf(s)
+		fmt.Printf(status)
 	}
 	fmt.Printf("|\n")
 
@@ -243,17 +242,17 @@ func PrintOrderTableSlice(table OrderTable, elevID int) {
 
 	// Print header: "Button / Floor" etterfulgt av alle etasjenumrene
 	fmt.Printf("%-12s", "Button\\Floor")
-	for f := 0; f < len(OT_Slice); f++ {
-		fmt.Printf(" | Floor %-2d", f)
+	for floor := 0; floor < len(OT_Slice); floor++ {
+		fmt.Printf(" | Floor %-2d", floor)
 	}
 	fmt.Println(" |")
 	fmt.Println(strings.Repeat("-", 12+len(OT_Slice)*11))
 
 	// Print én rad for hver knappetype
-	for b := 0; b < len(buttonNames); b++ {
-		fmt.Printf("%-12s", buttonNames[b])
-		for f := 0; f < len(OT_Slice); f++ {
-			status := OT_Slice[f][b]
+	for btn := 0; btn < len(buttonNames); btn++ {
+		fmt.Printf("%-12s", buttonNames[btn])
+		for floor := 0; floor < len(OT_Slice); floor++ {
+			status := OT_Slice[floor][btn]
 			fmt.Printf(" | %-8s", status)
 		}
 		fmt.Println(" |")

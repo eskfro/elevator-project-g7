@@ -17,60 +17,60 @@ func RoleManager(
 	fromRM_AliveList chan<- elev.AliveList,
 	fromRM_ResetVersion chan<- int,
 ) {
-	HeartBeatId := make(chan int, 50)
-	TimedOutId := make(chan int, 50)
+	heartBeatId := make(chan int, 50)
+	timedOutId := make(chan int, 50)
 
 	// Local to RoleManager
-	AliveList := initElev.AliveList
-	PhysicalInfo := initElev.PhysicalInfo
+	aliveList := initElev.AliveList
+	physicalInfo := initElev.PhysicalInfo
 	timeStart := time.Now()
 
-	go MonitorHeartBeats(HeartBeatId, TimedOutId)
+	go MonitorHeartBeats(heartBeatId, timedOutId)
 
 	for {
 		select {
 
 		case newPhysicalInfo := <-updateRM_PhysicalInfo:
-			PhysicalInfo = newPhysicalInfo
+			physicalInfo = newPhysicalInfo
 
-		case timedOutID := <-TimedOutId:
-			AliveList[timedOutID].Role = elev.ER_Dead
-			fromRM_AliveList <- AliveList
+		case timedOutID := <-timedOutId:
+			aliveList[timedOutID].Role = elev.ER_Dead
+			fromRM_AliveList <- aliveList
 			fromRM_ResetVersion <- timedOutID
-			PhysicalInfo, AliveList = handleAliveListUpdate(PhysicalInfo, AliveList, timeStart, fromRM_AliveList, fromRM_PrimaryId, fromRM_Role, true, false)
+			physicalInfo, aliveList = handleAliveListUpdate(physicalInfo, aliveList, timeStart, fromRM_AliveList, fromRM_PrimaryId, fromRM_Role, true, false)
 
 		case heartbeat := <-fromRX_PhysicalInfo:
 			// Always update watchdog timer
 			select {
-			case HeartBeatId <- heartbeat.Id:
+			case heartBeatId <- heartbeat.Id:
 			default:
 				log.Println("[RoleManager] Sending Heartbeat Default Case")
 			}
 
-			isHeartbeatUnchanged := AliveList[heartbeat.Id] == heartbeat
+			isHeartbeatChanged := aliveList[heartbeat.Id] != heartbeat
 			isValidPrimaryId := heartbeat.PrimaryId != elev.INVALID_PRIMARY_ID
-			wasDead := AliveList[heartbeat.Id].Role == elev.ER_Dead
+			wasDead := aliveList[heartbeat.Id].Role == elev.ER_Dead
 
 			// I starten settes PrimaryId til INVALID.
 			// Da bryr man seg ikke om isHeartBeatUnchanged fordi man må uansett oppdatere PrimaryId
-			if isHeartbeatUnchanged && isValidPrimaryId && !wasDead {
+			if !isHeartbeatChanged && isValidPrimaryId && !wasDead {
 				continue
 			}
 			if wasDead {
 				fromRM_ResetVersion <- heartbeat.Id
 			}
 			// log.Println("[RoleManager] New AliveList update to RoleManager")
-			AliveList[heartbeat.Id] = heartbeat
-			fromRM_AliveList <- AliveList
-			PhysicalInfo, AliveList = handleAliveListUpdate(PhysicalInfo, AliveList, timeStart, fromRM_AliveList, fromRM_PrimaryId, fromRM_Role, false, wasDead)
+			aliveList[heartbeat.Id] = heartbeat
+			fromRM_AliveList <- aliveList
+			physicalInfo, aliveList = handleAliveListUpdate(physicalInfo, aliveList, timeStart, fromRM_AliveList, fromRM_PrimaryId, fromRM_Role, false, wasDead)
 
 		}
 	}
 }
 
 func handleAliveListUpdate(
-	PhysicalInfo elev.ElevatorPhysicalInfo,
-	AliveList elev.AliveList,
+	physicalInfo elev.ElevatorPhysicalInfo,
+	aliveList elev.AliveList,
 	timeStart time.Time,
 	fromRM_AliveList chan<- elev.AliveList,
 	fromRM_PrimaryId chan<- int,
@@ -80,85 +80,85 @@ func handleAliveListUpdate(
 
 ) (elev.ElevatorPhysicalInfo, elev.AliveList) {
 
-	switch PhysicalInfo.Role {
+	switch physicalInfo.Role {
 
 	case elev.ER_Dead:
 		fmt.Println("[RoleManager] DEAD")
-		return PhysicalInfo, AliveList
+		return physicalInfo, aliveList
 
 	case elev.ER_Backup:
 
-		if ShouldBecomePrimary(PhysicalInfo.Id, PhysicalInfo.Role, AliveList, timeStart) {
+		if shouldBecomePrimary(physicalInfo.Id, aliveList, timeStart) {
 			log.Println("[RoleManager] Should Become Primary")
 			//Set change
-			PhysicalInfo.Role = elev.ER_Primary
-			PhysicalInfo.PrimaryId = PhysicalInfo.Id
-			AliveList[PhysicalInfo.Id] = PhysicalInfo
+			physicalInfo.Role = elev.ER_Primary
+			physicalInfo.PrimaryId = physicalInfo.Id
+			aliveList[physicalInfo.Id] = physicalInfo
 
 			// Send update
-			fromRM_AliveList <- AliveList
-			fromRM_PrimaryId <- PhysicalInfo.PrimaryId
-			fromRM_Role <- PhysicalInfo.Role
+			fromRM_AliveList <- aliveList
+			fromRM_PrimaryId <- physicalInfo.PrimaryId
+			fromRM_Role <- physicalInfo.Role
 
-			return PhysicalInfo, AliveList
+			return physicalInfo, aliveList
 		}
 
 		// Update PrimaryId when we know this elevator will be a backup
-		if ShouldUpdatePrimaryId(AliveList, PhysicalInfo.PrimaryId, timeStart) {
+		if shouldUpdatePrimaryId(aliveList, physicalInfo.PrimaryId, timeStart) {
 			log.Println("[RoleManager] Should Update PrimaryID")
-			newPrimaryId := GetPrimaryId(AliveList, recentTimeout)
-			PhysicalInfo.PrimaryId = newPrimaryId
-			AliveList[PhysicalInfo.Id] = PhysicalInfo
+			newPrimaryId := getPrimaryId(aliveList, recentTimeout)
+			physicalInfo.PrimaryId = newPrimaryId
+			aliveList[physicalInfo.Id] = physicalInfo
 
 			// Send update
-			fromRM_AliveList <- AliveList
-			fromRM_PrimaryId <- PhysicalInfo.PrimaryId
+			fromRM_AliveList <- aliveList
+			fromRM_PrimaryId <- physicalInfo.PrimaryId
 
 		}
 
 		// If an elevator was dead we want to start events so it updates nicely on the network or something
 		if wasDead {
-			fromRM_AliveList <- AliveList
-			fromRM_PrimaryId <- PhysicalInfo.PrimaryId
-			fromRM_Role <- PhysicalInfo.Role //IDK ABOUT THIS
+			fromRM_AliveList <- aliveList
+			fromRM_PrimaryId <- physicalInfo.PrimaryId
+			fromRM_Role <- physicalInfo.Role //IDK ABOUT THIS
 		}
 
-		return PhysicalInfo, AliveList
+		return physicalInfo, aliveList
 
 	case elev.ER_Primary:
 
-		if ShouldBecomeBackup(PhysicalInfo.Id, PhysicalInfo.Role, AliveList) {
+		if shouldBecomeBackup(physicalInfo.Id, aliveList) {
 			log.Println("[RoleManager] Should Become Backup")
 			// Set change
-			PhysicalInfo.Role = elev.ER_Backup
-			newPrimaryId := GetPrimaryId(AliveList, recentTimeout)
-			PhysicalInfo.PrimaryId = newPrimaryId
-			AliveList[PhysicalInfo.Id] = PhysicalInfo
+			physicalInfo.Role = elev.ER_Backup
+			newPrimaryId := getPrimaryId(aliveList, recentTimeout)
+			physicalInfo.PrimaryId = newPrimaryId
+			aliveList[physicalInfo.Id] = physicalInfo
 
 			// Send update
-			fromRM_AliveList <- AliveList
-			fromRM_PrimaryId <- PhysicalInfo.PrimaryId
-			fromRM_Role <- PhysicalInfo.Role
+			fromRM_AliveList <- aliveList
+			fromRM_PrimaryId <- physicalInfo.PrimaryId
+			fromRM_Role <- physicalInfo.Role
 
 		}
 
 		if wasDead {
-			fromRM_AliveList <- AliveList
-			fromRM_PrimaryId <- PhysicalInfo.PrimaryId
-			fromRM_Role <- PhysicalInfo.Role //IDK ABOUT THIS
+			fromRM_AliveList <- aliveList
+			fromRM_PrimaryId <- physicalInfo.PrimaryId
+			fromRM_Role <- physicalInfo.Role //IDK ABOUT THIS
 		}
 
-		return PhysicalInfo, AliveList
+		return physicalInfo, aliveList
 	}
 	log.Println("[handleAliveListUpdate] Bottom Return Case")
-	return PhysicalInfo, AliveList
+	return physicalInfo, aliveList
 }
 
-func MonitorHeartBeats(HeartBeatId <-chan int, TimedOutId chan<- int) {
+func MonitorHeartBeats(heartBeatId <-chan int, timedOutId chan<- int) {
 	// Array of timers accessed by id
 	var elevTimers [elev.N_MAX_ELEVS]*timer.Timer
 
-	for id := range HeartBeatId {
+	for id := range heartBeatId {
 		isIndexInvalid := id < 0 || id >= elev.N_MAX_ELEVS
 
 		if isIndexInvalid {
@@ -182,19 +182,19 @@ func MonitorHeartBeats(HeartBeatId <-chan int, TimedOutId chan<- int) {
 					timeoutChan <- id
 					fmt.Printf("[MonitorHeartBeats] Timeout triggered on elev id = %d\n", id)
 				}
-			}(id, TimedOutId, t.C)
+			}(id, timedOutId, t.C)
 		}
 
 		t.Start()
 	}
 }
 
-func GetPrimaryId(AliveList elev.AliveList, recentTimeout bool) int {
-	numPrimaries := CountPrimaries(AliveList)
+func getPrimaryId(aliveList elev.AliveList, recentTimeout bool) int {
+	numPrimaries := countPrimaries(aliveList)
 	// This is backup and should not become primary -> the lowest backupId is the new primary
 	if recentTimeout && numPrimaries == 0 {
 		for elevId := 0; elevId < elev.N_MAX_ELEVS; elevId++ {
-			if AliveList[elevId].Role == elev.ER_Backup {
+			if aliveList[elevId].Role == elev.ER_Backup {
 				return elevId
 			}
 		}
@@ -204,7 +204,7 @@ func GetPrimaryId(AliveList elev.AliveList, recentTimeout bool) int {
 	// Else return the primary with lowest Id
 	primaryId := elev.N_MAX_ELEVS
 	for elevId := 0; elevId < elev.N_MAX_ELEVS; elevId++ {
-		if AliveList[elevId].Role == elev.ER_Primary {
+		if aliveList[elevId].Role == elev.ER_Primary {
 			primaryId = elevId
 			break
 		}
@@ -216,20 +216,20 @@ func GetPrimaryId(AliveList elev.AliveList, recentTimeout bool) int {
 
 }
 
-func CountPrimaries(AliveList elev.AliveList) int {
+func countPrimaries(aliveList elev.AliveList) int {
 	numPrimaries := 0
 	for elevId := 0; elevId < elev.N_MAX_ELEVS; elevId++ {
-		if AliveList[elevId].Role == elev.ER_Primary {
+		if aliveList[elevId].Role == elev.ER_Primary {
 			numPrimaries++
 		}
 	}
 	return numPrimaries
 }
 
-func CountNumElevs(AliveList elev.AliveList) int {
+func CountNumElevs(aliveList elev.AliveList) int {
 	numElevs := 0
 	for elevId := 0; elevId < elev.N_MAX_ELEVS; elevId++ {
-		isDeadElev := AliveList[elevId].Role == elev.ER_Dead
+		isDeadElev := aliveList[elevId].Role == elev.ER_Dead
 		if isDeadElev {
 			continue
 		}
@@ -239,15 +239,15 @@ func CountNumElevs(AliveList elev.AliveList) int {
 }
 
 // Primary election -> the backup with smallest ID becomes primary
-func ShouldBecomePrimary(thisId int, thisRole elev.ElevatorRole, AliveList elev.AliveList, timeStart time.Time) bool {
+func shouldBecomePrimary(thisId int, aliveList elev.AliveList, timeStart time.Time) bool {
 	// Make sure the alivelist is updated before we start primary election
 	if time.Since(timeStart) < elev.PRIMARY_ELECTION_DELAY ||
-		CountPrimaries(AliveList) != 0 {
+		countPrimaries(aliveList) != 0 {
 		return false
 	}
 	smallestBackupId := elev.N_MAX_ELEVS
 	for elevId := 0; elevId < elev.N_MAX_ELEVS; elevId++ {
-		if AliveList[elevId].Role == elev.ER_Backup {
+		if aliveList[elevId].Role == elev.ER_Backup {
 			smallestBackupId = elevId
 			break
 		}
@@ -258,13 +258,14 @@ func ShouldBecomePrimary(thisId int, thisRole elev.ElevatorRole, AliveList elev.
 	return thisId == smallestBackupId
 }
 
-func ShouldBecomeBackup(thisId int, thisRole elev.ElevatorRole, AliveList elev.AliveList) bool {
-	if CountPrimaries(AliveList) < 2 {
+func shouldBecomeBackup(thisId int, aliveList elev.AliveList) bool {
+
+	if countPrimaries(aliveList) < 2 {
 		return false
 	}
 	smallestPrimaryId := elev.N_MAX_ELEVS
 	for elevId := 0; elevId < elev.N_MAX_ELEVS; elevId++ {
-		if AliveList[elevId].Role == elev.ER_Primary {
+		if aliveList[elevId].Role == elev.ER_Primary {
 			smallestPrimaryId = elevId
 			break
 		}
@@ -275,17 +276,11 @@ func ShouldBecomeBackup(thisId int, thisRole elev.ElevatorRole, AliveList elev.A
 	return thisId != smallestPrimaryId
 }
 
-func ShouldUpdatePrimaryId(aliveList elev.AliveList, primaryId int, timeStart time.Time) bool {
-	isInvalidPrimaryId := primaryId == elev.INVALID_PRIMARY_ID
+func shouldUpdatePrimaryId(aliveList elev.AliveList, primaryId int, timeStart time.Time) bool {
 
-	if isInvalidPrimaryId {
-		if time.Since(timeStart) >= elev.PRIMARY_ELECTION_DELAY {
-			return true
-		}
+	if primaryId == elev.INVALID_PRIMARY_ID {
+		return time.Since(timeStart) >= elev.PRIMARY_ELECTION_DELAY
 	} else {
-		if aliveList[primaryId].Role == elev.ER_Dead {
-			return true
-		}
+		return aliveList[primaryId].Role == elev.ER_Dead
 	}
-	return false
 }

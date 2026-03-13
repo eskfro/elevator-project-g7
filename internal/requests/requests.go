@@ -12,9 +12,9 @@ type DirnMovementPair struct {
 }
 
 func RequestAbove(LocalOrderTable elev.LocalOrderTable, currentFloor int) bool {
-	for f := currentFloor + 1; f < elev.N_FLOORS; f++ {
-		for b := 0; b < elev.N_BUTTONS; b++ {
-			if LocalOrderTable[f][b] {
+	for floor := currentFloor + 1; floor < elev.N_FLOORS; floor++ {
+		for btn := 0; btn < elev.N_BUTTONS; btn++ {
+			if LocalOrderTable[floor][btn] {
 				return true
 			}
 		}
@@ -23,9 +23,9 @@ func RequestAbove(LocalOrderTable elev.LocalOrderTable, currentFloor int) bool {
 }
 
 func RequestBelow(LocalOrderTable elev.LocalOrderTable, currentFloor int) bool {
-	for f := 0; f < currentFloor; f++ {
-		for b := 0; b < elev.N_BUTTONS; b++ {
-			if LocalOrderTable[f][b] {
+	for floor := 0; floor < currentFloor; floor++ {
+		for btn := 0; btn < elev.N_BUTTONS; btn++ {
+			if LocalOrderTable[floor][btn] {
 				return true
 			}
 		}
@@ -34,8 +34,8 @@ func RequestBelow(LocalOrderTable elev.LocalOrderTable, currentFloor int) bool {
 }
 
 func RequestHere(LocalOrderTable elev.LocalOrderTable, currentFloor int) bool {
-	for b := 0; b < elev.N_BUTTONS; b++ {
-		if LocalOrderTable[currentFloor][b] {
+	for btn := 0; btn < elev.N_BUTTONS; btn++ {
+		if LocalOrderTable[currentFloor][btn] {
 			return true
 		}
 	}
@@ -146,52 +146,49 @@ func ShouldClearImmediately(currentFloor int, dir elevio.MotorDirection, btnFloo
 	return sameFloor && btnTypeMatchDir
 }
 
-func ClearCurrentFloor(LocalOrderTable elev.LocalOrderTable,
+func ClearCurrentFloor(localOrderTable elev.LocalOrderTable,
 	currentFloor int,
 	dir elevio.MotorDirection) (elev.LocalOrderTable, [elev.N_BUTTONS]bool) {
 
 	var buttonsToClear [elev.N_BUTTONS]bool
 
-	LOT := LocalOrderTable
-	cf := currentFloor
-
 	// Clear the cab order
-	LOT[cf][elevio.BT_Cab] = false
+	localOrderTable[currentFloor][elevio.BT_Cab] = false
 	buttonsToClear[elevio.BT_Cab] = true
 
 	switch dir {
 
 	case elevio.MD_Up:
-		if !RequestAbove(LOT, cf) && !LOT[cf][elevio.BT_HallUp] {
-			LOT[cf][elevio.BT_HallDown] = false
+		if !RequestAbove(localOrderTable, currentFloor) && !localOrderTable[currentFloor][elevio.BT_HallUp] {
+			localOrderTable[currentFloor][elevio.BT_HallDown] = false
 			buttonsToClear[elevio.BT_HallDown] = true
 		}
-		LOT[cf][elevio.BT_HallUp] = false
+		localOrderTable[currentFloor][elevio.BT_HallUp] = false
 		buttonsToClear[elevio.BT_HallUp] = true
 
 	case elevio.MD_Down:
-		if !RequestBelow(LOT, cf) && !LOT[cf][elevio.BT_HallDown] {
-			LOT[cf][elevio.BT_HallUp] = false
+		if !RequestBelow(localOrderTable, currentFloor) && !localOrderTable[currentFloor][elevio.BT_HallDown] {
+			localOrderTable[currentFloor][elevio.BT_HallUp] = false
 			buttonsToClear[elevio.BT_HallUp] = true
 
 		}
-		LOT[cf][elevio.BT_HallDown] = false
+		localOrderTable[currentFloor][elevio.BT_HallDown] = false
 		buttonsToClear[elevio.BT_HallDown] = true
 
 	default:
-		LOT[cf][elevio.BT_HallUp] = false
-		LOT[cf][elevio.BT_HallDown] = false
+		localOrderTable[currentFloor][elevio.BT_HallUp] = false
+		localOrderTable[currentFloor][elevio.BT_HallDown] = false
 		buttonsToClear[elevio.BT_HallUp] = true
 		buttonsToClear[elevio.BT_HallDown] = true
 
 	}
-	return LOT, buttonsToClear
+	return localOrderTable, buttonsToClear
 }
 
-func PrintLOT(LocalOrderTable elev.LocalOrderTable) {
-	for i := 0; i < elev.N_FLOORS; i++ {
-		for j := 0; j < elev.N_BUTTONS; j++ {
-			if LocalOrderTable[i][j] {
+func PrintLOT(localOrderTable elev.LocalOrderTable) {
+	for floor := 0; floor < elev.N_FLOORS; floor++ {
+		for btn := 0; btn < elev.N_BUTTONS; btn++ {
+			if localOrderTable[floor][btn] {
 				fmt.Printf("  #   ")
 			} else {
 				fmt.Printf("  -   ")

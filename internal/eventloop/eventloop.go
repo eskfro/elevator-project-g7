@@ -125,9 +125,9 @@ func Start(
 				prevLOT := elevator.PhysicalInfo.LocalOrderTable
 				elevator.OrderTable = newOrderTable
 				elevator.PhysicalInfo.LocalOrderTable = ordercontrol.OrderTableToLOT(elevator.OrderTable, elevator.PhysicalInfo.Id)
-				isChange := prevLOT != elevator.PhysicalInfo.LocalOrderTable
+				isChanged := prevLOT != elevator.PhysicalInfo.LocalOrderTable
 
-				if isChange {
+				if isChanged {
 					sendPhysicalInfoUpdate(elevator.PhysicalInfo, updateMV_PhysicalInfo)
 				}
 				updateMV_OrderTable <- elevator.OrderTable

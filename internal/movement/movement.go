@@ -21,7 +21,7 @@ func Movement(
 	fromMV_ClearOrder chan<- elev.ClearOrders,
 	toMV_FloorArrival <-chan int) {
 
-	PhysicalInfo := initElev.PhysicalInfo
+	physicalInfo := initElev.PhysicalInfo
 	orderTable := initElev.OrderTable
 	aliveList := initElev.AliveList
 	prevLOT := initElev.PhysicalInfo.LocalOrderTable
@@ -31,31 +31,31 @@ func Movement(
 		select {
 		case newPhysicalInfo := <-updateMV_PhysicalInfo:
 			log.Println("[Movement] PhysicalInfo Update")
-			PhysicalInfo = newPhysicalInfo
+			physicalInfo = newPhysicalInfo
 
-			if PhysicalInfo.LocalOrderTable == prevLOT {
+			if physicalInfo.LocalOrderTable == prevLOT {
 				continue
 			}
 
-			PhysicalInfo = FSM_OnTableUpdate(PhysicalInfo, orderTable, aliveList, doorTimer, fromMV_LOT, fromMV_Movement, fromMV_MotorDir, fromMV_ClearOrder)
-			prevLOT = PhysicalInfo.LocalOrderTable
+			physicalInfo = FSM_OnTableUpdate(physicalInfo, orderTable, aliveList, doorTimer, fromMV_LOT, fromMV_Movement, fromMV_MotorDir, fromMV_ClearOrder)
+			prevLOT = physicalInfo.LocalOrderTable
 
 		case orderTable = <-updateMV_OrderTable:
-			SetAllLights(PhysicalInfo.LocalOrderTable, orderTable, aliveList)
+			SetAllLights(physicalInfo.LocalOrderTable, orderTable, aliveList)
 
 		case aliveList = <-updateMV_AliveList:
-			SetAllLights(PhysicalInfo.LocalOrderTable, orderTable, aliveList)
+			SetAllLights(physicalInfo.LocalOrderTable, orderTable, aliveList)
 
 		case <-doorTimer.C:
 			log.Println("[Movement] Doortimer Event")
-			PhysicalInfo = FSM_OnDoorTimeout(PhysicalInfo, orderTable, aliveList, doorTimer, fromMV_LOT, fromMV_Movement, fromMV_MotorDir, fromMV_ClearOrder)
-			prevLOT = PhysicalInfo.LocalOrderTable
+			physicalInfo = FSM_OnDoorTimeout(physicalInfo, orderTable, aliveList, doorTimer, fromMV_LOT, fromMV_Movement, fromMV_MotorDir, fromMV_ClearOrder)
+			prevLOT = physicalInfo.LocalOrderTable
 
 		case newFloor := <-toMV_FloorArrival:
 			fmt.Printf("[Movement]: Arrived at Floor = %d\n", newFloor)
-			PhysicalInfo.Floor = newFloor
-			PhysicalInfo = FSM_OnFloorArrival(PhysicalInfo, orderTable, aliveList, doorTimer, fromMV_LOT, fromMV_Movement, fromMV_ClearOrder)
-			prevLOT = PhysicalInfo.LocalOrderTable
+			physicalInfo.Floor = newFloor
+			physicalInfo = FSM_OnFloorArrival(physicalInfo, orderTable, aliveList, doorTimer, fromMV_LOT, fromMV_Movement, fromMV_ClearOrder)
+			prevLOT = physicalInfo.LocalOrderTable
 
 		}
 	}
@@ -197,10 +197,10 @@ func FSM_OnFloorArrival(
 
 	elevio.SetFloorIndicator(PhysicalInfo.Floor)
 
-	isNotMoving := PhysicalInfo.Movement != elev.EM_Moving
-	shouldNotStop := !requests.ShouldStop(PhysicalInfo.LocalOrderTable, PhysicalInfo.Floor, PhysicalInfo.MotorDir)
+	isMoving := PhysicalInfo.Movement == elev.EM_Moving
+	shouldStop := requests.ShouldStop(PhysicalInfo.LocalOrderTable, PhysicalInfo.Floor, PhysicalInfo.MotorDir)
 
-	if isNotMoving || shouldNotStop {
+	if !isMoving || !shouldStop {
 		return PhysicalInfo
 	}
 
@@ -298,26 +298,26 @@ func FSM_OnDoorTimeout(
 }
 
 func maskedOrderTable(orderTable elev.OrderTable, floor int, buttonsToClear [elev.N_BUTTONS]bool) elev.OrderTable {
-	masked := orderTable
-	for id := range masked {
+	maskedOT := orderTable
+	for id := range maskedOT {
 		for btn := 0; btn < elev.N_BUTTONS; btn++ {
 			if buttonsToClear[btn] {
-				masked[id][floor][btn] = elev.OS_NO_ORDER
+				maskedOT[id][floor][btn] = elev.OS_NO_ORDER
 			}
 		}
 	}
-	return masked
+	return maskedOT
 }
 
 // Føkka opp import-greier når eg flytta til elevio
 func SetAllLights(localOrderTable elev.LocalOrderTable, orderTable elev.OrderTable, aliveList elev.AliveList) {
-	for f := 0; f < elev.N_FLOORS; f++ {
-		for b := 0; b < elev.N_BUTTONS; b++ {
+	for floor := 0; floor < elev.N_FLOORS; floor++ {
+		for btn := 0; btn < elev.N_BUTTONS; btn++ {
 			shouldLightUp := false
-			btnType := elevio.ButtonType(b)
+			btnType := elevio.ButtonType(btn)
 
 			if btnType == elevio.BT_Cab {
-				if localOrderTable[f][b] {
+				if localOrderTable[floor][btn] {
 					shouldLightUp = true
 				}
 			} else {
@@ -325,14 +325,14 @@ func SetAllLights(localOrderTable elev.LocalOrderTable, orderTable elev.OrderTab
 					if phys.Role == elev.ER_Dead {
 						continue
 					}
-					if orderTable[id][f][b] == elev.OS_CONFIRMED {
+					if orderTable[id][floor][btn] == elev.OS_CONFIRMED {
 						shouldLightUp = true
 						break
 					}
 				}
 			}
 
-			elevio.SetButtonLamp(btnType, f, shouldLightUp)
+			elevio.SetButtonLamp(btnType, floor, shouldLightUp)
 		}
 	}
 }
@@ -354,13 +354,10 @@ func printElevatorMovement(state elev.ElevatorMovement) {
 // TODO: Lag slike funksjoner for fault tolerance kanskjer. Men vi setter aldri floor til (-1) da.
 func AT_IsValidCombination(floor int, movement elev.ElevatorMovement, doorOpen bool) {
 
-	movingWithOpenDoor := movement == elev.EM_Moving && doorOpen
-	betweenFloorsWithOpenDoor := floor == -1 && doorOpen
+	isMoving := movement == elev.EM_Moving
 
-	if movingWithOpenDoor || betweenFloorsWithOpenDoor {
-		// TODO: bytt til log.Fatalln() når vi vet at systemete fungerer
+	if doorOpen && isMoving {
 		log.Printf("floor = %d | movement = %d | doorOpen = %t \n", floor, movement, doorOpen)
-		log.Fatalln("AT_IsValidCombination triggered!")
-
+		log.Fatalln("AT_IsValidCombination triggered: Moving with door open!")
 	}
 }
