@@ -36,8 +36,6 @@ func Start(
 	// =================================================================== CHANNELS
 	// Movement
 	updateMV_PhysicalInfo := make(chan elev.ElevatorPhysicalInfo, 20)
-	updateMV_OrderTable := make(chan elev.OrderTable, 20)
-	updateMV_AliveList := make(chan elev.AliveList, 20)
 	toMV_FloorArrival := make(chan int, 5)
 	fromMV_LOT := make(chan elev.LocalOrderTable, 20)
 	fromMV_MotorDir := make(chan elevio.MotorDirection, 20)
@@ -68,7 +66,7 @@ func Start(
 	fromRX_PhysicalInfo := make(chan elev.ElevatorPhysicalInfo, 100)
 
 	// Start modules
-	go movement.Movement(elevator, updateMV_PhysicalInfo, updateMV_OrderTable, updateMV_AliveList, fromMV_LOT, fromMV_Movement, fromMV_MotorDir, fromMV_ClearOrders, toMV_FloorArrival)
+	go movement.Movement(elevator, updateMV_PhysicalInfo, fromMV_LOT, fromMV_Movement, fromMV_MotorDir, fromMV_ClearOrders, toMV_FloorArrival)
 	go ordercontrol.OrderControl(elevator, updateOC_PhysicalInfo, updateOC_AliveList, fromRX_OrderTableP, fromMV_ClearOrders, fromIO_BtnPress, fromOC_OrderTable, updateTX_OTP)
 	go rolemanager.RoleManager(elevator, fromRX_PhysicalInfo, updateRM_PhysicalInfo, fromRM_Role, fromRM_PrimaryId, fromRM_AliveList, fromRM_ResetVersion)
 	go network.TxHeartBeat(elevator, ports.HeartBeat, updateTX_PhysicalInfo)
@@ -132,8 +130,7 @@ func Start(
 					sendPhysicalInfoUpdate(elevator.PhysicalInfo, updateMV_PhysicalInfo)
 				}
 				if isOTChanged {
-					updateMV_OrderTable <- elevator.OrderTable
-					
+					elev.SetAllLights(elevator.PhysicalInfo.LocalOrderTable, elevator.OrderTable, elevator.AliveList)
 				}
 
 			// =================================================================== FROM ROLEMANAGER
@@ -167,7 +164,7 @@ func Start(
 
 				if isChanged {
 					updateOC_AliveList <- elevator.AliveList
-					updateMV_AliveList <- elevator.AliveList
+					elev.SetAllLights(elevator.PhysicalInfo.LocalOrderTable, elevator.OrderTable, elevator.AliveList)
 				}
 			}
 		}

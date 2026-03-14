@@ -13,8 +13,6 @@ import (
 func Movement(
 	initElev elev.Elevator,
 	updateMV_PhysicalInfo <-chan elev.ElevatorPhysicalInfo,
-	updateMV_OrderTable <-chan elev.OrderTable,
-	updateMV_AliveList <-chan elev.AliveList,
 	fromMV_LOT chan<- elev.LocalOrderTable,
 	fromMV_Movement chan<- elev.ElevatorMovement,
 	fromMV_MotorDir chan<- elevio.MotorDirection,
@@ -22,8 +20,6 @@ func Movement(
 	toMV_FloorArrival <-chan int) {
 
 	physicalInfo := initElev.PhysicalInfo
-	orderTable := initElev.OrderTable
-	aliveList := initElev.AliveList
 	prevLOT := initElev.PhysicalInfo.LocalOrderTable
 	doorTimer := timer.New(elev.DOOR_OPEN_TIME)
 
@@ -37,24 +33,18 @@ func Movement(
 				continue
 			}
 
-			physicalInfo = fsm_OnTableUpdate(physicalInfo, orderTable, aliveList, doorTimer, fromMV_LOT, fromMV_Movement, fromMV_MotorDir, fromMV_ClearOrder)
+			physicalInfo = fsm_OnTableUpdate(physicalInfo, doorTimer, fromMV_LOT, fromMV_Movement, fromMV_MotorDir, fromMV_ClearOrder)
 			prevLOT = physicalInfo.LocalOrderTable
-
-		case orderTable = <-updateMV_OrderTable:
-			setAllLights(physicalInfo.LocalOrderTable, orderTable, aliveList)
-
-		case aliveList = <-updateMV_AliveList:
-			setAllLights(physicalInfo.LocalOrderTable, orderTable, aliveList)
 
 		case <-doorTimer.C:
 			log.Println("[Movement] Doortimer Event")
-			physicalInfo = fsm_OnDoorTimeout(physicalInfo, orderTable, aliveList, doorTimer, fromMV_LOT, fromMV_Movement, fromMV_MotorDir, fromMV_ClearOrder)
+			physicalInfo = fsm_OnDoorTimeout(physicalInfo, doorTimer, fromMV_LOT, fromMV_Movement, fromMV_MotorDir, fromMV_ClearOrder)
 			prevLOT = physicalInfo.LocalOrderTable
 
 		case newFloor := <-toMV_FloorArrival:
 			fmt.Printf("[Movement]: Arrived at Floor = %d\n", newFloor)
 			physicalInfo.Floor = newFloor
-			physicalInfo = fsm_OnFloorArrival(physicalInfo, orderTable, aliveList, doorTimer, fromMV_LOT, fromMV_Movement, fromMV_ClearOrder)
+			physicalInfo = fsm_OnFloorArrival(physicalInfo, doorTimer, fromMV_LOT, fromMV_Movement, fromMV_ClearOrder)
 			prevLOT = physicalInfo.LocalOrderTable
 
 		}
@@ -84,8 +74,6 @@ func sendClearOrder(PhysicalInfo elev.ElevatorPhysicalInfo, buttonsToClear [elev
 
 func fsm_OnTableUpdate(
 	PhysicalInfo elev.ElevatorPhysicalInfo,
-	orderTable elev.OrderTable,
-	aliveList elev.AliveList,
 	doorTimer *timer.Timer,
 	fromMV_LOT chan<- elev.LocalOrderTable,
 	fromMV_Movement chan<- elev.ElevatorMovement,
@@ -109,7 +97,6 @@ func fsm_OnTableUpdate(
 
 			updated_LOT, buttonsToClear := requests.ClearCurrentFloor(PhysicalInfo.LocalOrderTable, PhysicalInfo.Floor, PhysicalInfo.MotorDir)
 			PhysicalInfo.LocalOrderTable = updated_LOT
-			setAllLights(PhysicalInfo.LocalOrderTable, orderTable, aliveList)
 
 			// Updates from MV
 			if anyOrderToClear(buttonsToClear) {
@@ -125,7 +112,6 @@ func fsm_OnTableUpdate(
 		}
 
 	case elev.EM_Moving:
-		setAllLights(PhysicalInfo.LocalOrderTable, orderTable, aliveList)
 
 	case elev.EM_Idle:
 		pair := requests.ChooseDirection(PhysicalInfo.LocalOrderTable, PhysicalInfo.Floor, PhysicalInfo.MotorDir)
@@ -141,7 +127,6 @@ func fsm_OnTableUpdate(
 
 		// Stay idle
 		if PhysicalInfo.Movement == elev.EM_Idle {
-			setAllLights(PhysicalInfo.LocalOrderTable, orderTable, aliveList)
 			return PhysicalInfo
 		}
 
@@ -155,7 +140,6 @@ func fsm_OnTableUpdate(
 
 			updated_LOT, buttonsToClear := requests.ClearCurrentFloor(PhysicalInfo.LocalOrderTable, PhysicalInfo.Floor, PhysicalInfo.MotorDir)
 			PhysicalInfo.LocalOrderTable = updated_LOT
-			setAllLights(PhysicalInfo.LocalOrderTable, orderTable, aliveList)
 
 			// Updates from MV
 			if anyOrderToClear(buttonsToClear) {
@@ -176,7 +160,6 @@ func fsm_OnTableUpdate(
 
 	}
 
-	setAllLights(PhysicalInfo.LocalOrderTable, orderTable, aliveList)
 	printElevatorMovement(PhysicalInfo.Movement)
 	return PhysicalInfo
 
@@ -184,8 +167,6 @@ func fsm_OnTableUpdate(
 
 func fsm_OnFloorArrival(
 	PhysicalInfo elev.ElevatorPhysicalInfo,
-	orderTable elev.OrderTable,
-	aliveList elev.AliveList,
 	doorTimer *timer.Timer,
 	fromMV_LOT chan<- elev.LocalOrderTable,
 	fromMV_Movement chan<- elev.ElevatorMovement,
@@ -213,7 +194,6 @@ func fsm_OnFloorArrival(
 	// Clear current floor
 	updated_LOT, buttonsToClear := requests.ClearCurrentFloor(PhysicalInfo.LocalOrderTable, PhysicalInfo.Floor, PhysicalInfo.MotorDir)
 	PhysicalInfo.LocalOrderTable = updated_LOT
-	setAllLights(PhysicalInfo.LocalOrderTable, maskedOrderTable(orderTable, PhysicalInfo.Floor, buttonsToClear), aliveList)
 
 	// Updates from MV
 	if anyOrderToClear(buttonsToClear) {
@@ -227,7 +207,6 @@ func fsm_OnFloorArrival(
 		fromMV_Movement <- PhysicalInfo.Movement
 	}
 
-	setAllLights(PhysicalInfo.LocalOrderTable, orderTable, aliveList)
 	printElevatorMovement(PhysicalInfo.Movement)
 	return PhysicalInfo
 
@@ -235,8 +214,6 @@ func fsm_OnFloorArrival(
 
 func fsm_OnDoorTimeout(
 	PhysicalInfo elev.ElevatorPhysicalInfo,
-	orderTable elev.OrderTable,
-	aliveList elev.AliveList,
 	doorTimer *timer.Timer,
 	fromMV_LOT chan<- elev.LocalOrderTable,
 	fromMV_Movement chan<- elev.ElevatorMovement,
@@ -272,7 +249,6 @@ func fsm_OnDoorTimeout(
 		// Clear current floor
 		updated_LOT, buttonsToClear := requests.ClearCurrentFloor(PhysicalInfo.LocalOrderTable, PhysicalInfo.Floor, PhysicalInfo.MotorDir)
 		PhysicalInfo.LocalOrderTable = updated_LOT
-		setAllLights(PhysicalInfo.LocalOrderTable, maskedOrderTable(orderTable, PhysicalInfo.Floor, buttonsToClear), aliveList)
 
 		// Updates from MV
 		if anyOrderToClear(buttonsToClear) {
@@ -292,49 +268,8 @@ func fsm_OnDoorTimeout(
 
 	}
 
-	setAllLights(PhysicalInfo.LocalOrderTable, orderTable, aliveList)
 	printElevatorMovement(PhysicalInfo.Movement)
 	return PhysicalInfo
-}
-
-func maskedOrderTable(orderTable elev.OrderTable, floor int, buttonsToClear [elev.N_BUTTONS]bool) elev.OrderTable {
-	maskedOT := orderTable
-	for id := range maskedOT {
-		for btn := 0; btn < elev.N_BUTTONS; btn++ {
-			if buttonsToClear[btn] {
-				maskedOT[id][floor][btn] = elev.OS_NO_ORDER
-			}
-		}
-	}
-	return maskedOT
-}
-
-// Føkka opp import-greier når eg flytta til elevio
-func setAllLights(localOrderTable elev.LocalOrderTable, orderTable elev.OrderTable, aliveList elev.AliveList) {
-	for floor := 0; floor < elev.N_FLOORS; floor++ {
-		for btn := 0; btn < elev.N_BUTTONS; btn++ {
-			shouldLightUp := false
-			btnType := elevio.ButtonType(btn)
-
-			if btnType == elevio.BT_Cab {
-				if localOrderTable[floor][btn] {
-					shouldLightUp = true
-				}
-			} else {
-				for id, phys := range aliveList {
-					if phys.Role == elev.ER_Dead {
-						continue
-					}
-					if orderTable[id][floor][btn] == elev.OS_CONFIRMED {
-						shouldLightUp = true
-						break
-					}
-				}
-			}
-
-			elevio.SetButtonLamp(btnType, floor, shouldLightUp)
-		}
-	}
 }
 
 func printElevatorMovement(state elev.ElevatorMovement) {
