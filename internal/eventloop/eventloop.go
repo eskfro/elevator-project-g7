@@ -27,6 +27,7 @@ func Start(
 	fromIO_BtnPress <-chan elevio.ButtonEvent,
 	fromIO_Floor <-chan int,
 	fromIO_Obstruction <-chan bool,
+
 ) {
 	// Ticker for debugging
 	timeStart := time.Now()

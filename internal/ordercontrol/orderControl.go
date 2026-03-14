@@ -43,31 +43,26 @@ func OrderControl(
 			physicalInfo = newPhysicalInfo
 
 		case order := <-orderToReassign:
-
 			var rcvOrderTable elev.OrderTable
-			var timeoutID int
 
 			if physicalInfo.Role == elev.ER_Primary {
-
 				var localOT elev.LocalOrderTable
+
 				localOT[order.Floor][order.ButtonType] = true
 				rcvOrderTable = reassignHallOrders(orderTable, physicalInfo.Id, localOT)
 				allOrderTables[physicalInfo.Id] = rcvOrderTable
-				timeoutID = order.ElevId
-			} else {
-				rcvOrderTable = orderTable
-				timeoutID = elev.INVALID_ELEVATOR_ID
-			}
+				timeoutID := order.ElevId
 
-			// Update states and send
-			newOrderTable := updateOrderTable(orderTable, rcvOrderTable, physicalInfo.Id, allOrderTables, physicalInfo,
-				aliveList, updateTX_OTP, startOrderTimer, stopOrderTimer, timeoutID)
-			isOrderTableChanged := orderTable != newOrderTable
-			orderTable = newOrderTable
-			allOrderTables[physicalInfo.Id] = orderTable
+				bestID := calculateBestElevator(order.Floor, rcvOrderTable, aliveList, timeoutID)
 
-			if isOrderTableChanged {
+				rcvOrderTable[bestID][order.Floor][order.ButtonType] = elev.OS_CONFIRMED
+
+				orderTable = rcvOrderTable
+				allOrderTables[physicalInfo.Id] = orderTable
+
 				fromOC_OrderTable <- orderTable
+				updateTX_OTP <- elev.OrderTablePacket{Id: physicalInfo.Id, OrderTable: orderTable}
+
 			}
 
 		// Directly from rolemanager
@@ -103,7 +98,7 @@ func OrderControl(
 
 			// Update states and send
 			newOrderTable := updateOrderTable(orderTable, rcvOrderTable, physicalInfo.Id, allOrderTables, physicalInfo,
-				aliveList, updateTX_OTP, startOrderTimer, stopOrderTimer, elev.INVALID_ELEVATOR_ID)
+				aliveList, updateTX_OTP, startOrderTimer, stopOrderTimer)
 			isOrderTableChanged := orderTable != newOrderTable
 			orderTable = newOrderTable
 			allOrderTables[physicalInfo.Id] = orderTable
@@ -125,7 +120,7 @@ func OrderControl(
 			rcvOrderTable[physicalInfo.Id][btnPress.Floor][btnPress.Button] = elev.OS_REQUESTED
 			// Update states and send
 			newOrderTable := updateOrderTable(orderTable, rcvOrderTable, physicalInfo.Id, allOrderTables, physicalInfo,
-				aliveList, updateTX_OTP, startOrderTimer, stopOrderTimer, elev.INVALID_ELEVATOR_ID)
+				aliveList, updateTX_OTP, startOrderTimer, stopOrderTimer)
 			isOrderTableDifferent := orderTable != newOrderTable
 			orderTable = newOrderTable
 			allOrderTables[physicalInfo.Id] = orderTable
@@ -149,7 +144,7 @@ func OrderControl(
 			}
 			// Update states and send
 			newOrderTable := updateOrderTable(orderTable, rcvOrderTable, physicalInfo.Id, allOrderTables, physicalInfo,
-				aliveList, updateTX_OTP, startOrderTimer, stopOrderTimer, elev.INVALID_ELEVATOR_ID)
+				aliveList, updateTX_OTP, startOrderTimer, stopOrderTimer)
 			isOrderTableDifferent := orderTable != newOrderTable
 			orderTable = newOrderTable
 			allOrderTables[physicalInfo.Id] = orderTable
@@ -170,7 +165,7 @@ func OrderControl(
 			allOrderTables[packet.Id] = packet.OrderTable
 			// Update states and send
 			newOrderTable := updateOrderTable(orderTable, packet.OrderTable, packet.Id, allOrderTables, physicalInfo,
-				aliveList, updateTX_OTP, startOrderTimer, stopOrderTimer, elev.INVALID_ELEVATOR_ID)
+				aliveList, updateTX_OTP, startOrderTimer, stopOrderTimer)
 			isOrderTableDifferent := orderTable != newOrderTable
 			orderTable = newOrderTable
 			allOrderTables[physicalInfo.Id] = orderTable
@@ -192,7 +187,6 @@ func updateOrderTable(
 	updateTX_OTP chan<- elev.OrderTablePacket,
 	startOrderTimer chan<- elev.Order,
 	stopOrderTimer chan<- elev.Order,
-	timeoutID int,
 ) elev.OrderTable {
 
 	prevOrderTable := OrderTable
@@ -225,7 +219,7 @@ func updateOrderTable(
 			primaryOT = handlePrimaryStatusTransitions(primaryOT, primaryOT, aliveList)
 			allOrderTables[physicalInfo.Id] = primaryOT
 
-			primaryOT = assignAndClearOrders(primaryOT, aliveList, allOrderTables, physicalInfo.Id, startOrderTimer, stopOrderTimer, timeoutID)
+			primaryOT = assignAndClearOrders(primaryOT, aliveList, allOrderTables, physicalInfo.Id, startOrderTimer, stopOrderTimer)
 			isOrderTableChanged := primaryOT != prevOrderTable
 
 			if isOrderTableChanged {
@@ -245,7 +239,7 @@ func updateOrderTable(
 			// OrderStatus transitions
 			primaryOT = handlePrimaryStatusTransitions(primaryOT, rcvOrderTable, aliveList)
 
-			primaryOT = assignAndClearOrders(primaryOT, aliveList, allOrderTables, physicalInfo.Id, startOrderTimer, stopOrderTimer, timeoutID)
+			primaryOT = assignAndClearOrders(primaryOT, aliveList, allOrderTables, physicalInfo.Id, startOrderTimer, stopOrderTimer)
 			isOrderTableChanged := primaryOT != prevOrderTable
 
 			if isOrderTableChanged {
@@ -268,7 +262,6 @@ func assignAndClearOrders(
 	thisID int,
 	startOrderTimer chan<- elev.Order,
 	stopOrderTimer chan<- elev.Order,
-	timeoutID int,
 ) elev.OrderTable {
 
 	for floor := 0; floor < elev.N_FLOORS; floor++ {
@@ -305,11 +298,11 @@ func assignAndClearOrders(
 							continue
 						}
 
-						bestElevId := calculateBestElevator(floor, primaryOT, aliveList, timeoutID)
+						bestElevId := calculateBestElevator(floor, primaryOT, aliveList, elev.INVALID_ELEVATOR_ID)
 						log.Printf("[OrderControl] bestId = %d\n", bestElevId)
 
 						primaryOT[bestElevId][floor][btn] = elev.OS_CONFIRMED
-						startOrderTimer <- elev.Order{Floor: floor, ButtonType: elevio.ButtonType(btn)}
+						startOrderTimer <- elev.Order{ElevId: bestElevId, Floor: floor, ButtonType: elevio.ButtonType(btn)}
 						allOrderTables[thisID] = primaryOT
 						continue
 					}
@@ -322,9 +315,9 @@ func assignAndClearOrders(
 								continue
 							}
 							primaryOT[elevID][floor][btn] = elev.OS_NO_ORDER
+							stopOrderTimer <- elev.Order{ElevId: orderElevId, Floor: floor, ButtonType: elevio.ButtonType(btn)}
 						}
 						allOrderTables[thisID] = primaryOT
-						stopOrderTimer <- elev.Order{Floor: floor, ButtonType: elevio.ButtonType(btn)}
 					}
 				}
 			}
@@ -540,6 +533,7 @@ func calculateBestElevator(
 	if bestElevId == math.MaxInt {
 		log.Fatalln("CalculateWhichElevator failed! No elevators found in alivelist.")
 	}
+	log.Printf("[calculateBestElevator] TimeoutID = %d, BestElevId = %d, Cost = %d\n", timeoutID, bestElevId, minCost)
 	return bestElevId
 
 }

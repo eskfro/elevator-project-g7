@@ -13,7 +13,7 @@ func monitorOrderTable(
 	orderToReassign chan<- elev.Order,
 ) {
 
-	var orderTimers [elev.N_FLOORS][elev.N_BUTTONS]*timer.Timer
+	var orderTimers [elev.N_MAX_ELEVS][elev.N_FLOORS][elev.N_BUTTONS]*timer.Timer
 
 	for {
 		select {
@@ -23,9 +23,10 @@ func monitorOrderTable(
 			floor := newOrderTimer.Floor
 			btn := newOrderTimer.ButtonType
 
-			if orderTimers[floor][btn] == nil {
+			if orderTimers[elevID][floor][btn] == nil {
+
 				t := timer.New(elev.ORDER_TIMEOUT)
-				orderTimers[floor][btn] = t
+				orderTimers[elevID][floor][btn] = t
 
 				go func(floor int, btn elevio.ButtonType, elevID int, orderTimeout chan<- elev.Order, timerC <-chan struct{}) {
 					for range timerC {
@@ -36,14 +37,16 @@ func monitorOrderTable(
 				}(floor, btn, elevID, orderToReassign, t.C)
 
 			}
-			orderTimers[floor][btn].Start()
+			orderTimers[elevID][floor][btn].Start()
 
 		case stopTimer := <-stopOrderTimer:
+
+			elevID := stopTimer.ElevId
 			floor := stopTimer.Floor
 			btn := stopTimer.ButtonType
 
-			if orderTimers[floor][btn] != nil {
-				orderTimers[floor][btn].Stop()
+			if orderTimers[elevID][floor][btn] != nil {
+				orderTimers[elevID][floor][btn].Stop()
 			}
 
 		}
