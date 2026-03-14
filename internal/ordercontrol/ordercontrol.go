@@ -71,7 +71,7 @@ func OrderControl(
 			allOrderTables[physicalInfo.Id] = orderTable
 
 			if isOrderTableChanged {
-				sendUpdateFromOC(orderTable, fromOC_OrderTable)
+				fromOC_OrderTable <- orderTable
 			}
 
 		// ============================================================================== BTN PRESS FROM IO
@@ -92,7 +92,7 @@ func OrderControl(
 			allOrderTables[physicalInfo.Id] = orderTable
 
 			if isOrderTableDifferent {
-				sendUpdateFromOC(orderTable, fromOC_OrderTable)
+				fromOC_OrderTable <- orderTable
 			}
 
 		// =========================================================================== CLEAR ORDER FROM MOVEMENT
@@ -115,7 +115,7 @@ func OrderControl(
 			allOrderTables[physicalInfo.Id] = orderTable
 
 			if isOrderTableDifferent {
-				sendUpdateFromOC(orderTable, fromOC_OrderTable)
+				fromOC_OrderTable <- orderTable
 			}
 
 		// =========================================================================== PACKET FROM RECIEVER
@@ -133,19 +133,12 @@ func OrderControl(
 			isOrderTableDifferent := orderTable != newOrderTable
 			orderTable = newOrderTable
 			allOrderTables[physicalInfo.Id] = orderTable
+
 			if isOrderTableDifferent {
-				sendUpdateFromOC(orderTable, fromOC_OrderTable)
+				fromOC_OrderTable <- orderTable
 			}
 		}
 	}
-}
-
-// TODO: Er det nødvendig å ha denne funksjonen?
-func sendUpdateFromOC(
-	orderTable elev.OrderTable,
-	fromOC_OrderTable chan<- elev.OrderTable,
-) {
-	fromOC_OrderTable <- orderTable
 }
 
 // Her oppdaterer man OrderTable. Det er tre måter OrderTable oppdateres:

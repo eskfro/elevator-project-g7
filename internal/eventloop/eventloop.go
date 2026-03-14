@@ -64,8 +64,8 @@ func Start(
 	// Reciever
 	updateRX_Role := make(chan elev.ElevatorRole, 5)
 	updateRX_PrimaryId := make(chan int, 5)
-	fromRX_OrderTableP := make(chan elev.OrderTablePacket, 50)
-	fromRX_PhysicalInfo := make(chan elev.ElevatorPhysicalInfo, 50)
+	fromRX_OrderTableP := make(chan elev.OrderTablePacket, 100)
+	fromRX_PhysicalInfo := make(chan elev.ElevatorPhysicalInfo, 100)
 
 	// Start modules
 	go movement.Movement(elevator, updateMV_PhysicalInfo, updateMV_OrderTable, updateMV_AliveList, fromMV_LOT, fromMV_Movement, fromMV_MotorDir, fromMV_ClearOrders, toMV_FloorArrival)
@@ -122,38 +122,53 @@ func Start(
 
 			case newOrderTable := <-fromOC_OrderTable:
 				log.Println("[MAIN] From OC: OrderTable")
-				prevLOT := elevator.PhysicalInfo.LocalOrderTable
+				isLOTChanged := elevator.PhysicalInfo.LocalOrderTable != ordercontrol.OrderTableToLOT(newOrderTable, elevator.PhysicalInfo.Id)
+				isOTChanged := elevator.OrderTable != newOrderTable
+
 				elevator.OrderTable = newOrderTable
 				elevator.PhysicalInfo.LocalOrderTable = ordercontrol.OrderTableToLOT(elevator.OrderTable, elevator.PhysicalInfo.Id)
-				isChanged := prevLOT != elevator.PhysicalInfo.LocalOrderTable
 
-				if isChanged {
+				if isLOTChanged {
 					sendPhysicalInfoUpdate(elevator.PhysicalInfo, updateMV_PhysicalInfo)
 				}
-				updateMV_OrderTable <- elevator.OrderTable
-				updateMV_AliveList <- elevator.AliveList
+				if isOTChanged {
+					updateMV_OrderTable <- elevator.OrderTable
+					
+				}
 
 			// =================================================================== FROM ROLEMANAGER
 
 			case newRole := <-fromRM_Role:
 				log.Println("[MAIN] From RM: Role")
+				isChanged := elevator.PhysicalInfo.Role != newRole
 				elevator.PhysicalInfo.Role = newRole
-				updateTX_Role <- elevator.PhysicalInfo.Role
-				updateRX_Role <- elevator.PhysicalInfo.Role
-				sendPhysicalInfoUpdate(elevator.PhysicalInfo, updateMV_PhysicalInfo, updateOC_PhysicalInfo, updateTX_PhysicalInfo)
+
+				if isChanged {
+					updateTX_Role <- elevator.PhysicalInfo.Role
+					updateRX_Role <- elevator.PhysicalInfo.Role
+					sendPhysicalInfoUpdate(elevator.PhysicalInfo, updateMV_PhysicalInfo, updateOC_PhysicalInfo, updateTX_PhysicalInfo)
+				}
 
 			case newPrimaryId := <-fromRM_PrimaryId:
 				log.Println("[MAIN] From RM: Primary ID")
+				isChanged := elevator.PhysicalInfo.PrimaryId != newPrimaryId
 				elevator.PhysicalInfo.PrimaryId = newPrimaryId
-				sendPhysicalInfoUpdate(elevator.PhysicalInfo, updateMV_PhysicalInfo, updateOC_PhysicalInfo, updateTX_PhysicalInfo)
-				updateRX_PrimaryId <- elevator.PhysicalInfo.PrimaryId
+
+				if isChanged {
+					sendPhysicalInfoUpdate(elevator.PhysicalInfo, updateMV_PhysicalInfo, updateOC_PhysicalInfo, updateTX_PhysicalInfo)
+					updateRX_PrimaryId <- elevator.PhysicalInfo.PrimaryId
+				}
 
 			case newAliveList := <-fromRM_AliveList:
 				log.Println("[MAIN] From RM: New AliveList")
+				isChanged := elevator.AliveList != newAliveList
 				elevator.AliveList = newAliveList
 				elevator.NumElevs = rolemanager.CountNumElevs(elevator.AliveList)
-				updateOC_AliveList <- elevator.AliveList
-				updateMV_AliveList <- elevator.AliveList
+
+				if isChanged {
+					updateOC_AliveList <- elevator.AliveList
+					updateMV_AliveList <- elevator.AliveList
+				}
 			}
 		}
 	}()

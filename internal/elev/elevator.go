@@ -88,7 +88,7 @@ type Elevator struct {
 	NumElevs       int
 }
 
-// ========================================= HELPER FUNCTIONS (TODO: slett eller flytt i egen fil [Koffor d🤔?]) 
+// ========================================= HELPER FUNCTIONS (TODO: slett eller flytt i egen fil [Koffor d🤔?])
 
 func CreateElevator(_Id int, _Port int, _Ip string) Elevator {
 	elevator := Elevator{PhysicalInfo: createPhysicalElevator(_Id, _Ip)}

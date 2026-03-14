@@ -50,8 +50,6 @@ func RxHeartBeat(
 			continue
 		}
 
-		// Før ignorerte vi meldinger fra oss selv, vi slutta med det
-
 		select {
 		case fromRX_PhysicalInfo <- rcvPhysicalInfo:
 		default:

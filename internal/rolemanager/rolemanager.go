@@ -17,7 +17,7 @@ func RoleManager(
 	fromRM_AliveList chan<- elev.AliveList,
 	fromRM_ResetVersion chan<- int,
 ) {
-	heartBeatId := make(chan int, 50)
+	heartBeatId := make(chan int, 200)
 	timedOutId := make(chan int, 50)
 
 	// Local to RoleManager
@@ -40,7 +40,6 @@ func RoleManager(
 			physicalInfo, aliveList = handleAliveListUpdate(physicalInfo, aliveList, timeStart, fromRM_AliveList, fromRM_PrimaryId, fromRM_Role, true, false)
 
 		case heartbeat := <-fromRX_PhysicalInfo:
-			// Always update watchdog timer
 			select {
 			case heartBeatId <- heartbeat.Id:
 			default:
@@ -52,7 +51,6 @@ func RoleManager(
 			wasDead := aliveList[heartbeat.Id].Role == elev.ER_Dead
 
 			// I starten settes PrimaryId til INVALID.
-			// Da bryr man seg ikke om isHeartBeatUnchanged fordi man må uansett oppdatere PrimaryId
 			if !isHeartbeatChanged && isValidPrimaryId && !wasDead {
 				continue
 			}
