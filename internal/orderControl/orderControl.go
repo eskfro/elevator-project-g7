@@ -47,19 +47,29 @@ func OrderControl(
 
 			if physicalInfo.Role == elev.ER_Primary {
 				var localOT elev.LocalOrderTable
-
+				rcvOrderTable = orderTable
 				localOT[order.Floor][order.ButtonType] = true
-				rcvOrderTable = reassignHallOrders(orderTable, physicalInfo.Id, localOT)
+
+				// Clear the old requests
+				for elevID := 0; elevID < elev.N_MAX_ELEVS; elevID++ {
+					if aliveList[elevID].Role == elev.ER_Dead {
+						continue
+					}
+					rcvOrderTable[elevID][order.Floor][order.ButtonType] = elev.OS_NO_ORDER
+				}
+
+				// Reassign order to primary
+				rcvOrderTable = reassignHallOrders(rcvOrderTable, physicalInfo.Id, localOT)
 				allOrderTables[physicalInfo.Id] = rcvOrderTable
 				timeoutID := order.ElevId
 
+				// Find best elevator to take new order
 				bestID := calculateBestElevator(order.Floor, rcvOrderTable, aliveList, timeoutID)
-
 				rcvOrderTable[bestID][order.Floor][order.ButtonType] = elev.OS_CONFIRMED
 
+				// Set values and send
 				orderTable = rcvOrderTable
 				allOrderTables[physicalInfo.Id] = orderTable
-
 				fromOC_OrderTable <- orderTable
 				updateTX_OTP <- elev.OrderTablePacket{Id: physicalInfo.Id, OrderTable: orderTable}
 
