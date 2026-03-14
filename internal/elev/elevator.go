@@ -13,6 +13,7 @@ const N_MAX_ELEVS = 4
 
 const DOOR_OPEN_TIME = 3000 * time.Millisecond
 const HEARTBEAT_TIMEOUT = 501 * time.Millisecond
+const ORDER_TIMEOUT = 10 * time.Second
 const PRIMARY_ELECTION_DELAY = 401 * time.Millisecond
 
 const INVALID_ELEVATOR_ID = N_MAX_ELEVS + 1
@@ -70,7 +71,6 @@ type ElevatorPhysicalInfo struct {
 	Id              int
 	Floor           int
 	PrimaryId       int
-	PrimaryIp       string
 	Ip              string
 	Role            ElevatorRole
 	MotorDir        elevio.MotorDirection

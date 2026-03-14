@@ -25,7 +25,7 @@ func RoleManager(
 	physicalInfo := initElev.PhysicalInfo
 	timeStart := time.Now()
 
-	go MonitorHeartBeats(heartBeatId, timedOutId)
+	go monitorHeartBeats(heartBeatId, timedOutId)
 
 	for {
 		select {
@@ -152,7 +152,10 @@ func handleAliveListUpdate(
 	return physicalInfo, aliveList
 }
 
-func MonitorHeartBeats(heartBeatId <-chan int, timedOutId chan<- int) {
+func monitorHeartBeats(
+	heartBeatId <-chan int, 
+	timedOutId chan<- int,
+) {
 	// Array of timers accessed by id
 	var elevTimers [elev.N_MAX_ELEVS]*timer.Timer
 
@@ -160,7 +163,7 @@ func MonitorHeartBeats(heartBeatId <-chan int, timedOutId chan<- int) {
 		isIndexInvalid := id < 0 || id >= elev.N_MAX_ELEVS
 
 		if isIndexInvalid {
-			log.Fatalf("[MonitorHeartBeats] Error: ID %d out of bounds\n", id)
+			log.Fatalf("[monitorHeartBeats] Error: ID %d out of bounds\n", id)
 			continue
 		}
 
@@ -168,7 +171,7 @@ func MonitorHeartBeats(heartBeatId <-chan int, timedOutId chan<- int) {
 
 		// INIT TIMER GOROUTINE
 		if t == nil {
-			fmt.Printf("[MonitorHeartBeats] New elevator: ID %d. Initializing timer.\n", id)
+			fmt.Printf("[monitorHeartBeats] New elevator: ID %d. Initializing timer.\n", id)
 
 			// Create the timer and store it in the array
 			t = timer.New(elev.HEARTBEAT_TIMEOUT)
@@ -178,7 +181,7 @@ func MonitorHeartBeats(heartBeatId <-chan int, timedOutId chan<- int) {
 			go func(id int, timeoutChan chan<- int, timerC <-chan struct{}) {
 				for range timerC {
 					timeoutChan <- id
-					fmt.Printf("[MonitorHeartBeats] Timeout triggered on elev id = %d\n", id)
+					fmt.Printf("[monitorHeartBeats] Timeout triggered on elev id = %d\n", id)
 				}
 			}(id, timedOutId, t.C)
 		}

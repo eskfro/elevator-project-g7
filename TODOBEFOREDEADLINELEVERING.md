@@ -6,6 +6,5 @@
 - 6 Fjerne funksjoner vi ikke bruker // DONE (ish)
 - 7 Ordne snakeCase: AliveList -> aliveList, utenom i structs der vi vil det skal være public //Har ikkje sett på medlemsvariable i structs, ellers done
 - 8 Når en ny primary velges blir det noen ganger en stuck ordre som står confirmed og ikke vil cleares. Sikkert noe med clearingen å gjøre //DONE
-- 9 Kanskje vi kan flytt setAllLights ut fra Movement inn til eventLoop egentlig. Da kan vi flytte SetAllLights inn til elevio. 
 
 NB! Husk å aldri sende over channels unødvendig, fordi man bruker channels som events, hvis ikke blir alt fort fucked!!! 

@@ -4,6 +4,7 @@ import (
 	"elevator-project-g7/internal/elev"
 	"elevator-project-g7/internal/elevio"
 	"elevator-project-g7/internal/requests"
+	"elevator-project-g7/internal/rolemanager"
 	"log"
 	"math"
 )
@@ -19,19 +20,55 @@ func OrderControl(
 	updateTX_OTP chan<- elev.OrderTablePacket,
 ) {
 
+	startOrderTimer := make(chan elev.Order, 10)
+	stopOrderTimer := make(chan elev.Order, 10)
+	orderToReassign := make(chan elev.Order, 10)
+
 	// Local to OrderControl
 	orderTable := initElev.OrderTable
 	allOrderTables := initElev.AllOrderTables
 	physicalInfo := initElev.PhysicalInfo
 	aliveList := initElev.AliveList
 
+	go monitorOrderTable(startOrderTimer, stopOrderTimer, orderToReassign)
+
 	for {
 
 		select {
 
+		// New
+
 		case newPhysicalInfo := <-updateOC_PhysicalInfo:
 			log.Println("[OrderControl] PhysicalInfo Update")
 			physicalInfo = newPhysicalInfo
+
+		case order := <-orderToReassign:
+
+			var rcvOrderTable elev.OrderTable
+			var timeoutID int
+
+			if physicalInfo.Role == elev.ER_Primary {
+
+				var localOT elev.LocalOrderTable
+				localOT[order.Floor][order.ButtonType] = true
+				rcvOrderTable = reassignHallOrders(orderTable, physicalInfo.Id, localOT)
+				allOrderTables[physicalInfo.Id] = rcvOrderTable
+				timeoutID = order.ElevId
+			} else {
+				rcvOrderTable = orderTable
+				timeoutID = elev.INVALID_ELEVATOR_ID
+			}
+
+			// Update states and send
+			newOrderTable := updateOrderTable(orderTable, rcvOrderTable, physicalInfo.Id, allOrderTables, physicalInfo,
+				aliveList, updateTX_OTP, startOrderTimer, stopOrderTimer, timeoutID)
+			isOrderTableChanged := orderTable != newOrderTable
+			orderTable = newOrderTable
+			allOrderTables[physicalInfo.Id] = orderTable
+
+			if isOrderTableChanged {
+				fromOC_OrderTable <- orderTable
+			}
 
 		// Directly from rolemanager
 		case newAliveList := <-updateOC_AliveList:
@@ -65,7 +102,8 @@ func OrderControl(
 			}
 
 			// Update states and send
-			newOrderTable := updateOrderTable(orderTable, rcvOrderTable, physicalInfo.Id, allOrderTables, physicalInfo, aliveList, updateTX_OTP)
+			newOrderTable := updateOrderTable(orderTable, rcvOrderTable, physicalInfo.Id, allOrderTables, physicalInfo,
+				aliveList, updateTX_OTP, startOrderTimer, stopOrderTimer, elev.INVALID_ELEVATOR_ID)
 			isOrderTableChanged := orderTable != newOrderTable
 			orderTable = newOrderTable
 			allOrderTables[physicalInfo.Id] = orderTable
@@ -86,7 +124,8 @@ func OrderControl(
 			}
 			rcvOrderTable[physicalInfo.Id][btnPress.Floor][btnPress.Button] = elev.OS_REQUESTED
 			// Update states and send
-			newOrderTable := updateOrderTable(orderTable, rcvOrderTable, physicalInfo.Id, allOrderTables, physicalInfo, aliveList, updateTX_OTP)
+			newOrderTable := updateOrderTable(orderTable, rcvOrderTable, physicalInfo.Id, allOrderTables, physicalInfo,
+				aliveList, updateTX_OTP, startOrderTimer, stopOrderTimer, elev.INVALID_ELEVATOR_ID)
 			isOrderTableDifferent := orderTable != newOrderTable
 			orderTable = newOrderTable
 			allOrderTables[physicalInfo.Id] = orderTable
@@ -109,7 +148,8 @@ func OrderControl(
 				}
 			}
 			// Update states and send
-			newOrderTable := updateOrderTable(orderTable, rcvOrderTable, physicalInfo.Id, allOrderTables, physicalInfo, aliveList, updateTX_OTP)
+			newOrderTable := updateOrderTable(orderTable, rcvOrderTable, physicalInfo.Id, allOrderTables, physicalInfo,
+				aliveList, updateTX_OTP, startOrderTimer, stopOrderTimer, elev.INVALID_ELEVATOR_ID)
 			isOrderTableDifferent := orderTable != newOrderTable
 			orderTable = newOrderTable
 			allOrderTables[physicalInfo.Id] = orderTable
@@ -129,7 +169,8 @@ func OrderControl(
 			// AOT Update
 			allOrderTables[packet.Id] = packet.OrderTable
 			// Update states and send
-			newOrderTable := updateOrderTable(orderTable, packet.OrderTable, packet.Id, allOrderTables, physicalInfo, aliveList, updateTX_OTP)
+			newOrderTable := updateOrderTable(orderTable, packet.OrderTable, packet.Id, allOrderTables, physicalInfo,
+				aliveList, updateTX_OTP, startOrderTimer, stopOrderTimer, elev.INVALID_ELEVATOR_ID)
 			isOrderTableDifferent := orderTable != newOrderTable
 			orderTable = newOrderTable
 			allOrderTables[physicalInfo.Id] = orderTable
@@ -141,10 +182,6 @@ func OrderControl(
 	}
 }
 
-// Her oppdaterer man OrderTable. Det er tre måter OrderTable oppdateres:
-// 1. btnPress fra IO
-// 2. clearOrder fra Movement
-// 3. oppdatering fra primary gjennom nettverket
 func updateOrderTable(
 	OrderTable elev.OrderTable,
 	rcvOrderTable elev.OrderTable,
@@ -153,6 +190,9 @@ func updateOrderTable(
 	physicalInfo elev.ElevatorPhysicalInfo,
 	aliveList elev.AliveList,
 	updateTX_OTP chan<- elev.OrderTablePacket,
+	startOrderTimer chan<- elev.Order,
+	stopOrderTimer chan<- elev.Order,
+	timeoutID int,
 ) elev.OrderTable {
 
 	prevOrderTable := OrderTable
@@ -185,7 +225,7 @@ func updateOrderTable(
 			primaryOT = handlePrimaryStatusTransitions(primaryOT, primaryOT, aliveList)
 			allOrderTables[physicalInfo.Id] = primaryOT
 
-			primaryOT = assignAndClearOrders(primaryOT, aliveList, allOrderTables, physicalInfo.Id)
+			primaryOT = assignAndClearOrders(primaryOT, aliveList, allOrderTables, physicalInfo.Id, startOrderTimer, stopOrderTimer, timeoutID)
 			isOrderTableChanged := primaryOT != prevOrderTable
 
 			if isOrderTableChanged {
@@ -205,7 +245,7 @@ func updateOrderTable(
 			// OrderStatus transitions
 			primaryOT = handlePrimaryStatusTransitions(primaryOT, rcvOrderTable, aliveList)
 
-			primaryOT = assignAndClearOrders(primaryOT, aliveList, allOrderTables, physicalInfo.Id)
+			primaryOT = assignAndClearOrders(primaryOT, aliveList, allOrderTables, physicalInfo.Id, startOrderTimer, stopOrderTimer, timeoutID)
 			isOrderTableChanged := primaryOT != prevOrderTable
 
 			if isOrderTableChanged {
@@ -226,6 +266,9 @@ func assignAndClearOrders(
 	aliveList elev.AliveList,
 	allOrderTables elev.AllOrderTables,
 	thisID int,
+	startOrderTimer chan<- elev.Order,
+	stopOrderTimer chan<- elev.Order,
+	timeoutID int,
 ) elev.OrderTable {
 
 	for floor := 0; floor < elev.N_FLOORS; floor++ {
@@ -262,10 +305,11 @@ func assignAndClearOrders(
 							continue
 						}
 
-						bestElevId := calculateBestElevator(floor, primaryOT, aliveList)
+						bestElevId := calculateBestElevator(floor, primaryOT, aliveList, timeoutID)
 						log.Printf("[OrderControl] bestId = %d\n", bestElevId)
 
 						primaryOT[bestElevId][floor][btn] = elev.OS_CONFIRMED
+						startOrderTimer <- elev.Order{Floor: floor, ButtonType: elevio.ButtonType(btn)}
 						allOrderTables[thisID] = primaryOT
 						continue
 					}
@@ -280,6 +324,7 @@ func assignAndClearOrders(
 							primaryOT[elevID][floor][btn] = elev.OS_NO_ORDER
 						}
 						allOrderTables[thisID] = primaryOT
+						stopOrderTimer <- elev.Order{Floor: floor, ButtonType: elevio.ButtonType(btn)}
 					}
 				}
 			}
@@ -470,19 +515,24 @@ func calculateBestElevator(
 	orderFloor int,
 	OrderTable elev.OrderTable,
 	AliveList elev.AliveList,
+	timeoutID int,
 ) int {
 
 	minCost := math.MaxInt
 	bestElevId := math.MaxInt
+	isOneElev := rolemanager.CountNumElevs(AliveList) == 1
 
 	for elevIndex := 0; elevIndex < elev.N_MAX_ELEVS; elevIndex++ {
 		isDeadElev := AliveList[elevIndex].Role == elev.ER_Dead
 		if isDeadElev {
 			continue
 		}
+		if isOneElev {
+			return elevIndex
+		}
 		currentElev := AliveList[elevIndex]
 		cost := calculateCost(orderFloor, currentElev, OrderTableToLOT(OrderTable, currentElev.Id))
-		if cost < minCost {
+		if cost < minCost && timeoutID != elevIndex {
 			minCost = cost
 			bestElevId = currentElev.Id
 		}
