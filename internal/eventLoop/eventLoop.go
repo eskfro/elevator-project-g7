@@ -5,8 +5,8 @@ import (
 	"elevator-project-g7/internal/elevio"
 	"elevator-project-g7/internal/movement"
 	"elevator-project-g7/internal/network"
-	"elevator-project-g7/internal/ordercontrol"
-	"elevator-project-g7/internal/rolemanager"
+	ordercontrol "elevator-project-g7/internal/orderControl"
+	rolemanager "elevator-project-g7/internal/roleManager"
 	"log"
 	"time"
 )

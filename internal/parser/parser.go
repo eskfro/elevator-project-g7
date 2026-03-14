@@ -6,16 +6,16 @@ import (
 	"strconv"
 )
 
-func ParseOsArgs(args []string, sim bool) (int, network.Ports) {
+func ParseOsArgs(args []string, sim bool) (int, network.Ports, string) {
 	/*
 		Parser for OS-args when running program from cmd line
-		Returns Id, HardwarePort, HeartBeatPort, OrderTablePort
+		Returns Id, Ports, ProcessPairRole
 	*/
 
 	if sim {
-		return 0, network.Ports{Hardware: 15657, OrderTableP: 16767, HeartBeat: 16668}
+		return 0, network.Ports{Hardware: 15657, OrderTableP: 16767, HeartBeat: 16668}, "1"
 	}
-	if len(args) < 5 {
+	if len(args) < 6 {
 		log.Fatalln("OS args missing! (1)")
 	}
 
@@ -23,11 +23,15 @@ func ParseOsArgs(args []string, sim bool) (int, network.Ports) {
 	port_HW, err1 := strconv.Atoi(args[2])
 	port_HB, err2 := strconv.Atoi(args[3])
 	port_OT, err3 := strconv.Atoi(args[4])
+	ppRole := args[5]
 
 	if err0 != nil || err1 != nil || err2 != nil || err3 != nil {
 		log.Fatalln("OS args missing! (2)")
 	}
 
-	return id, network.Ports{Hardware: port_HW, OrderTableP: port_OT, HeartBeat: port_HB}
+	return id, network.Ports{Hardware: port_HW, OrderTableP: port_OT, HeartBeat: port_HB}, ppRole
+
+	// ppRole = "1" -> Programmet starter som en master
+	// ppRole = "0" -> Programmet starter som slave, denne er blitt kalt fra en master.
 
 }

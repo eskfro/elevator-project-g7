@@ -4,7 +4,7 @@ import (
 	"elevator-project-g7/internal/elev"
 	"elevator-project-g7/internal/elevio"
 	"elevator-project-g7/internal/requests"
-	"elevator-project-g7/internal/rolemanager"
+	rolemanager "elevator-project-g7/internal/roleManager"
 	"log"
 	"math"
 )

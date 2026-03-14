@@ -19,6 +19,7 @@ cd "$SCRIPT_DIR/.."
 HW_PORT=$((16657 + E_ID)) # hardware port, needs to mach the simulation script port
 HB_PORT=11311 # heartbeat port -> constant for all elevs
 OT_PORT=10411 # Port for primary TCP if this becomes primary. Elevator ID is when elevator is inited. It is actually different for OrderTable things
+PP_ROLE=1 # 1 = Master / 0 = Slave (called from master program)
 
 
 
@@ -43,6 +44,6 @@ sleep 1
 
 # --- ELEVATOR CLIENT ---
 echo "Starting Elevator $E_ID (HW: $HW_PORT, HB: $HB_PORT, OT: $OT_PORT)..."
-gnome-terminal --geometry="${W}x${H}+${X0}+${Y_BOT}" --title="Elevator $E_ID" -- bash -c "./out $E_ID $HW_PORT $HB_PORT $OT_PORT; exec bash" &
+gnome-terminal --geometry="${W}x${H}+${X0}+${Y_BOT}" --title="Elevator $E_ID" -- bash -c "./out $E_ID $HW_PORT $HB_PORT $OT_PORT $PP_ROLE; exec bash" &
 
 sleep 1

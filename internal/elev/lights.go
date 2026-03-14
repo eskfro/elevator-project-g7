@@ -29,15 +29,3 @@ func SetAllLights(localOrderTable LocalOrderTable, orderTable OrderTable, aliveL
 		}
 	}
 }
-
-func MaskedOrderTable(orderTable OrderTable, floor int, buttonsToClear [N_BUTTONS]bool) OrderTable {
-	maskedOT := orderTable
-	for id := range maskedOT {
-		for btn := 0; btn < N_BUTTONS; btn++ {
-			if buttonsToClear[btn] {
-				maskedOT[id][floor][btn] = OS_NO_ORDER
-			}
-		}
-	}
-	return maskedOT
-}
