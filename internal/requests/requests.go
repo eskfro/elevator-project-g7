@@ -166,10 +166,17 @@ func ClearCurrentFloor(localOrderTable elev.LocalOrderTable,
 		buttonsToClear[elevio.BT_HallDown] = true
 
 	default:
-		localOrderTable[currentFloor][elevio.BT_HallUp] = false
-		localOrderTable[currentFloor][elevio.BT_HallDown] = false
-		buttonsToClear[elevio.BT_HallUp] = true
-		buttonsToClear[elevio.BT_HallDown] = true
+		//localOrderTable[currentFloor][elevio.BT_HallUp] = false
+		//localOrderTable[currentFloor][elevio.BT_HallDown] = false
+		//buttonsToClear[elevio.BT_HallUp] = true
+		//buttonsToClear[elevio.BT_HallDown] = true
+		if localOrderTable[currentFloor][elevio.BT_HallUp] {
+			localOrderTable[currentFloor][elevio.BT_HallUp] = false
+			buttonsToClear[elevio.BT_HallUp] = true
+		} else if localOrderTable[currentFloor][elevio.BT_HallDown] {
+			localOrderTable[currentFloor][elevio.BT_HallDown] = false
+			buttonsToClear[elevio.BT_HallDown] = true
+		}
 
 	}
 	return localOrderTable, buttonsToClear

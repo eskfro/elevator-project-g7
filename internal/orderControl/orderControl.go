@@ -36,8 +36,6 @@ func OrderControl(
 
 		select {
 
-		// New
-
 		case newPhysicalInfo := <-updateOC_PhysicalInfo:
 			log.Println("[OrderControl] PhysicalInfo Update")
 			physicalInfo = newPhysicalInfo
@@ -555,6 +553,7 @@ func calculateCost(orderFloor int, elevator elev.ElevatorPhysicalInfo, LocalOrde
 	penaltyFloorDiff := 3
 	penaltyNumOrders := 3
 	penaltyWrongDir := 10
+	penaltyObstruction := 100
 
 	numOrders := 0
 
@@ -576,6 +575,9 @@ func calculateCost(orderFloor int, elevator elev.ElevatorPhysicalInfo, LocalOrde
 	if wrongDir {
 		totalCost += penaltyWrongDir
 	}
+	if elevator.Obstructed {
+		totalCost += penaltyObstruction
+	}
 	return totalCost
 
 }
@@ -588,4 +590,14 @@ func OrderTableToLOT(OrderTable elev.OrderTable, elevId int) elev.LocalOrderTabl
 		}
 	}
 	return localOT
+}
+func HasOrders(lot elev.LocalOrderTable) bool {
+	for f := 0; f < elev.N_FLOORS; f++ {
+		for b := 0; b < elev.N_BUTTONS; b++ {
+			if lot[f][b] {
+				return true
+			}
+		}
+	}
+	return false
 }
