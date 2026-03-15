@@ -37,18 +37,15 @@ func Start(
 	id int,
 	ports network.Ports,
 	ppRole string,
-	fromIO_BtnPress <-chan elevio.ButtonEvent,
-	fromIO_Floor <-chan int,
-	fromIO_Obstruction <-chan bool,
 ) {
 	switch Role(ppRole) {
 	case PP_MASTER:
 		log.Println("[PP START] ppRole = Master")
-		startMaster(id, ports, fromIO_BtnPress, fromIO_Floor, fromIO_Obstruction)
+		startMaster(id, ports)
 
 	case PP_SLAVE:
 		log.Println("[PP START] ppRole = Slave")
-		startSlave(id, ports, fromIO_BtnPress, fromIO_Floor, fromIO_Obstruction)
+		startSlave(id, ports)
 
 	default:
 		log.Fatalln("[PP START] ppRole not 0 or 1")
@@ -58,20 +55,20 @@ func Start(
 func startMaster(
 	id int,
 	ports network.Ports,
-	fromIO_BtnPress <-chan elevio.ButtonEvent,
-	fromIO_Floor <-chan int,
-	fromIO_Obstruction <-chan bool,
 ) {
-
 	// Start Process Pair Slave
-	spawnSlave(id, ports)
-
+	
 	elevio.InitPhysicalElevator("localhost", ports.Hardware, elev.N_FLOORS)
 	elevator := elev.CreateElevator(id, ports.Hardware, network.GetLocalIP())
-
+	
+	fromIO_BtnPress, fromIO_Floor, fromIO_Obstruction := elevio.Inputs()
+	
 	snapshotTx := make(chan elev.Elevator, 32)
 	go txHeartbeat(localHeartbeatPort(id))
 	go txSnapshots(localSnapshotPort(id), snapshotTx)
+	spawnSlave(id, ports)
+	
+	snapshotTx <- elevator
 
 	eventloop.Start(elevator, ports, fromIO_BtnPress, fromIO_Floor, fromIO_Obstruction, snapshotTx)
 }
@@ -79,12 +76,9 @@ func startMaster(
 func startSlave(
 	id int,
 	ports network.Ports,
-	fromIO_BtnPress <-chan elevio.ButtonEvent,
-	fromIO_Floor <-chan int,
-	fromIO_Obstruction <-chan bool,
 ) {
-	hbRx := make(chan struct{}, 1)
-	snapshotRx := make(chan Snapshot, 1)
+	hbRx := make(chan struct{}, 32)
+	snapshotRx := make(chan Snapshot, 32)
 
 	done := make(chan struct{})
 	go rxHeartbeat(localHeartbeatPort(id), hbRx, done)
@@ -118,8 +112,7 @@ func startSlave(
 			}
 			//Slave takes control over hardware
 			elevio.InitPhysicalElevator("localhost", ports.Hardware, elev.N_FLOORS)
-
-			spawnSlave(id, ports)
+			fromIO_BtnPress, fromIO_Floor, fromIO_Obstruction := elevio.Inputs()
 
 			snapshotTx := make(chan elev.Elevator, 32)
 			go txHeartbeat(localHeartbeatPort(id))
@@ -128,15 +121,20 @@ func startSlave(
 			// Check these if troubleshooting
 			mirrorElev.PhysicalInfo.Role = elev.ER_Backup
 			mirrorElev.PhysicalInfo.PrimaryId = elev.INVALID_PRIMARY_ID
+			mirrorElev.PhysicalInfo.Movement = elev.EM_Idle
+			mirrorElev.PhysicalInfo.MotorDir = elevio.MD_Stop
+
+			snapshotTx <- mirrorElev
 
 			close(done)
+			spawnSlave(id, ports)
 			eventloop.Start(mirrorElev, ports, fromIO_BtnPress, fromIO_Floor, fromIO_Obstruction, snapshotTx)
 			return
 		}
 	}
 }
 
-func spawnSlave(id int, ports network.Ports) {
+func spawnSlave2(id int, ports network.Ports) {
 	log.Println("[PROCESS PAIRS]============================ I HAVE TRIED TO SPAWN A BACKUP")
 	cmd := exec.Command(
 		"gnome-terminal",
@@ -146,10 +144,32 @@ func spawnSlave(id int, ports network.Ports) {
 		strconv.Itoa(ports.Hardware),
 		strconv.Itoa(ports.HeartBeat),
 		strconv.Itoa(ports.OrderTableP),
-		string(PP_SLAVE),
+		string(PP_SLAVE)+"; read",
 	)
 	if err := cmd.Start(); err != nil {
 		log.Fatal(err)
+	}
+}
+
+func spawnSlave(id int, ports network.Ports) {
+	log.Println("[PROCESS PAIRS]============================ I HAVE TRIED TO SPAWN A BACKUP")
+
+	cmd := exec.Command(
+		"gnome-terminal",
+		"--",
+		"bash",
+		"-c",
+		"./"+TARGET+" "+
+			strconv.Itoa(id)+" "+
+			strconv.Itoa(ports.Hardware)+" "+
+			strconv.Itoa(ports.HeartBeat)+" "+
+			strconv.Itoa(ports.OrderTableP)+" "+
+			string(PP_SLAVE)+"; read",
+	)
+
+	err := cmd.Start()
+	if err != nil {
+		log.Println("Spawn error:", err)
 	}
 }
 

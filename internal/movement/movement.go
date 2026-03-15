@@ -9,7 +9,6 @@ import (
 	"log"
 )
 
-// [X]
 func Movement(
 	initElev elev.Elevator,
 	updateMV_PhysicalInfo <-chan elev.ElevatorPhysicalInfo,
@@ -29,12 +28,12 @@ func Movement(
 			log.Println("[Movement] PhysicalInfo Update")
 			physicalInfo = newPhysicalInfo
 
-			if physicalInfo.LocalOrderTable == prevLOT {
-				continue
-			}
-
-			physicalInfo = fsm_OnTableUpdate(physicalInfo, doorTimer, fromMV_LOT, fromMV_Movement, fromMV_MotorDir, fromMV_ClearOrder)
+			isChanged := physicalInfo.LocalOrderTable == prevLOT
 			prevLOT = physicalInfo.LocalOrderTable
+
+			if isChanged || physicalInfo.Movement == elev.EM_Idle {
+				physicalInfo = fsm_OnTableUpdate(physicalInfo, doorTimer, fromMV_LOT, fromMV_Movement, fromMV_MotorDir, fromMV_ClearOrder)
+			}
 
 		case <-doorTimer.C:
 			log.Println("[Movement] Doortimer Event")

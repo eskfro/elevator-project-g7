@@ -20,6 +20,16 @@ func sendPhysicalInfoUpdate(info elev.ElevatorPhysicalInfo, channels ...chan<- e
 		}
 	}
 }
+func publishSnapshotPP(e elev.Elevator, tx chan<- elev.Elevator) {
+	if tx == nil {
+		return
+	}
+
+	select {
+	case tx <- e:
+	default:
+	}
+}
 
 func Start(
 	elevator elev.Elevator,
@@ -75,6 +85,12 @@ func Start(
 	go network.TxOrderTable(elevator, ports.OrderTableP, updateTX_OTP, updateTX_Role)
 	go network.RxOrderTable(elevator, ports.OrderTableP, updateRX_Role, updateRX_PrimaryId, fromRM_ResetVersion, fromRX_OrderTableP)
 
+	publishSnapshotPP(elevator, processPairsTx)
+
+	sendPhysicalInfoUpdate(elevator.PhysicalInfo, updateMV_PhysicalInfo)
+	time.Sleep(10 * time.Millisecond)
+	sendPhysicalInfoUpdate(elevator.PhysicalInfo, updateMV_PhysicalInfo)
+
 	// ========================================================================= PRINT DEBUGGING
 	go func() {
 		for range ticker_printElevator.C {
@@ -84,7 +100,6 @@ func Start(
 		}
 	}()
 
-	//func() {
 	for {
 		select {
 		// ================================================================= FROM HARDWARE
@@ -93,12 +108,14 @@ func Start(
 			log.Println("[MAIN] FromIO obs")
 			elevator.PhysicalInfo.Obstructed = obst
 			sendPhysicalInfoUpdate(elevator.PhysicalInfo, updateRM_PhysicalInfo, updateOC_PhysicalInfo, updateTX_PhysicalInfo, updateMV_PhysicalInfo)
+			publishSnapshotPP(elevator, processPairsTx)
 
 		case floor := <-fromIO_Floor:
 			log.Println("[MAIN] FromIO floor")
 			elevator.PhysicalInfo.Floor = floor
 			toMV_FloorArrival <- floor
 			sendPhysicalInfoUpdate(elevator.PhysicalInfo, updateRM_PhysicalInfo, updateOC_PhysicalInfo, updateTX_PhysicalInfo)
+			publishSnapshotPP(elevator, processPairsTx)
 
 		// ================================================================== FROM MOVEMENT
 
@@ -106,16 +123,19 @@ func Start(
 			log.Println("[MAIN] From MV: LocalOrderTable")
 			elevator.PhysicalInfo.LocalOrderTable = newLOT
 			sendPhysicalInfoUpdate(elevator.PhysicalInfo, updateRM_PhysicalInfo, updateOC_PhysicalInfo, updateTX_PhysicalInfo)
+			publishSnapshotPP(elevator, processPairsTx)
 
 		case newMovement := <-fromMV_Movement:
 			log.Println("[MAIN] From MV: Movement")
 			elevator.PhysicalInfo.Movement = newMovement
 			sendPhysicalInfoUpdate(elevator.PhysicalInfo, updateRM_PhysicalInfo, updateOC_PhysicalInfo, updateTX_PhysicalInfo)
+			publishSnapshotPP(elevator, processPairsTx)
 
 		case newMotorDir := <-fromMV_MotorDir:
 			log.Println("[MAIN] From MV: MotorDir")
 			elevator.PhysicalInfo.MotorDir = newMotorDir
 			sendPhysicalInfoUpdate(elevator.PhysicalInfo, updateRM_PhysicalInfo, updateOC_PhysicalInfo, updateTX_PhysicalInfo)
+			publishSnapshotPP(elevator, processPairsTx)
 
 		// ================================================================== FROM ORDERCONTROL
 
@@ -129,9 +149,11 @@ func Start(
 
 			if isLOTChanged {
 				sendPhysicalInfoUpdate(elevator.PhysicalInfo, updateMV_PhysicalInfo)
+				publishSnapshotPP(elevator, processPairsTx)
 			}
 			if isOTChanged {
 				elev.SetAllLights(elevator.PhysicalInfo.LocalOrderTable, elevator.OrderTable, elevator.AliveList)
+				publishSnapshotPP(elevator, processPairsTx)
 			}
 
 		// =================================================================== FROM ROLEMANAGER
@@ -145,6 +167,7 @@ func Start(
 				updateTX_Role <- elevator.PhysicalInfo.Role
 				updateRX_Role <- elevator.PhysicalInfo.Role
 				sendPhysicalInfoUpdate(elevator.PhysicalInfo, updateMV_PhysicalInfo, updateOC_PhysicalInfo, updateTX_PhysicalInfo)
+				publishSnapshotPP(elevator, processPairsTx)
 			}
 
 		case newPrimaryId := <-fromRM_PrimaryId:
@@ -155,6 +178,7 @@ func Start(
 			if isChanged {
 				sendPhysicalInfoUpdate(elevator.PhysicalInfo, updateMV_PhysicalInfo, updateOC_PhysicalInfo, updateTX_PhysicalInfo)
 				updateRX_PrimaryId <- elevator.PhysicalInfo.PrimaryId
+				publishSnapshotPP(elevator, processPairsTx)
 			}
 
 		case newAliveList := <-fromRM_AliveList:
@@ -166,12 +190,8 @@ func Start(
 			if isChanged {
 				updateOC_AliveList <- elevator.AliveList
 				elev.SetAllLights(elevator.PhysicalInfo.LocalOrderTable, elevator.OrderTable, elevator.AliveList)
+				publishSnapshotPP(elevator, processPairsTx)
 			}
 		}
-		select {
-		case processPairsTx <- elevator:
-		default:
-		}
 	}
-	//}()
 }
