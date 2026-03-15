@@ -285,13 +285,4 @@ func printElevatorMovement(state elev.ElevatorMovement) {
 	}
 }
 
-// TODO: Lag slike funksjoner for fault tolerance kanskjer. Men vi setter aldri floor til (-1) da.
-func AT_IsValidCombination(floor int, movement elev.ElevatorMovement, doorOpen bool) {
 
-	isMoving := movement == elev.EM_Moving
-
-	if doorOpen && isMoving {
-		log.Printf("floor = %d | movement = %d | doorOpen = %t \n", floor, movement, doorOpen)
-		log.Fatalln("AT_IsValidCombination triggered: Moving with door open!")
-	}
-}

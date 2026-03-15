@@ -106,7 +106,7 @@ func createPhysicalElevator(_Id int, _Ip string) ElevatorPhysicalInfo {
 		Floor:      elevio.GetFloor(),
 		MotorDir:   elevio.MD_Stop,
 		Movement:   EM_Idle,
-		Obstructed: false,
+		Obstructed: elevio.GetObstruction(),
 	}
 	return physicalElevator
 }

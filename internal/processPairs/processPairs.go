@@ -57,17 +57,17 @@ func startMaster(
 	ports network.Ports,
 ) {
 	// Start Process Pair Slave
-	
+
 	elevio.InitPhysicalElevator("localhost", ports.Hardware, elev.N_FLOORS)
 	elevator := elev.CreateElevator(id, ports.Hardware, network.GetLocalIP())
-	
+
 	fromIO_BtnPress, fromIO_Floor, fromIO_Obstruction := elevio.Inputs()
-	
+
 	snapshotTx := make(chan elev.Elevator, 32)
 	go txHeartbeat(localHeartbeatPort(id))
 	go txSnapshots(localSnapshotPort(id), snapshotTx)
 	spawnSlave(id, ports)
-	
+
 	snapshotTx <- elevator
 
 	eventloop.Start(elevator, ports, fromIO_BtnPress, fromIO_Floor, fromIO_Obstruction, snapshotTx)
@@ -109,9 +109,14 @@ func startSlave(
 
 			if !haveSnapshot {
 				mirrorElev = elev.CreateElevator(id, ports.Hardware, network.GetLocalIP())
+				log.Println("[PROCESS PAIRS] ============= X ==============")
+
 			}
+			log.Println("[PROCESS PAIRS] ============= 1 ==============")
 			//Slave takes control over hardware
 			elevio.InitPhysicalElevator("localhost", ports.Hardware, elev.N_FLOORS)
+			log.Println("[PROCESS PAIRS] ============= 2 ==============")
+
 			fromIO_BtnPress, fromIO_Floor, fromIO_Obstruction := elevio.Inputs()
 
 			snapshotTx := make(chan elev.Elevator, 32)
@@ -121,39 +126,18 @@ func startSlave(
 			// Check these if troubleshooting
 			mirrorElev.PhysicalInfo.Role = elev.ER_Backup
 			mirrorElev.PhysicalInfo.PrimaryId = elev.INVALID_PRIMARY_ID
-			mirrorElev.PhysicalInfo.Movement = elev.EM_Idle
 			mirrorElev.PhysicalInfo.MotorDir = elevio.MD_Stop
-
-			snapshotTx <- mirrorElev
 
 			close(done)
 			spawnSlave(id, ports)
+			snapshotTx <- mirrorElev
 			eventloop.Start(mirrorElev, ports, fromIO_BtnPress, fromIO_Floor, fromIO_Obstruction, snapshotTx)
 			return
 		}
 	}
 }
 
-func spawnSlave2(id int, ports network.Ports) {
-	log.Println("[PROCESS PAIRS]============================ I HAVE TRIED TO SPAWN A BACKUP")
-	cmd := exec.Command(
-		"gnome-terminal",
-		"--",
-		"./"+TARGET,
-		strconv.Itoa(id),
-		strconv.Itoa(ports.Hardware),
-		strconv.Itoa(ports.HeartBeat),
-		strconv.Itoa(ports.OrderTableP),
-		string(PP_SLAVE)+"; read",
-	)
-	if err := cmd.Start(); err != nil {
-		log.Fatal(err)
-	}
-}
-
 func spawnSlave(id int, ports network.Ports) {
-	log.Println("[PROCESS PAIRS]============================ I HAVE TRIED TO SPAWN A BACKUP")
-
 	cmd := exec.Command(
 		"gnome-terminal",
 		"--",
@@ -164,7 +148,7 @@ func spawnSlave(id int, ports network.Ports) {
 			strconv.Itoa(ports.Hardware)+" "+
 			strconv.Itoa(ports.HeartBeat)+" "+
 			strconv.Itoa(ports.OrderTableP)+" "+
-			string(PP_SLAVE)+"; read",
+			string(PP_SLAVE),
 	)
 
 	err := cmd.Start()

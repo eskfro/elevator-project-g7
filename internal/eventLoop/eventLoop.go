@@ -193,5 +193,12 @@ func Start(
 				publishSnapshotPP(elevator, processPairsTx)
 			}
 		}
+
+		//===================== ACCEPTANCE TESTS ===============================
+
+		if elevator.PhysicalInfo.Floor < 0 || elevator.PhysicalInfo.Floor >= elev.N_FLOORS {
+			log.Fatalln("AT: Invalid floor index: ")
+		}
+
 	}
 }

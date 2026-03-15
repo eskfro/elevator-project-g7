@@ -52,9 +52,10 @@ func InitPhysicalElevator(ip string, port int, numFloors int) {
 	}
 	SetMotorDirection(MD_Stop)
 
-	for GetObstruction() {
-		SetDoorOpenLamp(true)
-	}
+	//for GetObstruction() {
+	//	SetDoorOpenLamp(true)
+	//}
+	
 	SetDoorOpenLamp(false)
 	SetFloorIndicator(GetFloor())
 }
