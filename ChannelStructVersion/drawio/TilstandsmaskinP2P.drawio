@@ -1,0 +1,144 @@
+<mxfile host="app.diagrams.net" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:147.0) Gecko/20100101 Firefox/147.0" version="29.3.6">
+  <diagram name="Page-1" id="58cdce13-f638-feb5-8d6f-7d28b1aa9fa0">
+    <mxGraphModel dx="868" dy="578" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="10000" pageHeight="850" background="none" math="0" shadow="0" adaptiveColors="none">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="q785LvnOFEuMxjt2j7kJ-4" parent="1" style="ellipse;html=1;shape=startState;fillColor=#000000;strokeColor=none;" value="" vertex="1">
+          <mxGeometry height="30" width="30" x="1172" y="45" as="geometry" />
+        </mxCell>
+        <mxCell id="tZOwcFTLtuDrlLxBM7cd-1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;" value="&lt;font style=&quot;font-size: 35px;&quot;&gt;🍐&lt;/font&gt;" vertex="1">
+          <mxGeometry height="90" width="170" x="441" y="231" as="geometry" />
+        </mxCell>
+        <mxCell id="tZOwcFTLtuDrlLxBM7cd-26" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" value="&lt;font style=&quot;font-size: 26px;&quot;&gt;Peer-to-peer&lt;/font&gt;" vertex="1">
+          <mxGeometry height="27" width="167" x="441" y="87" as="geometry" />
+        </mxCell>
+        <mxCell id="CqROs3zI1tzqSftvnFBU-1" edge="1" parent="1" style="html=1;verticalAlign=bottom;startArrow=oval;startFill=1;endArrow=block;startSize=8;curved=0;rounded=0;entryX=0.25;entryY=0;entryDx=0;entryDy=0;" target="tZOwcFTLtuDrlLxBM7cd-1" value="">
+          <mxGeometry relative="1" width="60" as="geometry">
+            <mxPoint x="484" y="152" as="sourcePoint" />
+            <mxPoint x="558" y="154" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="CqROs3zI1tzqSftvnFBU-2" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" value="&lt;div style=&quot;text-align: left;&quot;&gt;&lt;font face=&quot;Google Sans, Arial, sans-serif&quot; style=&quot;color: rgb(0, 0, 0);&quot;&gt;&lt;span style=&quot;background-color: rgb(255, 255, 255);&quot;&gt;New connection&lt;/span&gt;&lt;/font&gt;&lt;/div&gt;&lt;span style=&quot;color: rgb(102, 102, 102); font-family: &amp;quot;Google Sans&amp;quot;, Arial, sans-serif; text-align: left; background-color: rgb(255, 255, 255);&quot;&gt;/&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;background-color: light-dark(rgb(255, 255, 255), rgb(18, 18, 18)); color: light-dark(rgb(102, 102, 102), rgb(149, 149, 149)); font-family: &amp;quot;Google Sans&amp;quot;, Arial, sans-serif; text-align: left;&quot;&gt;– Start broadcast-timer&lt;/span&gt;" vertex="1">
+          <mxGeometry height="30" width="151" x="338" y="174" as="geometry" />
+        </mxCell>
+        <mxCell id="CqROs3zI1tzqSftvnFBU-3" edge="1" parent="1" source="tZOwcFTLtuDrlLxBM7cd-1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.25;exitDx=0;exitDy=0;entryX=1;entryY=0.75;entryDx=0;entryDy=0;" target="tZOwcFTLtuDrlLxBM7cd-1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="CqROs3zI1tzqSftvnFBU-4" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" value="Broadcast-timer timed out&lt;br&gt;&lt;div&gt;&lt;font color=&quot;#666666&quot;&gt;/&amp;nbsp;&lt;/font&gt;&lt;span style=&quot;background-color: rgb(255, 255, 255); color: rgb(102, 102, 102); font-family: &amp;quot;Google Sans&amp;quot;, Arial, sans-serif; text-align: left;&quot;&gt;–&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: light-dark(rgb(102, 102, 102), rgb(149, 149, 149)); background-color: transparent;&quot;&gt;Broadcast ID and role&lt;/span&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;color: rgb(102, 102, 102); font-family: &amp;quot;Google Sans&amp;quot;, Arial, sans-serif; text-align: left; background-color: rgb(255, 255, 255);&quot;&gt;– Restart broadcast-timer&lt;/span&gt;&lt;span style=&quot;color: light-dark(rgb(102, 102, 102), rgb(149, 149, 149)); background-color: transparent;&quot;&gt;&lt;/span&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="30" width="150" x="633" y="261" as="geometry" />
+        </mxCell>
+        <mxCell id="CqROs3zI1tzqSftvnFBU-5" edge="1" parent="1" source="tZOwcFTLtuDrlLxBM7cd-1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.75;exitY=1;exitDx=0;exitDy=0;entryX=0.576;entryY=1.006;entryDx=0;entryDy=0;entryPerimeter=0;" target="tZOwcFTLtuDrlLxBM7cd-1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="569" y="377" />
+              <mxPoint x="539" y="377" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="CqROs3zI1tzqSftvnFBU-6" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" value="Message received from X&lt;br&gt;&lt;div&gt;&lt;font color=&quot;#666666&quot;&gt;/&amp;nbsp;&lt;/font&gt;&lt;span style=&quot;background-color: rgb(255, 255, 255); color: rgb(102, 102, 102); font-family: &amp;quot;Google Sans&amp;quot;, Arial, sans-serif; text-align: left;&quot;&gt;– Update alive list&lt;/span&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;color: rgb(102, 102, 102); font-family: &amp;quot;Google Sans&amp;quot;, Arial, sans-serif; text-align: left; background-color: rgb(255, 255, 255);&quot;&gt;– Restart alive-timer for X&lt;/span&gt;&lt;span style=&quot;color: light-dark(rgb(102, 102, 102), rgb(149, 149, 149)); background-color: transparent;&quot;&gt;&lt;/span&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="31" width="160" x="564" y="337" as="geometry" />
+        </mxCell>
+        <mxCell id="CqROs3zI1tzqSftvnFBU-7" edge="1" parent="1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.75;exitY=1;exitDx=0;exitDy=0;entryX=0.576;entryY=1.006;entryDx=0;entryDy=0;entryPerimeter=0;">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="468" y="377" />
+              <mxPoint x="498" y="377" />
+            </Array>
+            <mxPoint x="468" y="322" as="sourcePoint" />
+            <mxPoint x="498" y="321" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="CqROs3zI1tzqSftvnFBU-8" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" value="&lt;div style=&quot;text-align: left;&quot;&gt;&lt;span style=&quot;background-color: transparent; color: light-dark(rgb(0, 0, 0), rgb(255, 255, 255));&quot;&gt;Alive-timer for X timed out&lt;/span&gt;&lt;/div&gt;&lt;div style=&quot;text-align: left;&quot;&gt;&lt;font style=&quot;color: rgb(102, 102, 102);&quot;&gt;&lt;font&gt;/&amp;nbsp;&lt;/font&gt;&lt;span style=&quot;background-color: rgb(255, 255, 255); font-family: &amp;quot;Google Sans&amp;quot;, Arial, sans-serif; color: rgb(102, 102, 102);&quot;&gt;– Update alive list&lt;/span&gt;&lt;/font&gt;&lt;/div&gt;&lt;div style=&quot;text-align: left;&quot;&gt;&lt;font style=&quot;color: rgb(102, 102, 102);&quot;&gt;&lt;span style=&quot;background-color: rgb(255, 255, 255); font-family: &amp;quot;Google Sans&amp;quot;, Arial, sans-serif; color: rgb(102, 102, 102);&quot;&gt;– If self is m&lt;/span&gt;&lt;/font&gt;&lt;span style=&quot;background-color: rgb(255, 255, 255); color: rgb(102, 102, 102); font-family: &amp;quot;Google Sans&amp;quot;, Arial, sans-serif;&quot;&gt;aster, tell OrderControl that X died&lt;/span&gt;&lt;/div&gt;&lt;div style=&quot;text-align: left;&quot;&gt;&lt;span style=&quot;background-color: rgb(255, 255, 255); color: rgb(102, 102, 102); font-family: &amp;quot;Google Sans&amp;quot;, Arial, sans-serif;&quot;&gt;&lt;span style=&quot;background-color: rgb(255, 255, 255); color: rgb(102, 102, 102);&quot;&gt;– If X is master, trigger &#39;Primary Crashes&#39; in Primary Election state machine&lt;/span&gt;&lt;/span&gt;&lt;/div&gt;&lt;div style=&quot;text-align: left;&quot;&gt;&lt;span style=&quot;background-color: rgb(255, 255, 255); color: rgb(102, 102, 102); font-family: &amp;quot;Google Sans&amp;quot;, Arial, sans-serif;&quot;&gt;&lt;br&gt;&lt;/span&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="31" width="160" x="286" y="334" as="geometry" />
+        </mxCell>
+        <mxCell id="q785LvnOFEuMxjt2j7kJ-1" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" value="&lt;font style=&quot;font-size: 23px;&quot;&gt;Peer-to-peer&lt;/font&gt;" vertex="1">
+          <mxGeometry height="20" width="150" x="1112.5" y="15" as="geometry" />
+        </mxCell>
+        <mxCell id="q785LvnOFEuMxjt2j7kJ-11" edge="1" parent="1" source="q785LvnOFEuMxjt2j7kJ-17" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="q785LvnOFEuMxjt2j7kJ-10">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="q785LvnOFEuMxjt2j7kJ-12" edge="1" parent="1" source="q785LvnOFEuMxjt2j7kJ-7" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="q785LvnOFEuMxjt2j7kJ-8">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="q785LvnOFEuMxjt2j7kJ-13" edge="1" parent="1" source="q785LvnOFEuMxjt2j7kJ-7" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="q785LvnOFEuMxjt2j7kJ-9">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="q785LvnOFEuMxjt2j7kJ-7" parent="1" style="rhombus;whiteSpace=wrap;html=1;" value="select" vertex="1">
+          <mxGeometry height="80" width="80" x="1147" y="189" as="geometry" />
+        </mxCell>
+        <mxCell id="q785LvnOFEuMxjt2j7kJ-22" edge="1" parent="1" source="q785LvnOFEuMxjt2j7kJ-8" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="1194.5" y="460.0370189525462" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="q785LvnOFEuMxjt2j7kJ-8" parent="1" style="rounded=1;whiteSpace=wrap;html=1;" value="&lt;div&gt;&lt;span style=&quot;background-color: rgb(255, 255, 255); color: rgb(102, 102, 102); font-family: &amp;quot;Google Sans&amp;quot;, Arial, sans-serif; text-align: left;&quot;&gt;– Update alive list&lt;/span&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;color: rgb(102, 102, 102); font-family: &amp;quot;Google Sans&amp;quot;, Arial, sans-serif; text-align: left; background-color: rgb(255, 255, 255);&quot;&gt;– Restart alive-timer for X&lt;/span&gt;&lt;span style=&quot;color: light-dark(rgb(102, 102, 102), rgb(149, 149, 149)); background-color: transparent;&quot;&gt;&lt;/span&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="59" width="117" x="1136" y="334" as="geometry" />
+        </mxCell>
+        <mxCell id="q785LvnOFEuMxjt2j7kJ-9" parent="1" style="rounded=1;whiteSpace=wrap;html=1;" value="&lt;div&gt;&lt;span style=&quot;background-color: rgb(255, 255, 255); color: rgb(102, 102, 102); font-family: &amp;quot;Google Sans&amp;quot;, Arial, sans-serif; text-align: left;&quot;&gt;–&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: light-dark(rgb(102, 102, 102), rgb(149, 149, 149)); background-color: transparent;&quot;&gt;Broadcast ID and role&lt;/span&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;color: rgb(102, 102, 102); font-family: &amp;quot;Google Sans&amp;quot;, Arial, sans-serif; text-align: left; background-color: rgb(255, 255, 255);&quot;&gt;– Restart broadcast-timer&lt;/span&gt;&lt;span style=&quot;color: light-dark(rgb(102, 102, 102), rgb(149, 149, 149)); background-color: transparent;&quot;&gt;&lt;/span&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="51" width="134.5" x="942" y="337" as="geometry" />
+        </mxCell>
+        <mxCell id="q785LvnOFEuMxjt2j7kJ-25" edge="1" parent="1" source="q785LvnOFEuMxjt2j7kJ-10" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="q785LvnOFEuMxjt2j7kJ-21">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1373" y="500" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="q785LvnOFEuMxjt2j7kJ-10" parent="1" style="rounded=1;whiteSpace=wrap;html=1;" value="&lt;div style=&quot;text-align: left;&quot;&gt;&lt;font style=&quot;color: rgb(102, 102, 102);&quot;&gt;&lt;span style=&quot;background-color: rgb(255, 255, 255); font-family: &amp;quot;Google Sans&amp;quot;, Arial, sans-serif; color: rgb(102, 102, 102);&quot;&gt;– Update alive list&lt;/span&gt;&lt;/font&gt;&lt;/div&gt;&lt;div style=&quot;text-align: left;&quot;&gt;&lt;font style=&quot;color: rgb(102, 102, 102);&quot;&gt;&lt;span style=&quot;background-color: rgb(255, 255, 255); font-family: &amp;quot;Google Sans&amp;quot;, Arial, sans-serif; color: rgb(102, 102, 102);&quot;&gt;– If self is m&lt;/span&gt;&lt;/font&gt;&lt;span style=&quot;background-color: rgb(255, 255, 255); color: rgb(102, 102, 102); font-family: &amp;quot;Google Sans&amp;quot;, Arial, sans-serif;&quot;&gt;aster, tell OrderControl that X died&lt;/span&gt;&lt;/div&gt;&lt;div style=&quot;text-align: left;&quot;&gt;&lt;span style=&quot;background-color: rgb(255, 255, 255); color: rgb(102, 102, 102); font-family: &amp;quot;Google Sans&amp;quot;, Arial, sans-serif;&quot;&gt;&lt;span style=&quot;background-color: rgb(255, 255, 255); color: rgb(102, 102, 102);&quot;&gt;– If X is master, trigger &#39;Primary Crashes&#39; in Primary Election state machine&lt;/span&gt;&lt;/span&gt;&lt;span style=&quot;background-color: rgb(255, 255, 255); color: rgb(102, 102, 102); font-family: &amp;quot;Google Sans&amp;quot;, Arial, sans-serif;&quot;&gt;&lt;br&gt;&lt;/span&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="128" width="195" x="1277" y="334" as="geometry" />
+        </mxCell>
+        <mxCell id="q785LvnOFEuMxjt2j7kJ-15" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" value="&lt;span style=&quot;background-color: light-dark(#ffffff, var(--ge-dark-color, #121212));&quot;&gt;case: Broadcast timer timed out&lt;/span&gt;" vertex="1">
+          <mxGeometry height="30" width="143" x="949" y="279" as="geometry" />
+        </mxCell>
+        <mxCell id="q785LvnOFEuMxjt2j7kJ-16" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" value="&lt;span style=&quot;background-color: light-dark(#ffffff, var(--ge-dark-color, #121212));&quot;&gt;case: Message recieved from X&lt;/span&gt;" vertex="1">
+          <mxGeometry height="30" width="143" x="1121" y="279" as="geometry" />
+        </mxCell>
+        <mxCell id="q785LvnOFEuMxjt2j7kJ-20" edge="1" parent="1" source="q785LvnOFEuMxjt2j7kJ-7" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="q785LvnOFEuMxjt2j7kJ-17" value="">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="1227" y="229" as="sourcePoint" />
+            <mxPoint x="1375" y="334" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="q785LvnOFEuMxjt2j7kJ-17" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" value="&lt;span style=&quot;background-color: light-dark(#ffffff, var(--ge-dark-color, #121212));&quot;&gt;case: Timer for X timed out&lt;/span&gt;" vertex="1">
+          <mxGeometry height="30" width="143" x="1303" y="279" as="geometry" />
+        </mxCell>
+        <mxCell id="q785LvnOFEuMxjt2j7kJ-27" edge="1" parent="1" source="q785LvnOFEuMxjt2j7kJ-21" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1194" y="553" />
+              <mxPoint x="920" y="553" />
+              <mxPoint x="920" y="168" />
+            </Array>
+            <mxPoint x="1186" y="168" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="q785LvnOFEuMxjt2j7kJ-21" parent="1" style="rhombus;whiteSpace=wrap;html=1;" value="" vertex="1">
+          <mxGeometry height="80" width="80" x="1154.5" y="460" as="geometry" />
+        </mxCell>
+        <mxCell id="q785LvnOFEuMxjt2j7kJ-23" edge="1" parent="1" source="q785LvnOFEuMxjt2j7kJ-9" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.526;entryDx=0;entryDy=0;entryPerimeter=0;" target="q785LvnOFEuMxjt2j7kJ-21">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1009" y="502" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="q785LvnOFEuMxjt2j7kJ-19" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" value="&lt;span style=&quot;background-color: light-dark(#ffffff, var(--ge-dark-color, #121212));&quot;&gt;New &quot;connection&quot; with X&lt;/span&gt;" vertex="1">
+          <mxGeometry height="30" width="149" x="1198" y="57" as="geometry" />
+        </mxCell>
+        <mxCell id="q785LvnOFEuMxjt2j7kJ-30" edge="1" parent="1" source="q785LvnOFEuMxjt2j7kJ-29" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="q785LvnOFEuMxjt2j7kJ-7" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="q785LvnOFEuMxjt2j7kJ-29" parent="1" style="rounded=1;whiteSpace=wrap;html=1;" value="&lt;div&gt;&lt;span style=&quot;background-color: rgb(255, 255, 255); color: rgb(102, 102, 102); font-family: &amp;quot;Google Sans&amp;quot;, Arial, sans-serif; text-align: left;&quot;&gt;– Start alive-timer for X&lt;/span&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="33" width="136.5" x="1119.25" y="102" as="geometry" />
+        </mxCell>
+        <mxCell id="q785LvnOFEuMxjt2j7kJ-32" edge="1" parent="1" style="endArrow=classic;html=1;rounded=0;" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="1186.89" y="64" as="sourcePoint" />
+            <mxPoint x="1186.89" y="102" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
