@@ -24,17 +24,20 @@ func Movement(
 	// Movement timers
 	doorTimer := timer.New(elev.DOOR_OPEN_TIME)
 	betweenFloorTimer := timer.New(elev.BETWEEN_FLOORS_TIMEOUT)
+	stuckDoorTimer := timer.New(elev.STUCK_DOOR_TIMEOUT)
 	defer doorTimer.Close()
 	defer betweenFloorTimer.Close()
-
-	// Marius timer
-	// defer stuckTicker.Stop()
-	// stuckTicker := time.NewTicker(elev.STUCK_TICKER_INTERVAL)
-	// lastFloorChange := time.Now()
-	// lastFloor := physicalInfo.Floor
+	defer stuckDoorTimer.Close()
 
 	for {
 		select {
+		case <-betweenFloorTimer.C:
+			log.Fatalln("[Movement] Elevator stuck between floors!")
+
+		case <-stuckDoorTimer.C:
+			log.Fatalln("[Movement] The door is stuck open!")
+
+		// FSM onTableUpdate
 		case newPhysicalInfo := <-updateMV_PhysicalInfo:
 			log.Println("[Movement] PhysicalInfo Update")
 			prevMovement := physicalInfo.Movement
@@ -43,52 +46,62 @@ func Movement(
 			isLotChanged := physicalInfo.LocalOrderTable != prevLOT
 
 			if isLotChanged {
-				physicalInfo = fsm_OnTableUpdate(physicalInfo, doorTimer, fromMV_LOT, fromMV_Movement, fromMV_MotorDir, fromMV_ClearOrder)
+				physicalInfo = fsm_onTableUpdate(physicalInfo, doorTimer, fromMV_LOT, fromMV_Movement, fromMV_MotorDir, fromMV_ClearOrder)
 			}
 
 			// Sync and update
 			syncBetweenFloorTimer(prevMovement, prevFloor, physicalInfo, betweenFloorTimer)
+			syncStuckDoorTimer(prevMovement, physicalInfo, stuckDoorTimer)
 			prevLOT = physicalInfo.LocalOrderTable
 
+		// FSM onDoorTimeout
 		case <-doorTimer.C:
 			log.Println("[Movement] Doortimer Event")
 			prevMovement := physicalInfo.Movement
 			prevFloor := physicalInfo.Floor
 
-			physicalInfo = fsm_OnDoorTimeout(physicalInfo, doorTimer, fromMV_LOT, fromMV_Movement, fromMV_MotorDir, fromMV_ClearOrder)
+			physicalInfo = fsm_onDoorTimeout(physicalInfo, doorTimer, fromMV_LOT, fromMV_Movement, fromMV_MotorDir, fromMV_ClearOrder)
 
 			// Sync and update
 			syncBetweenFloorTimer(prevMovement, prevFloor, physicalInfo, betweenFloorTimer)
+			syncStuckDoorTimer(prevMovement, physicalInfo, stuckDoorTimer)
 			prevLOT = physicalInfo.LocalOrderTable
 
-		case <-betweenFloorTimer.C:
-			log.Fatalln("[Movement] Elevator stuck between floors!")
-
-		// case <-stuckTicker.C:
-		// 	hasActiveOrders := ordercontrol.HasOrders(physicalInfo.LocalOrderTable)
-		// 	if hasActiveOrders && time.Since(lastFloorChange) > elev.STUCK_TIMEOUT {
-		// 		log.Fatalln("[Movement] Elevator is stuck!")
-		// 	}
-
+		// FSM onFloorArrival
 		case newFloor := <-toMV_FloorArrival:
 			fmt.Printf("[Movement]: Arrived at Floor = %d\n", newFloor)
 			prevMovement := physicalInfo.Movement
 			prevFloor := physicalInfo.Floor
 
-			// Marius timer
-			// if newFloor != lastFloor {
-			// 	lastFloorChange = time.Now()
-			// 	lastFloor = newFloor
-			// }
-
 			physicalInfo.Floor = newFloor
-			physicalInfo = fsm_OnFloorArrival(physicalInfo, doorTimer, fromMV_LOT, fromMV_Movement, fromMV_ClearOrder)
+			physicalInfo = fsm_onFloorArrival(physicalInfo, doorTimer, fromMV_LOT, fromMV_Movement, fromMV_ClearOrder)
 
 			// Sync and update
 			syncBetweenFloorTimer(prevMovement, prevFloor, physicalInfo, betweenFloorTimer)
+			syncStuckDoorTimer(prevMovement, physicalInfo, stuckDoorTimer)
 			prevLOT = physicalInfo.LocalOrderTable
 
 		}
+	}
+}
+
+func syncStuckDoorTimer(
+	prevMovement elev.ElevatorMovement,
+	physicalInfo elev.ElevatorPhysicalInfo,
+	stuckDoorTimer *timer.Timer,
+) {
+	enteredDoorOpen := prevMovement != elev.EM_DoorOpen &&
+		physicalInfo.Movement == elev.EM_DoorOpen
+
+	leftDoorOpen := prevMovement == elev.EM_DoorOpen &&
+		physicalInfo.Movement != elev.EM_DoorOpen
+
+	switch {
+	case leftDoorOpen:
+		stuckDoorTimer.Stop()
+
+	case enteredDoorOpen:
+		stuckDoorTimer.Start()
 	}
 }
 

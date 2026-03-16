@@ -8,7 +8,7 @@ import (
 	"fmt"
 )
 
-func fsm_OnTableUpdate(
+func fsm_onTableUpdate(
 	PhysicalInfo elev.ElevatorPhysicalInfo,
 	doorTimer *timer.Timer,
 	fromMV_LOT chan<- elev.LocalOrderTable,
@@ -101,7 +101,7 @@ func fsm_OnTableUpdate(
 
 }
 
-func fsm_OnFloorArrival(
+func fsm_onFloorArrival(
 	PhysicalInfo elev.ElevatorPhysicalInfo,
 	doorTimer *timer.Timer,
 	fromMV_LOT chan<- elev.LocalOrderTable,
@@ -148,7 +148,7 @@ func fsm_OnFloorArrival(
 
 }
 
-func fsm_OnDoorTimeout(
+func fsm_onDoorTimeout(
 	PhysicalInfo elev.ElevatorPhysicalInfo,
 	doorTimer *timer.Timer,
 	fromMV_LOT chan<- elev.LocalOrderTable,

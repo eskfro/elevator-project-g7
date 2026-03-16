@@ -12,10 +12,9 @@ const N_MAX_ELEVS = 4
 
 const DOOR_OPEN_TIME = 3000 * time.Millisecond
 const PRIMARY_ELECTION_DELAY = 401 * time.Millisecond
-const STUCK_TICKER_INTERVAL = 500 * time.Millisecond
 
 const ORDER_TIMEOUT = 20 * time.Second
-const STUCK_TIMEOUT = 10 * time.Second
+const STUCK_DOOR_TIMEOUT = 20 * time.Second
 const HEARTBEAT_TIMEOUT = 501 * time.Millisecond
 const BETWEEN_FLOORS_TIMEOUT = 7000 * time.Millisecond
 
@@ -79,7 +78,7 @@ type ElevatorPhysicalInfo struct {
 	MotorDir        elevio.MotorDirection
 	Movement        ElevatorMovement
 	Obstructed      bool
-	LocalOrderTable [N_FLOORS][N_BUTTONS]bool
+	LocalOrderTable LocalOrderTable
 }
 
 // ELEVATOR

@@ -11,10 +11,14 @@ import (
 	"time"
 )
 
-const LOOPBACK_IP = "127.0.0.1"
+const (
+	LOOPBACK_IP         = "127.0.0.1"
+	BASE_PORT_HEARTBEAT = 51000
+	BASE_PORT_SNAPSHOT  = 52000
+)
 
-func localHeartbeatPort(id int) int { return 51000 + id }
-func localSnapshotPort(id int) int  { return 52000 + id }
+func localHeartbeatPort(id int) int { return BASE_PORT_HEARTBEAT + id }
+func localSnapshotPort(id int) int  { return BASE_PORT_SNAPSHOT + id }
 
 func txHeartbeat(port int) {
 	lc := listenConfig()
