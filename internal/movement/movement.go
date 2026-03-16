@@ -28,6 +28,14 @@ func Movement(
 	defer betweenFloorTimer.Close()
 	defer stuckDoorTimer.Close()
 
+	// Initial sync for crash/restart cases
+	if physicalInfo.Movement == elev.EM_DoorOpen {
+		stuckDoorTimer.Start()
+	}
+	if physicalInfo.Movement == elev.EM_Moving {
+		betweenFloorTimer.Start()
+	}
+
 	for {
 		select {
 		case <-betweenFloorTimer.C:

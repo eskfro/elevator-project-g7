@@ -14,3 +14,8 @@ TING FØR FREDAG:
 - LAB: Teste om en primary blir til backup når nettverkskabelen plugges inn igjen
 - LAB: Packetloss under normal operasjon
 - Sjekk golangci-lint (Casper anbefalte)
+
+
+ACCEPTANCE TEST TO MAKE:
+- Du er backup men primaryID sier du er primary
+- Du er primary men primaryID sier annnna tall

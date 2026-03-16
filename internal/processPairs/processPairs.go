@@ -106,15 +106,12 @@ func startSlave(
 
 			if !haveSnapshot {
 				mirrorElev = elev.CreateElevator(ID, ports.Hardware, network.GetLocalIP())
-				log.Println("[PROCESS PAIRS] ============= X ==============")
 
 			}
-			log.Println("[PROCESS PAIRS] ============= 1 ==============")
 			//Slave takes control over hardware
 			snapshotTx := make(chan elev.Elevator, 32)
 
 			elevio.InitPhysicalElevator("localhost", ports.Hardware, elev.N_FLOORS)
-			log.Println("[PROCESS PAIRS] ============= 2 ==============")
 
 			fromIO_BtnPress, fromIO_Floor, fromIO_Obstruction := elevio.Inputs()
 
@@ -128,6 +125,11 @@ func startSlave(
 
 			if mirrorElev.PhysicalInfo.Movement == elev.EM_DoorOpen {
 				elevio.SetDoorOpenLamp(true)
+			}
+
+			// 16.03
+			if elevio.GetObstruction() {
+				mirrorElev.PhysicalInfo.Obstructed = true
 			}
 
 			close(done)
