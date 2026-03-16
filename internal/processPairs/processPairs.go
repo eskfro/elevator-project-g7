@@ -52,14 +52,13 @@ func startMaster(
 	id int,
 	ports network.Ports,
 ) {
-	// Start Process Pair Slave
+	snapshotTx := make(chan elev.Elevator, 32)
 
 	elevio.InitPhysicalElevator("localhost", ports.Hardware, elev.N_FLOORS)
 	elevator := elev.CreateElevator(id, ports.Hardware, network.GetLocalIP())
 
 	fromIO_BtnPress, fromIO_Floor, fromIO_Obstruction := elevio.Inputs()
 
-	snapshotTx := make(chan elev.Elevator, 32)
 	go txHeartbeat(localHeartbeatPort(id))
 	go txSnapshots(localSnapshotPort(id), snapshotTx)
 
@@ -76,14 +75,15 @@ func startSlave(
 ) {
 	hbRx := make(chan struct{}, 32)
 	snapshotRx := make(chan Snapshot, 32)
-
 	done := make(chan struct{})
+
+	timeout := timer.New(PP_HEARTBEAT_TIMEOUT)
+	defer timeout.Close()
+
 	go rxHeartbeat(localHeartbeatPort(id), hbRx, done)
 	go rxSnapshots(localSnapshotPort(id), snapshotRx, done)
 
-	timeout := timer.New(PP_HEARTBEAT_TIMEOUT)
 	timeout.Start()
-	defer timeout.Close()
 
 	var mirrorElev elev.Elevator
 	var lastVersion uint64
@@ -111,12 +111,13 @@ func startSlave(
 			}
 			log.Println("[PROCESS PAIRS] ============= 1 ==============")
 			//Slave takes control over hardware
+			snapshotTx := make(chan elev.Elevator, 32)
+
 			elevio.InitPhysicalElevator("localhost", ports.Hardware, elev.N_FLOORS)
 			log.Println("[PROCESS PAIRS] ============= 2 ==============")
 
 			fromIO_BtnPress, fromIO_Floor, fromIO_Obstruction := elevio.Inputs()
 
-			snapshotTx := make(chan elev.Elevator, 32)
 			go txHeartbeat(localHeartbeatPort(id))
 			go txSnapshots(localSnapshotPort(id), snapshotTx)
 
@@ -135,8 +136,13 @@ func startSlave(
 }
 
 func spawnSlave(id int, ports network.Ports) {
+
+	strID := strconv.Itoa(id)
+	title := "Elevator " + strID
+
 	cmd := exec.Command(
 		"gnome-terminal",
+		"--title="+title,
 		"--",
 		"bash",
 		"-c",
