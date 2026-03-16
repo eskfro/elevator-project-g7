@@ -19,7 +19,6 @@ func Movement(
 
 	// Local to Movement
 	physicalInfo := initElev.PhysicalInfo
-	prevLOT := initElev.PhysicalInfo.LocalOrderTable
 
 	// Movement timers
 	doorTimer := timer.New(elev.DOOR_OPEN_TIME)
@@ -43,16 +42,12 @@ func Movement(
 			prevMovement := physicalInfo.Movement
 			prevFloor := physicalInfo.Floor
 			physicalInfo = newPhysicalInfo
-			isLotChanged := physicalInfo.LocalOrderTable != prevLOT
 
-			if isLotChanged {
-				physicalInfo = fsm_onTableUpdate(physicalInfo, doorTimer, fromMV_LOT, fromMV_Movement, fromMV_MotorDir, fromMV_ClearOrder)
-			}
+			physicalInfo = fsm_onTableUpdate(physicalInfo, doorTimer, fromMV_LOT, fromMV_Movement, fromMV_MotorDir, fromMV_ClearOrder)
 
 			// Sync and update
 			syncBetweenFloorTimer(prevMovement, prevFloor, physicalInfo, betweenFloorTimer)
 			syncStuckDoorTimer(prevMovement, physicalInfo, stuckDoorTimer)
-			prevLOT = physicalInfo.LocalOrderTable
 
 		// FSM onDoorTimeout
 		case <-doorTimer.C:
@@ -65,7 +60,6 @@ func Movement(
 			// Sync and update
 			syncBetweenFloorTimer(prevMovement, prevFloor, physicalInfo, betweenFloorTimer)
 			syncStuckDoorTimer(prevMovement, physicalInfo, stuckDoorTimer)
-			prevLOT = physicalInfo.LocalOrderTable
 
 		// FSM onFloorArrival
 		case newFloor := <-toMV_FloorArrival:
@@ -79,7 +73,6 @@ func Movement(
 			// Sync and update
 			syncBetweenFloorTimer(prevMovement, prevFloor, physicalInfo, betweenFloorTimer)
 			syncStuckDoorTimer(prevMovement, physicalInfo, stuckDoorTimer)
-			prevLOT = physicalInfo.LocalOrderTable
 
 		}
 	}

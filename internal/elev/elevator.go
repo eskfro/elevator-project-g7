@@ -94,6 +94,12 @@ func CreateElevator(_ID int, _Port int, _IP string) Elevator {
 	elevator := Elevator{PhysicalInfo: createPhysicalElevator(_ID, _IP)}
 	elevator.AliveList[_ID] = elevator.PhysicalInfo
 	elevator.NumElevs = 1
+
+	if elevio.GetObstruction() {
+		elevator.PhysicalInfo.Obstructed = true
+		elevio.SetDoorOpenLamp(true)
+	}
+
 	return elevator
 }
 
@@ -106,7 +112,7 @@ func createPhysicalElevator(_ID int, _IP string) ElevatorPhysicalInfo {
 		Floor:      elevio.GetFloor(),
 		MotorDir:   elevio.MD_Stop,
 		Movement:   EM_Idle,
-		Obstructed: elevio.GetObstruction(),
+		Obstructed: false,
 	}
 	return physicalElevator
 }

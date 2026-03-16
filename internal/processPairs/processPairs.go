@@ -62,7 +62,7 @@ func startMaster(
 	go txHeartbeat(localHeartbeatPort(ID))
 	go txSnapshots(localSnapshotPort(ID), snapshotTx)
 
-	//spawnSlave(id, ports)
+	spawnSlave(ID, ports)
 
 	snapshotTx <- elevator
 
@@ -125,6 +125,10 @@ func startSlave(
 			mirrorElev.PhysicalInfo.Role = elev.ER_Backup
 			mirrorElev.PhysicalInfo.PrimaryID = elev.INVALID_PRIMARY_ID
 			mirrorElev.PhysicalInfo.MotorDir = elevio.MD_Stop
+
+			if mirrorElev.PhysicalInfo.Movement == elev.EM_DoorOpen {
+				elevio.SetDoorOpenLamp(true)
+			}
 
 			close(done)
 			spawnSlave(ID, ports)
