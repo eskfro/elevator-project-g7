@@ -36,9 +36,11 @@ func RoleManager(
 		case <-startupCheck.C:
 			aliveList[physicalInfo.ID] = physicalInfo
 			physicalInfo, aliveList = handleAliveListUpdate(physicalInfo, aliveList, timeStart, fromRM_AliveList, fromRM_PrimaryID, fromRM_Role, false, false)
+			at_rolePrimaryID(physicalInfo.PrimaryID, physicalInfo.ID, physicalInfo.Role)
 
 		case newPhysicalInfo := <-updateRM_PhysicalInfo:
 			physicalInfo = newPhysicalInfo
+			at_rolePrimaryID(physicalInfo.PrimaryID, physicalInfo.ID, physicalInfo.Role)
 
 		case timedOutID := <-timedOutID:
 			if timedOutID == physicalInfo.ID {
@@ -49,6 +51,7 @@ func RoleManager(
 			fromRM_AliveList <- aliveList
 			fromRM_ResetVersion <- timedOutID
 			physicalInfo, aliveList = handleAliveListUpdate(physicalInfo, aliveList, timeStart, fromRM_AliveList, fromRM_PrimaryID, fromRM_Role, true, false)
+			at_rolePrimaryID(physicalInfo.PrimaryID, physicalInfo.ID, physicalInfo.Role)
 
 		case heartbeat := <-fromRX_PhysicalInfo:
 			select {
@@ -63,6 +66,7 @@ func RoleManager(
 
 			// I starten settes PrimaryId til INVALID
 			if !isHeartbeatChanged && isValidPrimaryID && !wasDead {
+				at_rolePrimaryID(physicalInfo.PrimaryID, physicalInfo.ID, physicalInfo.Role)
 				continue
 			}
 			if wasDead {
@@ -72,6 +76,7 @@ func RoleManager(
 			aliveList[heartbeat.ID] = heartbeat
 			fromRM_AliveList <- aliveList
 			physicalInfo, aliveList = handleAliveListUpdate(physicalInfo, aliveList, timeStart, fromRM_AliveList, fromRM_PrimaryID, fromRM_Role, false, wasDead)
+			at_rolePrimaryID(physicalInfo.PrimaryID, physicalInfo.ID, physicalInfo.Role)
 
 		}
 	}
@@ -272,9 +277,10 @@ func shouldBecomePrimary(thisID int, aliveList elev.AliveList, timeStart time.Ti
 
 func shouldBecomeBackup(thisID int, aliveList elev.AliveList) bool {
 
-	if countPrimaries(aliveList) < 2 {
+	if countPrimaries(aliveList) <= 1 {
 		return false
 	}
+
 	smallestPrimaryID := elev.N_MAX_ELEVS
 	for elevID := 0; elevID < elev.N_MAX_ELEVS; elevID++ {
 		if aliveList[elevID].Role == elev.ER_Primary {
@@ -295,4 +301,15 @@ func shouldUpdatePrimaryId(aliveList elev.AliveList, primaryID int, timeStart ti
 	} else {
 		return aliveList[primaryID].Role == elev.ER_Dead
 	}
+}
+
+func at_rolePrimaryID(PrimaryID int, thisID int, thisRole elev.ElevatorRole) {
+
+	if thisRole == elev.ER_Primary && thisID != PrimaryID {
+		log.Fatalln("[at_rolePrimaryID] err1")
+	}
+	if thisRole == elev.ER_Backup && thisID == PrimaryID {
+		log.Fatalln("[at_rolePrimaryID] err2")
+	}
+
 }
