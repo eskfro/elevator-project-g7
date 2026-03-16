@@ -10,6 +10,7 @@ const N_BUTTONS = 3
 const N_MAX_ELEVS = 4
 
 const DOOR_OPEN_TIME = 3000 * time.Millisecond
+const BETWEEN_FLOORS_TIME = 5000 * time.Millisecond
 const HEARTBEAT_TIMEOUT = 501 * time.Millisecond
 const ORDER_TIMEOUT = 10 * time.Second
 const PRIMARY_ELECTION_DELAY = 401 * time.Millisecond

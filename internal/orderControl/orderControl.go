@@ -37,6 +37,7 @@ func OrderControl(
 			log.Println("[OrderControl] PhysicalInfo Update")
 			physicalInfo = newPhysicalInfo
 
+		// ======================================================================= ORDER TO REASSIGN
 		case order := <-orderToReassign:
 			var rcvOrderTable elev.OrderTable
 
@@ -83,7 +84,7 @@ func OrderControl(
 				}
 			}
 
-		// Directly from rolemanager
+		// ====================================================================== ALIVELIST FROM ROLEMANAGER
 		case newAliveList := <-updateOC_AliveList:
 			log.Println("[OrderControl] AliveList Update")
 
