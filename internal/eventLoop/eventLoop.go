@@ -87,12 +87,12 @@ func Start(
 
 	publishSnapshotPP(elevator, processPairsTx)
 
-	lastFloorChange := time.Now()
-	lastFloor := elevator.PhysicalInfo.Floor
-	stuckTicker := time.NewTicker(500 * time.Millisecond)
-	defer stuckTicker.Stop()
+	// lastFloorChange := time.Now()
+	// lastFloor := elevator.PhysicalInfo.Floor
+	// stuckTicker := time.NewTicker(500 * time.Millisecond)
+	// defer stuckTicker.Stop()
 
-	// ========================================================================= PRINT DEBUGGING
+	// ==================================================================== PRINT ELEVATOR
 	go func() {
 		for range ticker_printElevator.C {
 			uptime := time.Since(timeStart).Seconds()
@@ -104,12 +104,12 @@ func Start(
 	for {
 		select {
 
-		case <-stuckTicker.C:
-			hasActiveOrders := ordercontrol.HasOrders(elevator.PhysicalInfo.LocalOrderTable)
+		// case <-stuckTicker.C:
+		// 	hasActiveOrders := ordercontrol.HasOrders(elevator.PhysicalInfo.LocalOrderTable)
 
-			if hasActiveOrders && time.Since(lastFloorChange) > 10*time.Second {
-				log.Fatalln("Stuck elevator, killing process pairs master")
-			}
+		// 	if hasActiveOrders && time.Since(lastFloorChange) > 10*time.Second {
+		// 		log.Fatalln("Stuck elevator, killing process pairs master")
+		// 	}
 		// ================================================================= FROM HARDWARE
 
 		case obst := <-fromIO_Obstruction:
@@ -121,10 +121,10 @@ func Start(
 		case floor := <-fromIO_Floor:
 			log.Println("[MAIN] FromIO floor")
 
-			if floor != lastFloor {
-				lastFloorChange = time.Now()
-				lastFloor = floor
-			}
+			// if floor != lastFloor {
+			// 	lastFloorChange = time.Now()
+			// 	lastFloor = floor
+			// }
 
 			elevator.PhysicalInfo.Floor = floor
 			toMV_FloorArrival <- floor
@@ -209,6 +209,8 @@ func Start(
 		}
 
 		//===================== ACCEPTANCE TESTS ===============================
+
+		// TODO: Denne må flyttes herifra, eventloopen skal bare inneholde events mellom moduler
 
 		if elevator.PhysicalInfo.Floor < 0 || elevator.PhysicalInfo.Floor >= elev.N_FLOORS {
 			log.Fatalln("AT: Invalid floor index: ")
