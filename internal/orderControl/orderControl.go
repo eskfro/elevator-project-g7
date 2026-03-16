@@ -66,14 +66,12 @@ func OrderControl(
 						}
 						rcvOrderTable[elevID][order.Floor][order.ButtonType] = elev.OS_NO_ORDER
 					}
-
-					// Reassign order to primary
-					rcvOrderTable[physicalInfo.ID][order.Floor][order.ButtonType] = elev.OS_REQUESTED
-					allOrderTables[physicalInfo.ID] = rcvOrderTable
 					timeoutID := order.ElevID
 
 					// Find best elevator to take new order
 					bestID := calculateBestElevator(order.Floor, rcvOrderTable, aliveList, timeoutID)
+
+					rcvOrderTable[physicalInfo.ID][order.Floor][order.ButtonType] = elev.OS_NO_ORDER
 					rcvOrderTable[bestID][order.Floor][order.ButtonType] = elev.OS_CONFIRMED
 
 					// Set values and send
