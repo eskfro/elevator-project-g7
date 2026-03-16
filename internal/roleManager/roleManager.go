@@ -25,15 +25,26 @@ func RoleManager(
 	physicalInfo := initElev.PhysicalInfo
 	timeStart := time.Now()
 
+	startupCheck := time.NewTimer(elev.PRIMARY_ELECTION_DELAY)
+	defer startupCheck.Stop()
+
 	go monitorHeartBeats(heartBeatID, timedOutID)
 
 	for {
 		select {
 
+		case <-startupCheck.C:
+			aliveList[physicalInfo.ID] = physicalInfo
+			physicalInfo, aliveList = handleAliveListUpdate(physicalInfo, aliveList, timeStart, fromRM_AliveList, fromRM_PrimaryID, fromRM_Role, false, false)
+
 		case newPhysicalInfo := <-updateRM_PhysicalInfo:
 			physicalInfo = newPhysicalInfo
 
 		case timedOutID := <-timedOutID:
+			if timedOutID == physicalInfo.ID {
+				continue
+			}
+
 			aliveList[timedOutID].Role = elev.ER_Dead
 			fromRM_AliveList <- aliveList
 			fromRM_ResetVersion <- timedOutID
