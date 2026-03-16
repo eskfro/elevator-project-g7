@@ -13,3 +13,5 @@ TING FØR FREDAG:
 - LAB: Teste systemet på LAB der vi plugger ut netverkskabel
 - LAB: Teste om en primary blir til backup når nettverkskabelen plugges inn igjen
 - LAB: Packetloss under normal operasjon
+
+github test etter merging og dritt
