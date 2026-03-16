@@ -30,18 +30,18 @@ const PP_HEARTBEAT_INTERVAL = 200 * time.Millisecond
 const PP_HEARTBEAT_TIMEOUT = 1 * time.Second
 
 func Start(
-	id int,
+	ID int,
 	ports network.Ports,
 	ppRole string,
 ) {
 	switch Role(ppRole) {
 	case PP_MASTER:
 		log.Println("[PP START] ppRole = Master")
-		startMaster(id, ports)
+		startMaster(ID, ports)
 
 	case PP_SLAVE:
 		log.Println("[PP START] ppRole = Slave")
-		startSlave(id, ports)
+		startSlave(ID, ports)
 
 	default:
 		log.Fatalln("[PP START] ppRole not 0 or 1")
@@ -49,18 +49,18 @@ func Start(
 }
 
 func startMaster(
-	id int,
+	ID int,
 	ports network.Ports,
 ) {
 	snapshotTx := make(chan elev.Elevator, 32)
 
 	elevio.InitPhysicalElevator("localhost", ports.Hardware, elev.N_FLOORS)
-	elevator := elev.CreateElevator(id, ports.Hardware, network.GetLocalIP())
+	elevator := elev.CreateElevator(ID, ports.Hardware, network.GetLocalIP())
 
 	fromIO_BtnPress, fromIO_Floor, fromIO_Obstruction := elevio.Inputs()
 
-	go txHeartbeat(localHeartbeatPort(id))
-	go txSnapshots(localSnapshotPort(id), snapshotTx)
+	go txHeartbeat(localHeartbeatPort(ID))
+	go txSnapshots(localSnapshotPort(ID), snapshotTx)
 
 	//spawnSlave(id, ports)
 
@@ -70,7 +70,7 @@ func startMaster(
 }
 
 func startSlave(
-	id int,
+	ID int,
 	ports network.Ports,
 ) {
 	hbRx := make(chan struct{}, 32)
@@ -80,8 +80,8 @@ func startSlave(
 	timeout := timer.New(PP_HEARTBEAT_TIMEOUT)
 	defer timeout.Close()
 
-	go rxHeartbeat(localHeartbeatPort(id), hbRx, done)
-	go rxSnapshots(localSnapshotPort(id), snapshotRx, done)
+	go rxHeartbeat(localHeartbeatPort(ID), hbRx, done)
+	go rxSnapshots(localSnapshotPort(ID), snapshotRx, done)
 
 	timeout.Start()
 
@@ -105,7 +105,7 @@ func startSlave(
 			log.Println("[PP] master timed out, taking over")
 
 			if !haveSnapshot {
-				mirrorElev = elev.CreateElevator(id, ports.Hardware, network.GetLocalIP())
+				mirrorElev = elev.CreateElevator(ID, ports.Hardware, network.GetLocalIP())
 				log.Println("[PROCESS PAIRS] ============= X ==============")
 
 			}
@@ -118,16 +118,16 @@ func startSlave(
 
 			fromIO_BtnPress, fromIO_Floor, fromIO_Obstruction := elevio.Inputs()
 
-			go txHeartbeat(localHeartbeatPort(id))
-			go txSnapshots(localSnapshotPort(id), snapshotTx)
+			go txHeartbeat(localHeartbeatPort(ID))
+			go txSnapshots(localSnapshotPort(ID), snapshotTx)
 
 			// Check these if troubleshooting
 			mirrorElev.PhysicalInfo.Role = elev.ER_Backup
-			mirrorElev.PhysicalInfo.PrimaryId = elev.INVALID_PRIMARY_ID
+			mirrorElev.PhysicalInfo.PrimaryID = elev.INVALID_PRIMARY_ID
 			mirrorElev.PhysicalInfo.MotorDir = elevio.MD_Stop
 
 			close(done)
-			spawnSlave(id, ports)
+			spawnSlave(ID, ports)
 			snapshotTx <- mirrorElev
 			eventloop.Start(mirrorElev, ports, fromIO_BtnPress, fromIO_Floor, fromIO_Obstruction, snapshotTx)
 			return
@@ -135,9 +135,9 @@ func startSlave(
 	}
 }
 
-func spawnSlave(id int, ports network.Ports) {
+func spawnSlave(ID int, ports network.Ports) {
 
-	strID := strconv.Itoa(id)
+	strID := strconv.Itoa(ID)
 	title := "Elevator " + strID
 
 	cmd := exec.Command(
@@ -147,7 +147,7 @@ func spawnSlave(id int, ports network.Ports) {
 		"bash",
 		"-c",
 		"./"+TARGET+" "+
-			strconv.Itoa(id)+" "+
+			strconv.Itoa(ID)+" "+
 			strconv.Itoa(ports.Hardware)+" "+
 			strconv.Itoa(ports.HeartBeat)+" "+
 			strconv.Itoa(ports.OrderTableP)+" "+

@@ -42,7 +42,11 @@ func requestHere(LocalOrderTable elev.LocalOrderTable, currentFloor int) bool {
 	return false
 }
 
-func ChooseDirection(localOrderTable elev.LocalOrderTable, currentFloor int, dir elevio.MotorDirection) DirnMovementPair {
+func ChooseDirection(
+	localOrderTable elev.LocalOrderTable,
+	currentFloor int,
+	dir elevio.MotorDirection,
+) DirnMovementPair {
 	switch dir {
 	case elevio.MD_Up:
 		if RequestAbove(localOrderTable, currentFloor) {
@@ -119,7 +123,11 @@ func ChooseDirection(localOrderTable elev.LocalOrderTable, currentFloor int, dir
 	}
 }
 
-func ShouldStop(localOrderTable elev.LocalOrderTable, currentFloor int, dir elevio.MotorDirection) bool {
+func ShouldStop(
+	localOrderTable elev.LocalOrderTable,
+	currentFloor int,
+	dir elevio.MotorDirection,
+) bool {
 	switch dir {
 	case elevio.MD_Down:
 		return localOrderTable[currentFloor][elevio.BT_HallDown] ||
@@ -138,7 +146,8 @@ func ShouldStop(localOrderTable elev.LocalOrderTable, currentFloor int, dir elev
 
 func ClearCurrentFloor(localOrderTable elev.LocalOrderTable,
 	currentFloor int,
-	dir elevio.MotorDirection) (elev.LocalOrderTable, [elev.N_BUTTONS]bool) {
+	dir elevio.MotorDirection,
+) (elev.LocalOrderTable, [elev.N_BUTTONS]bool) {
 
 	var buttonsToClear [elev.N_BUTTONS]bool
 
@@ -170,6 +179,7 @@ func ClearCurrentFloor(localOrderTable elev.LocalOrderTable,
 		localOrderTable[currentFloor][elevio.BT_HallDown] = false
 		buttonsToClear[elevio.BT_HallUp] = true
 		buttonsToClear[elevio.BT_HallDown] = true
+
 		// if localOrderTable[currentFloor][elevio.BT_HallUp] {
 		// 	localOrderTable[currentFloor][elevio.BT_HallUp] = false
 		// 	buttonsToClear[elevio.BT_HallUp] = true

@@ -19,11 +19,11 @@ func PrintElevatorInfo(elevator Elevator, uptime float64) {
 	localOT := elevator.PhysicalInfo.LocalOrderTable
 
 	fmt.Printf("--------------------------------\n")
-	fmt.Printf("ELEVATOR %d ", elevator.PhysicalInfo.Id)
+	fmt.Printf("ELEVATOR %d ", elevator.PhysicalInfo.ID)
 	fmt.Printf(" [ %s ] ", elevator.PhysicalInfo.Role)
-	fmt.Printf(" < " + elevator.PhysicalInfo.Ip + " > |")
+	fmt.Printf(" < " + elevator.PhysicalInfo.IP + " > |")
 	fmt.Printf(" t = " + uptimeString + "s |")
-	fmt.Printf(" primaryId = %d\n", elevator.PhysicalInfo.PrimaryId)
+	fmt.Printf(" primaryId = %d\n", elevator.PhysicalInfo.PrimaryID)
 	fmt.Printf("--------------------------------\n")
 	fmt.Printf("STATE = %s\n", elevator.PhysicalInfo.Movement)
 	fmt.Printf("--------------------------------\n")

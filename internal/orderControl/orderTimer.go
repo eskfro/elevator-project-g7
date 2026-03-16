@@ -19,7 +19,7 @@ func monitorOrderTable(
 		select {
 		case newOrderTimer := <-startOrderTimer:
 
-			elevID := newOrderTimer.ElevId
+			elevID := newOrderTimer.ElevID
 			floor := newOrderTimer.Floor
 			btn := newOrderTimer.ButtonType
 
@@ -32,7 +32,7 @@ func monitorOrderTable(
 					for range timerC {
 						log.Printf("[OrderControl] Order timer expired for floor %d, button %d\n", floor, btn)
 
-						orderTimeout <- elev.Order{ElevId: elevID, Floor: floor, ButtonType: btn}
+						orderTimeout <- elev.Order{ElevID: elevID, Floor: floor, ButtonType: btn}
 					}
 				}(floor, btn, elevID, orderToReassign, t.C)
 
@@ -41,7 +41,7 @@ func monitorOrderTable(
 
 		case stopTimer := <-stopOrderTimer:
 
-			elevID := stopTimer.ElevId
+			elevID := stopTimer.ElevID
 			floor := stopTimer.Floor
 			btn := stopTimer.ButtonType
 

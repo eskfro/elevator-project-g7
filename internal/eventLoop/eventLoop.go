@@ -11,26 +11,6 @@ import (
 	"time"
 )
 
-func sendPhysicalInfoUpdate(info elev.ElevatorPhysicalInfo, channels ...chan<- elev.ElevatorPhysicalInfo) {
-	for _, ch := range channels {
-		select {
-		case ch <- info:
-		default:
-			log.Printf("[MAIN] Send Physical Info Default Case")
-		}
-	}
-}
-func publishSnapshotPP(e elev.Elevator, tx chan<- elev.Elevator) {
-	if tx == nil {
-		return
-	}
-
-	select {
-	case tx <- e:
-	default:
-	}
-}
-
 func Start(
 	elevator elev.Elevator,
 	ports network.Ports,
@@ -61,29 +41,29 @@ func Start(
 	// RoleManager
 	updateRM_PhysicalInfo := make(chan elev.ElevatorPhysicalInfo, 20)
 	fromRM_Role := make(chan elev.ElevatorRole, 20)
-	fromRM_PrimaryId := make(chan int, 20)
+	fromRM_PrimaryID := make(chan int, 20)
 	fromRM_AliveList := make(chan elev.AliveList, 20)
 	fromRM_ResetVersion := make(chan int, 10)
 
-	// Transmitter
+	// Network transmitter
 	updateTX_PhysicalInfo := make(chan elev.ElevatorPhysicalInfo, 20)
 	updateTX_OTP := make(chan elev.OrderTablePacket, 100)
 	updateTX_Role := make(chan elev.ElevatorRole, 5)
 
-	// Reciever
+	// Network reciever
 	updateRX_Role := make(chan elev.ElevatorRole, 5)
-	updateRX_PrimaryId := make(chan int, 5)
+	updateRX_PrimaryID := make(chan int, 5)
 	fromRX_OrderTableP := make(chan elev.OrderTablePacket, 100)
 	fromRX_PhysicalInfo := make(chan elev.ElevatorPhysicalInfo, 100)
 
 	// Start modules
 	go movement.Movement(elevator, updateMV_PhysicalInfo, fromMV_LOT, fromMV_Movement, fromMV_MotorDir, fromMV_ClearOrders, toMV_FloorArrival)
 	go ordercontrol.OrderControl(elevator, updateOC_PhysicalInfo, updateOC_AliveList, fromRX_OrderTableP, fromMV_ClearOrders, fromIO_BtnPress, fromOC_OrderTable, updateTX_OTP)
-	go rolemanager.RoleManager(elevator, fromRX_PhysicalInfo, updateRM_PhysicalInfo, fromRM_Role, fromRM_PrimaryId, fromRM_AliveList, fromRM_ResetVersion)
+	go rolemanager.RoleManager(elevator, fromRX_PhysicalInfo, updateRM_PhysicalInfo, fromRM_Role, fromRM_PrimaryID, fromRM_AliveList, fromRM_ResetVersion)
 	go network.TxHeartBeat(elevator, ports.HeartBeat, updateTX_PhysicalInfo)
-	go network.RxHeartBeat(ports.HeartBeat, fromRX_PhysicalInfo, elevator.PhysicalInfo.Id)
+	go network.RxHeartBeat(ports.HeartBeat, fromRX_PhysicalInfo, elevator.PhysicalInfo.ID)
 	go network.TxOrderTable(elevator, ports.OrderTableP, updateTX_OTP, updateTX_Role)
-	go network.RxOrderTable(elevator, ports.OrderTableP, updateRX_Role, updateRX_PrimaryId, fromRM_ResetVersion, fromRX_OrderTableP)
+	go network.RxOrderTable(elevator, ports.OrderTableP, updateRX_Role, updateRX_PrimaryID, fromRM_ResetVersion, fromRX_OrderTableP)
 
 	publishSnapshotPP(elevator, processPairsTx)
 
@@ -92,7 +72,7 @@ func Start(
 		for range ticker_printElevator.C {
 			uptime := time.Since(timeStart).Seconds()
 			elev.PrintElevatorInfo(elevator, uptime)
-			elev.PrintOrderTableSlice(elevator.OrderTable, elevator.PhysicalInfo.Id)
+			elev.PrintOrderTableSlice(elevator.OrderTable, elevator.PhysicalInfo.ID)
 		}
 	}()
 
@@ -137,11 +117,11 @@ func Start(
 
 		case newOrderTable := <-fromOC_OrderTable:
 			log.Println("[MAIN] From OC: OrderTable")
-			isLOTChanged := elevator.PhysicalInfo.LocalOrderTable != ordercontrol.OrderTableToLOT(newOrderTable, elevator.PhysicalInfo.Id)
+			isLOTChanged := elevator.PhysicalInfo.LocalOrderTable != ordercontrol.OrderTableToLOT(newOrderTable, elevator.PhysicalInfo.ID)
 			isOTChanged := elevator.OrderTable != newOrderTable
 
 			elevator.OrderTable = newOrderTable
-			elevator.PhysicalInfo.LocalOrderTable = ordercontrol.OrderTableToLOT(elevator.OrderTable, elevator.PhysicalInfo.Id)
+			elevator.PhysicalInfo.LocalOrderTable = ordercontrol.OrderTableToLOT(elevator.OrderTable, elevator.PhysicalInfo.ID)
 
 			if isLOTChanged {
 				sendPhysicalInfoUpdate(elevator.PhysicalInfo, updateMV_PhysicalInfo)
@@ -166,14 +146,14 @@ func Start(
 				publishSnapshotPP(elevator, processPairsTx)
 			}
 
-		case newPrimaryId := <-fromRM_PrimaryId:
+		case newPrimaryId := <-fromRM_PrimaryID:
 			log.Println("[MAIN] From RM: Primary ID")
-			isChanged := elevator.PhysicalInfo.PrimaryId != newPrimaryId
-			elevator.PhysicalInfo.PrimaryId = newPrimaryId
+			isChanged := elevator.PhysicalInfo.PrimaryID != newPrimaryId
+			elevator.PhysicalInfo.PrimaryID = newPrimaryId
 
 			if isChanged {
 				sendPhysicalInfoUpdate(elevator.PhysicalInfo, updateMV_PhysicalInfo, updateOC_PhysicalInfo, updateTX_PhysicalInfo)
-				updateRX_PrimaryId <- elevator.PhysicalInfo.PrimaryId
+				updateRX_PrimaryID <- elevator.PhysicalInfo.PrimaryID
 				publishSnapshotPP(elevator, processPairsTx)
 			}
 
@@ -198,5 +178,25 @@ func Start(
 			log.Fatalln("AT: Invalid floor index: ")
 		}
 
+	}
+}
+
+func sendPhysicalInfoUpdate(info elev.ElevatorPhysicalInfo, channels ...chan<- elev.ElevatorPhysicalInfo) {
+	for _, ch := range channels {
+		select {
+		case ch <- info:
+		default:
+			log.Printf("[MAIN] Send Physical Info Default Case")
+		}
+	}
+}
+func publishSnapshotPP(e elev.Elevator, tx chan<- elev.Elevator) {
+	if tx == nil {
+		return
+	}
+
+	select {
+	case tx <- e:
+	default:
 	}
 }

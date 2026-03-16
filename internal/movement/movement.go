@@ -146,9 +146,9 @@ func sendClearOrder(PhysicalInfo elev.ElevatorPhysicalInfo, buttonsToClear [elev
 	var clearOrder elev.ClearOrders
 	for btn := 0; btn < elev.N_BUTTONS; btn++ {
 		if buttonsToClear[btn] {
-			clearOrder[btn] = elev.Order{ElevId: PhysicalInfo.Id, Floor: PhysicalInfo.Floor, ButtonType: elevio.ButtonType(btn)}
+			clearOrder[btn] = elev.Order{ElevID: PhysicalInfo.ID, Floor: PhysicalInfo.Floor, ButtonType: elevio.ButtonType(btn)}
 		} else {
-			clearOrder[btn] = elev.Order{ElevId: elev.INVALID_ELEVATOR_ID, Floor: PhysicalInfo.Floor, ButtonType: elevio.ButtonType(btn)}
+			clearOrder[btn] = elev.Order{ElevID: elev.INVALID_ELEVATOR_ID, Floor: PhysicalInfo.Floor, ButtonType: elevio.ButtonType(btn)}
 		}
 	}
 	fromMV_ClearOrder <- clearOrder

@@ -25,7 +25,7 @@ func calculateBestElevator(
 ) int {
 
 	minCost := math.MaxInt
-	bestElevId := math.MaxInt
+	bestElevID := math.MaxInt
 	isOneElev := rolemanager.CountNumElevs(AliveList) == 1
 
 	for elevIndex := 0; elevIndex < elev.N_MAX_ELEVS; elevIndex++ {
@@ -37,17 +37,17 @@ func calculateBestElevator(
 			return elevIndex
 		}
 		currentElev := AliveList[elevIndex]
-		cost := calculateCost(orderFloor, currentElev, OrderTableToLOT(OrderTable, currentElev.Id))
+		cost := calculateCost(orderFloor, currentElev, OrderTableToLOT(OrderTable, currentElev.ID))
 		if cost < minCost && timeoutID != elevIndex {
 			minCost = cost
-			bestElevId = currentElev.Id
+			bestElevID = currentElev.ID
 		}
 	}
-	if bestElevId == math.MaxInt {
+	if bestElevID == math.MaxInt {
 		log.Fatalln("CalculateWhichElevator failed! No elevators found in alivelist.")
 	}
-	log.Printf("[calculateBestElevator] TimeoutID = %d, BestElevId = %d, Cost = %d\n", timeoutID, bestElevId, minCost)
-	return bestElevId
+	log.Printf("[calculateBestElevator] TimeoutID = %d, BestElevId = %d, Cost = %d\n", timeoutID, bestElevID, minCost)
+	return bestElevID
 
 }
 

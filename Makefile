@@ -25,7 +25,7 @@ clean:
 
 
 
-# SIMULATOR THINGS
+# =========================== STARTING ELEVS AT HOME
 sim0:
 	chmod +x scripts/sim.sh
 	./scripts/sim.sh 0
@@ -38,7 +38,6 @@ sim2:
 	chmod +x scripts/sim.sh
 	./scripts/sim.sh 2
 
-# Change to SimAll on lab
 simall:
 	chmod +x scripts/simAll.sh
 	./scripts/simAll.sh
@@ -46,3 +45,16 @@ simall:
 kill:
 	chmod +x scripts/kill.sh
 	./scripts/kill.sh
+
+# ========================= STARTING ELEVATORS AT THE LAB
+lab0:
+	chmod +x scripts/lab.sh
+	./scripts/lab.sh 0
+
+lab1:
+	chmod +x scripts/lab.sh
+	./scripts/lab.sh 1
+
+lab2:
+	chmod +x scripts/lab.sh
+	./scripts/lab.sh 2

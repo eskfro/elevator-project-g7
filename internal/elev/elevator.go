@@ -57,23 +57,23 @@ type ClearOrders [N_BUTTONS]Order
 // ===================================== STRUCTS
 
 type Order struct {
-	ElevId     int
+	ElevID     int
 	Floor      int
 	ButtonType elevio.ButtonType
 }
 
 type OrderTablePacket struct {
-	Id         int
+	ID         int
 	Version    uint64
 	OrderTable OrderTable
 }
 
 // Info about single elevator
 type ElevatorPhysicalInfo struct {
-	Id              int
+	ID              int
 	Floor           int
-	PrimaryId       int
-	Ip              string
+	PrimaryID       int
+	IP              string
 	Role            ElevatorRole
 	MotorDir        elevio.MotorDirection
 	Movement        ElevatorMovement
@@ -90,19 +90,19 @@ type Elevator struct {
 	NumElevs       int
 }
 
-func CreateElevator(_Id int, _Port int, _Ip string) Elevator {
-	elevator := Elevator{PhysicalInfo: createPhysicalElevator(_Id, _Ip)}
-	elevator.AliveList[_Id] = elevator.PhysicalInfo
+func CreateElevator(_ID int, _Port int, _IP string) Elevator {
+	elevator := Elevator{PhysicalInfo: createPhysicalElevator(_ID, _IP)}
+	elevator.AliveList[_ID] = elevator.PhysicalInfo
 	elevator.NumElevs = 1
 	return elevator
 }
 
-func createPhysicalElevator(_Id int, _Ip string) ElevatorPhysicalInfo {
+func createPhysicalElevator(_ID int, _IP string) ElevatorPhysicalInfo {
 	physicalElevator := ElevatorPhysicalInfo{
-		Id:         _Id,
+		ID:         _ID,
 		Role:       ER_Backup,
-		Ip:         _Ip,
-		PrimaryId:  INVALID_PRIMARY_ID,
+		IP:         _IP,
+		PrimaryID:  INVALID_PRIMARY_ID,
 		Floor:      elevio.GetFloor(),
 		MotorDir:   elevio.MD_Stop,
 		Movement:   EM_Idle,

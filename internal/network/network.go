@@ -2,6 +2,7 @@ package network
 
 import (
 	"net"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -28,6 +29,20 @@ var lc = net.ListenConfig{
 			syscall.SetsockoptInt(int(fd), syscall.SOL_SOCKET, syscall.SO_BROADCAST, 1)
 		})
 	},
+}
+
+var localIP_addr string
+
+func localIP() (string, error) {
+	if localIP_addr == "" {
+		conn, err := net.DialTCP("tcp4", nil, &net.TCPAddr{IP: []byte{8, 8, 8, 8}, Port: 53})
+		if err != nil {
+			return "", err
+		}
+		defer conn.Close()
+		localIP_addr = strings.Split(conn.LocalAddr().String(), ":")[0]
+	}
+	return localIP_addr, nil
 }
 
 func GetLocalIP() string {

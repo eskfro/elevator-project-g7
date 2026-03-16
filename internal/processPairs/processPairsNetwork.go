@@ -17,8 +17,8 @@ const (
 	BASE_PORT_SNAPSHOT  = 52000
 )
 
-func localHeartbeatPort(id int) int { return BASE_PORT_HEARTBEAT + id }
-func localSnapshotPort(id int) int  { return BASE_PORT_SNAPSHOT + id }
+func localHeartbeatPort(ID int) int { return BASE_PORT_HEARTBEAT + ID }
+func localSnapshotPort(ID int) int  { return BASE_PORT_SNAPSHOT + ID }
 
 func txHeartbeat(port int) {
 	lc := listenConfig()

@@ -13,7 +13,7 @@ import (
 func RxHeartBeat(
 	port_hb int,
 	fromRX_PhysicalInfo chan<- elev.ElevatorPhysicalInfo,
-	thisElevId int) {
+	thisElevID int) {
 
 	addr := ":" + strconv.Itoa(port_hb)
 
@@ -63,14 +63,14 @@ func RxOrderTable(
 	initElev elev.Elevator,
 	port_ot int,
 	updateRX_Role <-chan elev.ElevatorRole,
-	updateRX_PrimaryId <-chan int,
+	updateRX_PrimaryID <-chan int,
 	fromRM_ResetVersion <-chan int,
 	fromRX_OTP chan<- elev.OrderTablePacket,
 ) {
 
 	thisRole := initElev.PhysicalInfo.Role
-	thisId := initElev.PhysicalInfo.Id
-	primaryId := initElev.PhysicalInfo.PrimaryId
+	thisID := initElev.PhysicalInfo.ID
+	primaryID := initElev.PhysicalInfo.PrimaryID
 
 	addr := ":" + strconv.Itoa(port_ot)
 	conn, _ := lc.ListenPacket(context.Background(), "udp4", addr)
@@ -85,7 +85,7 @@ func RxOrderTable(
 		case thisRole = <-updateRX_Role:
 			log.Println("[RxOrderTableUDP] Role Update")
 
-		case primaryId = <-updateRX_PrimaryId:
+		case primaryID = <-updateRX_PrimaryID:
 			log.Println("[RxOrderTableUDP] PrimaryId Update")
 
 		case resetIndex := <-fromRM_ResetVersion: //Eskil 12.03
@@ -102,17 +102,17 @@ func RxOrderTable(
 			json.Unmarshal(buf[:n], &rcvOTP)
 
 			isThisPrimary := thisRole == elev.ER_Primary
-			isRcvVersionNewer := rcvOTP.Version > versionsSeen[rcvOTP.Id]
+			isRcvVersionNewer := rcvOTP.Version > versionsSeen[rcvOTP.ID]
 			isRcvVersionInit := rcvOTP.Version <= 1
 
-			isMsgFromSelf := rcvOTP.Id == thisId
-			isMsgFromPrimary := rcvOTP.Id == primaryId
+			isMsgFromSelf := rcvOTP.ID == thisID
+			isMsgFromPrimary := rcvOTP.ID == primaryID
 
 			if isThisPrimary && !isMsgFromSelf {
 
 				if isRcvVersionInit || isRcvVersionNewer { //Eskil 12.03 -> reset when a dead elev spawns
 					log.Println("[RxOrderTableP] Got message from backup")
-					versionsSeen[rcvOTP.Id] = rcvOTP.Version
+					versionsSeen[rcvOTP.ID] = rcvOTP.Version
 					fromRX_OTP <- rcvOTP
 					continue
 				}
@@ -122,7 +122,7 @@ func RxOrderTable(
 
 				if isMsgFromPrimary && isRcvVersionNewer {
 					log.Println("[RxOrderTableP] Got message from primary")
-					versionsSeen[rcvOTP.Id] = rcvOTP.Version
+					versionsSeen[rcvOTP.ID] = rcvOTP.Version
 					fromRX_OTP <- rcvOTP
 					continue
 				}

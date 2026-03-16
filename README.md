@@ -11,15 +11,21 @@ Elevator project where the goal is to make fault tolerant code for a distributed
 - Golang 1.20
 
 ### Build
-- make build
+- Elevator Program: make build
+- Elevator Server: dmd -w -g src/sim_server.d src/timer_event.d -ofSimElevatorServer
 
-### Run simulator
-- ./out id hardwarePort ordertablePort heartbeatPort
-- ./SimElevatorServer --port hardwarePort <br>
+### Run simulator at home
+- Start program: ./out id hardwarePort ordertablePort heartbeatPort
+- Start server: ./SimElevatorServer --port hardwarePort <br>
 or <br>
-- make sim0, make sim1, make sim2
+- make sim0 / make sim1 / make sim2
 - make simall
 
-### Kill simulator 
-- make kill
+### Run simulator at the lab
+- Start program: ./out id hardWarePort orderTablePort, heartbeatPort
+- Start server: elevatorserver <br>
+or <br>
+- Start program: make lab1 / make lab2 / make lab3
+- Start server: elevatorserver 
+
 
