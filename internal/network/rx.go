@@ -53,7 +53,7 @@ func RxHeartBeat(
 		select {
 		case fromRX_PhysicalInfo <- rcvPhysicalInfo:
 		default:
-			log.Println("[RxHeartBeat] fromRX_PhysicalInfo full!")
+			log.Fatalln("[RxHeartBeat] fromRX_PhysicalInfo full!")
 		}
 
 	}

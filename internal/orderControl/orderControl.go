@@ -172,7 +172,7 @@ func OrderControl(
 				fromOC_OrderTable <- orderTable
 			}
 
-		// =========================================================================== PACKET FROM RECIEVER
+		// =========================================================================== PACKET FROM NETWORK
 		case packet := <-fromRX_OrderTableP:
 			isMsgFromSelf := packet.ID == physicalInfo.ID
 			isChanged := allOrderTables[packet.ID] != packet.OrderTable
