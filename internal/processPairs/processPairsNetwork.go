@@ -11,6 +11,8 @@ import (
 	"time"
 )
 
+const LOOPBACK_IP = "127.0.0.1"
+
 func localHeartbeatPort(id int) int { return 51000 + id }
 func localSnapshotPort(id int) int  { return 52000 + id }
 
@@ -22,7 +24,7 @@ func txHeartbeat(port int) {
 	}
 	defer conn.Close()
 
-	destination, err := net.ResolveUDPAddr("udp4", "127.0.0.1:"+strconv.Itoa(port))
+	destination, err := net.ResolveUDPAddr("udp4", LOOPBACK_IP+":"+strconv.Itoa(port))
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -72,7 +74,7 @@ func txSnapshots(port int, in <-chan elev.Elevator) {
 	}
 	defer conn.Close()
 
-	destination, err := net.ResolveUDPAddr("udp4", "127.0.0.1:"+strconv.Itoa(port))
+	destination, err := net.ResolveUDPAddr("udp4", LOOPBACK_IP+":"+strconv.Itoa(port))
 	if err != nil {
 		log.Fatalln(err)
 	}

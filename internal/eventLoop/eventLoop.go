@@ -87,11 +87,6 @@ func Start(
 
 	publishSnapshotPP(elevator, processPairsTx)
 
-	// lastFloorChange := time.Now()
-	// lastFloor := elevator.PhysicalInfo.Floor
-	// stuckTicker := time.NewTicker(500 * time.Millisecond)
-	// defer stuckTicker.Stop()
-
 	// ==================================================================== PRINT ELEVATOR
 	go func() {
 		for range ticker_printElevator.C {
@@ -104,14 +99,6 @@ func Start(
 	for {
 		select {
 
-		// case <-stuckTicker.C:
-		// 	hasActiveOrders := ordercontrol.HasOrders(elevator.PhysicalInfo.LocalOrderTable)
-
-		// 	if hasActiveOrders && time.Since(lastFloorChange) > 10*time.Second {
-		// 		log.Fatalln("Stuck elevator, killing process pairs master")
-		// 	}
-		// ================================================================= FROM HARDWARE
-
 		case obst := <-fromIO_Obstruction:
 			log.Println("[MAIN] FromIO obs")
 			elevator.PhysicalInfo.Obstructed = obst
@@ -120,11 +107,6 @@ func Start(
 
 		case floor := <-fromIO_Floor:
 			log.Println("[MAIN] FromIO floor")
-
-			// if floor != lastFloor {
-			// 	lastFloorChange = time.Now()
-			// 	lastFloor = floor
-			// }
 
 			elevator.PhysicalInfo.Floor = floor
 			toMV_FloorArrival <- floor

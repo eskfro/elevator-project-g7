@@ -9,6 +9,7 @@ import (
 	"math"
 )
 
+// Penalties used in cost function
 const (
 	penaltyFloorDiff   = 3
 	penaltyNumOrders   = 3
@@ -50,10 +51,11 @@ func calculateBestElevator(
 
 }
 
-// Denne beregner hvor mye det koster der heis nummer elevNum å komme seg til rcvOrder.
-// Funksjonen er nok ikke optimal men sikkert bra nok :)
-func calculateCost(orderFloor int, elevator elev.ElevatorPhysicalInfo, LocalOrderTable elev.LocalOrderTable) int {
-	// Cost function penalties
+func calculateCost(
+	orderFloor int,
+	elevator elev.ElevatorPhysicalInfo,
+	LocalOrderTable elev.LocalOrderTable,
+) int {
 
 	numOrders := 0
 
