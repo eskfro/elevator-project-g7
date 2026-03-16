@@ -69,116 +69,121 @@ func Start(
 
 	// ==================================================================== PRINT ELEVATOR
 	go func() {
-		for range ticker_printElevator.C {
-			uptime := time.Since(timeStart).Seconds()
-			elev.PrintElevatorInfo(elevator, uptime)
-			elev.PrintOrderTableSlice(elevator.OrderTable, elevator.PhysicalInfo.ID)
+
+		for {
+			select {
+			case <-ticker_printElevator.C:
+				uptime := time.Since(timeStart).Seconds()
+				elev.PrintElevatorInfo(elevator, uptime)
+				elev.PrintOrderTableSlice(elevator.OrderTable, elevator.PhysicalInfo.ID)
+
+			case obst := <-fromIO_Obstruction:
+				log.Println("[MAIN] FromIO obs")
+				elevator.PhysicalInfo.Obstructed = obst
+				sendPhysicalInfoUpdate(elevator.PhysicalInfo, updateRM_PhysicalInfo, updateOC_PhysicalInfo, updateTX_PhysicalInfo, updateMV_PhysicalInfo)
+				publishSnapshotPP(elevator, processPairsTx)
+
+			case floor := <-fromIO_Floor:
+				log.Println("[MAIN] FromIO floor")
+
+				elevator.PhysicalInfo.Floor = floor
+				toMV_FloorArrival <- floor
+				sendPhysicalInfoUpdate(elevator.PhysicalInfo, updateRM_PhysicalInfo, updateOC_PhysicalInfo, updateTX_PhysicalInfo)
+				publishSnapshotPP(elevator, processPairsTx)
+			}
 		}
 	}()
 
-	for {
-		select {
+	go func() {
 
-		case obst := <-fromIO_Obstruction:
-			log.Println("[MAIN] FromIO obs")
-			elevator.PhysicalInfo.Obstructed = obst
-			sendPhysicalInfoUpdate(elevator.PhysicalInfo, updateRM_PhysicalInfo, updateOC_PhysicalInfo, updateTX_PhysicalInfo, updateMV_PhysicalInfo)
-			publishSnapshotPP(elevator, processPairsTx)
-
-		case floor := <-fromIO_Floor:
-			log.Println("[MAIN] FromIO floor")
-
-			elevator.PhysicalInfo.Floor = floor
-			toMV_FloorArrival <- floor
-			sendPhysicalInfoUpdate(elevator.PhysicalInfo, updateRM_PhysicalInfo, updateOC_PhysicalInfo, updateTX_PhysicalInfo)
-			publishSnapshotPP(elevator, processPairsTx)
-
-		// ================================================================== FROM MOVEMENT
-
-		case newLOT := <-fromMV_LOT:
-			log.Println("[MAIN] From MV: LocalOrderTable")
-			elevator.PhysicalInfo.LocalOrderTable = newLOT
-			sendPhysicalInfoUpdate(elevator.PhysicalInfo, updateRM_PhysicalInfo, updateOC_PhysicalInfo, updateTX_PhysicalInfo)
-			publishSnapshotPP(elevator, processPairsTx)
-
-		case newMovement := <-fromMV_Movement:
-			log.Println("[MAIN] From MV: Movement")
-			elevator.PhysicalInfo.Movement = newMovement
-			sendPhysicalInfoUpdate(elevator.PhysicalInfo, updateRM_PhysicalInfo, updateOC_PhysicalInfo, updateTX_PhysicalInfo)
-			publishSnapshotPP(elevator, processPairsTx)
-
-		case newMotorDir := <-fromMV_MotorDir:
-			log.Println("[MAIN] From MV: MotorDir")
-			elevator.PhysicalInfo.MotorDir = newMotorDir
-			sendPhysicalInfoUpdate(elevator.PhysicalInfo, updateRM_PhysicalInfo, updateOC_PhysicalInfo, updateTX_PhysicalInfo)
-			publishSnapshotPP(elevator, processPairsTx)
-
-		// ================================================================== FROM ORDERCONTROL
-
-		case newOrderTable := <-fromOC_OrderTable:
-			log.Println("[MAIN] From OC: OrderTable")
-			isLOTChanged := elevator.PhysicalInfo.LocalOrderTable != ordercontrol.OrderTableToLOT(newOrderTable, elevator.PhysicalInfo.ID)
-			isOTChanged := elevator.OrderTable != newOrderTable
-
-			elevator.OrderTable = newOrderTable
-			elevator.PhysicalInfo.LocalOrderTable = ordercontrol.OrderTableToLOT(elevator.OrderTable, elevator.PhysicalInfo.ID)
-
-			if isLOTChanged {
-				sendPhysicalInfoUpdate(elevator.PhysicalInfo, updateMV_PhysicalInfo)
+		for {
+			select {
+			// ================================================================== FROM MOVEMENT
+			case newLOT := <-fromMV_LOT:
+				log.Println("[MAIN] From MV: LocalOrderTable")
+				elevator.PhysicalInfo.LocalOrderTable = newLOT
+				sendPhysicalInfoUpdate(elevator.PhysicalInfo, updateRM_PhysicalInfo, updateOC_PhysicalInfo, updateTX_PhysicalInfo)
 				publishSnapshotPP(elevator, processPairsTx)
-			}
-			if isOTChanged {
-				elev.SetAllLights(elevator.PhysicalInfo.LocalOrderTable, elevator.OrderTable, elevator.AliveList)
+
+			case newMovement := <-fromMV_Movement:
+				log.Println("[MAIN] From MV: Movement")
+				elevator.PhysicalInfo.Movement = newMovement
+				sendPhysicalInfoUpdate(elevator.PhysicalInfo, updateRM_PhysicalInfo, updateOC_PhysicalInfo, updateTX_PhysicalInfo)
 				publishSnapshotPP(elevator, processPairsTx)
-			}
 
-		// =================================================================== FROM ROLEMANAGER
-
-		case newRole := <-fromRM_Role:
-			log.Println("[MAIN] From RM: Role")
-			isChanged := elevator.PhysicalInfo.Role != newRole
-			elevator.PhysicalInfo.Role = newRole
-
-			if isChanged {
-				updateTX_Role <- elevator.PhysicalInfo.Role
-				updateRX_Role <- elevator.PhysicalInfo.Role
-				sendPhysicalInfoUpdate(elevator.PhysicalInfo, updateMV_PhysicalInfo, updateOC_PhysicalInfo, updateTX_PhysicalInfo)
+			case newMotorDir := <-fromMV_MotorDir:
+				log.Println("[MAIN] From MV: MotorDir")
+				elevator.PhysicalInfo.MotorDir = newMotorDir
+				sendPhysicalInfoUpdate(elevator.PhysicalInfo, updateRM_PhysicalInfo, updateOC_PhysicalInfo, updateTX_PhysicalInfo)
 				publishSnapshotPP(elevator, processPairsTx)
+
+			// ================================================================== FROM ORDERCONTROL
+
+			case newOrderTable := <-fromOC_OrderTable:
+				log.Println("[MAIN] From OC: OrderTable")
+				isLOTChanged := elevator.PhysicalInfo.LocalOrderTable != ordercontrol.OrderTableToLOT(newOrderTable, elevator.PhysicalInfo.ID)
+				isOTChanged := elevator.OrderTable != newOrderTable
+
+				elevator.OrderTable = newOrderTable
+				elevator.PhysicalInfo.LocalOrderTable = ordercontrol.OrderTableToLOT(elevator.OrderTable, elevator.PhysicalInfo.ID)
+
+				if isLOTChanged {
+					sendPhysicalInfoUpdate(elevator.PhysicalInfo, updateMV_PhysicalInfo)
+					publishSnapshotPP(elevator, processPairsTx)
+				}
+				if isOTChanged {
+					elev.SetAllLights(elevator.PhysicalInfo.LocalOrderTable, elevator.OrderTable, elevator.AliveList)
+					publishSnapshotPP(elevator, processPairsTx)
+				}
+
+			// =================================================================== FROM ROLEMANAGER
+
+			case newRole := <-fromRM_Role:
+				log.Println("[MAIN] From RM: Role")
+				isChanged := elevator.PhysicalInfo.Role != newRole
+				elevator.PhysicalInfo.Role = newRole
+
+				if isChanged {
+					updateTX_Role <- elevator.PhysicalInfo.Role
+					updateRX_Role <- elevator.PhysicalInfo.Role
+					sendPhysicalInfoUpdate(elevator.PhysicalInfo, updateMV_PhysicalInfo, updateOC_PhysicalInfo, updateTX_PhysicalInfo)
+					publishSnapshotPP(elevator, processPairsTx)
+				}
+
+			case newPrimaryId := <-fromRM_PrimaryID:
+				log.Println("[MAIN] From RM: Primary ID")
+				isChanged := elevator.PhysicalInfo.PrimaryID != newPrimaryId
+				elevator.PhysicalInfo.PrimaryID = newPrimaryId
+
+				if isChanged {
+					sendPhysicalInfoUpdate(elevator.PhysicalInfo, updateMV_PhysicalInfo, updateOC_PhysicalInfo, updateTX_PhysicalInfo)
+					updateRX_PrimaryID <- elevator.PhysicalInfo.PrimaryID
+					publishSnapshotPP(elevator, processPairsTx)
+				}
+
+			case newAliveList := <-fromRM_AliveList:
+				log.Println("[MAIN] From RM: New AliveList")
+				isChanged := elevator.AliveList != newAliveList
+				elevator.AliveList = newAliveList
+				elevator.NumElevs = rolemanager.CountNumElevs(elevator.AliveList)
+
+				if isChanged {
+					updateOC_AliveList <- elevator.AliveList
+					elev.SetAllLights(elevator.PhysicalInfo.LocalOrderTable, elevator.OrderTable, elevator.AliveList)
+					publishSnapshotPP(elevator, processPairsTx)
+				}
 			}
 
-		case newPrimaryId := <-fromRM_PrimaryID:
-			log.Println("[MAIN] From RM: Primary ID")
-			isChanged := elevator.PhysicalInfo.PrimaryID != newPrimaryId
-			elevator.PhysicalInfo.PrimaryID = newPrimaryId
+			//===================== ACCEPTANCE TESTS ===============================
 
-			if isChanged {
-				sendPhysicalInfoUpdate(elevator.PhysicalInfo, updateMV_PhysicalInfo, updateOC_PhysicalInfo, updateTX_PhysicalInfo)
-				updateRX_PrimaryID <- elevator.PhysicalInfo.PrimaryID
-				publishSnapshotPP(elevator, processPairsTx)
+			// TODO: Denne må flyttes herifra, eventloopen skal bare inneholde events mellom moduler
+
+			if elevator.PhysicalInfo.Floor < 0 || elevator.PhysicalInfo.Floor >= elev.N_FLOORS {
+				log.Fatalln("AT: Invalid floor index: ")
 			}
 
-		case newAliveList := <-fromRM_AliveList:
-			log.Println("[MAIN] From RM: New AliveList")
-			isChanged := elevator.AliveList != newAliveList
-			elevator.AliveList = newAliveList
-			elevator.NumElevs = rolemanager.CountNumElevs(elevator.AliveList)
-
-			if isChanged {
-				updateOC_AliveList <- elevator.AliveList
-				elev.SetAllLights(elevator.PhysicalInfo.LocalOrderTable, elevator.OrderTable, elevator.AliveList)
-				publishSnapshotPP(elevator, processPairsTx)
-			}
 		}
-
-		//===================== ACCEPTANCE TESTS ===============================
-
-		// TODO: Denne må flyttes herifra, eventloopen skal bare inneholde events mellom moduler
-
-		if elevator.PhysicalInfo.Floor < 0 || elevator.PhysicalInfo.Floor >= elev.N_FLOORS {
-			log.Fatalln("AT: Invalid floor index: ")
-		}
-
-	}
+	}()
 }
 
 func sendPhysicalInfoUpdate(info elev.ElevatorPhysicalInfo, channels ...chan<- elev.ElevatorPhysicalInfo) {
