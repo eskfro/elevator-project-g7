@@ -24,6 +24,7 @@ func Movement(
 	doorTimer := timer.New(elev.DOOR_OPEN_TIME)
 	betweenFloorTimer := timer.New(elev.BETWEEN_FLOORS_TIMEOUT)
 	stuckDoorTimer := timer.New(elev.STUCK_DOOR_TIMEOUT)
+	idleRestartTimer := timer.New(elev.IDLE_RESTART_TIMEOUT)
 	defer doorTimer.Close()
 	defer betweenFloorTimer.Close()
 	defer stuckDoorTimer.Close()
@@ -39,10 +40,13 @@ func Movement(
 	for {
 		select {
 		case <-betweenFloorTimer.C:
-			log.Fatalln("[Movement] Elevator stuck between floors!")
+			log.Fatalf("[Movement] Elevator stuck between floors for %v!", elev.BETWEEN_FLOORS_TIMEOUT)
 
 		case <-stuckDoorTimer.C:
-			log.Fatalln("[Movement] The door is stuck open!")
+			log.Fatalf("[Movement] The door was stuck open for %v!", elev.STUCK_DOOR_TIMEOUT)
+
+		case <-idleRestartTimer.C:
+			log.Fatalf("[Movement] Idle for %v, restart just in case", elev.IDLE_RESTART_TIMEOUT)
 
 		// FSM onTableUpdate
 		case newPhysicalInfo := <-updateMV_PhysicalInfo:
@@ -56,6 +60,7 @@ func Movement(
 			// Sync and update
 			syncBetweenFloorTimer(prevMovement, prevFloor, physicalInfo, betweenFloorTimer)
 			syncStuckDoorTimer(prevMovement, physicalInfo, stuckDoorTimer)
+			syncIdleRestartTimer(physicalInfo, idleRestartTimer)
 
 		// FSM onDoorTimeout
 		case <-doorTimer.C:
@@ -68,6 +73,7 @@ func Movement(
 			// Sync and update
 			syncBetweenFloorTimer(prevMovement, prevFloor, physicalInfo, betweenFloorTimer)
 			syncStuckDoorTimer(prevMovement, physicalInfo, stuckDoorTimer)
+			syncIdleRestartTimer(physicalInfo, idleRestartTimer)
 
 		// FSM onFloorArrival
 		case newFloor := <-toMV_FloorArrival:
@@ -84,9 +90,31 @@ func Movement(
 			// Sync and update
 			syncBetweenFloorTimer(prevMovement, prevFloor, physicalInfo, betweenFloorTimer)
 			syncStuckDoorTimer(prevMovement, physicalInfo, stuckDoorTimer)
+			syncIdleRestartTimer(physicalInfo, idleRestartTimer)
 
 		}
 	}
+}
+
+func syncIdleRestartTimer(
+	physicalInfo elev.ElevatorPhysicalInfo,
+	idleRestartTimer *timer.Timer,
+) {
+	if idleRestartTimer == nil {
+		return
+	}
+
+	isIdle := physicalInfo.Movement == elev.EM_Idle
+
+	if !isIdle {
+		idleRestartTimer.Stop()
+		return
+	}
+
+	if !idleRestartTimer.IsRunning() {
+		idleRestartTimer.Start()
+	}
+
 }
 
 func syncStuckDoorTimer(
