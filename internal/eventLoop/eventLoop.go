@@ -23,7 +23,7 @@ func Start(
 	processPairsTx chan<- elev.Elevator,
 ) {
 	// Ticker for debugging
-	timeStart := time.Now()
+	// timeStart := time.Now()
 	ticker_printElevator := time.NewTicker(1000 * time.Millisecond)
 	defer ticker_printElevator.Stop()
 
@@ -104,16 +104,16 @@ func Start(
 		for {
 			select {
 
+			// case <-ticker_printElevator.C:
+			// 	uptime := time.Since(timeStart).Seconds()
+			// 	elev.PrintElevatorInfo(elevator, uptime)
+			// 	elev.PrintOrderTableSlice(elevator.OrderTable, elevator.PhysicalInfo.ID)
+
 			case newPhysicalInfo := <-fromHW_PhysicalInfo:
 				log.Println("[eventLoop] From HW PhysicalInfo ")
 				elevator.PhysicalInfo = newPhysicalInfo
 				sendPhysicalInfoUpdate(elevator.PhysicalInfo, updateRM_PhysicalInfo, updateOC_PhysicalInfo, updateTX_PhysicalInfo, updateMV_PhysicalInfo)
 				publishSnapshotPP(elevator, processPairsTx)
-
-			case <-ticker_printElevator.C:
-				uptime := time.Since(timeStart).Seconds()
-				elev.PrintElevatorInfo(elevator, uptime)
-				elev.PrintOrderTableSlice(elevator.OrderTable, elevator.PhysicalInfo.ID)
 
 			// ================================================================== FROM MOVEMENT
 			case newLOT := <-fromMV_LOT:
