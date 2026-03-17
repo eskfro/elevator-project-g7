@@ -111,14 +111,14 @@ func RxOrderTable(
 			if !isMsgFromSelf {
 
 				if isRcvVersionInit || isRcvVersionNewer {
-					log.Println("[RxOrderTableUDP] Got message from backup")
+					// log.Println("[RxOrderTableUDP] Got message from backup")
 					versionsSeen[rcvOTP.ID] = rcvOTP.Version
 					fromRX_OTP <- rcvOTP
 				}
 				//isMsgFromSelf -> Sjekker om vi kan ha samme case uansett om det er fra deg selv eller ikke
 			} else {
 				if isRcvVersionInit || isRcvVersionNewer {
-					log.Println("[RxOrderTableUDP] Got message from backup")
+					// log.Println("[RxOrderTableUDP] Got message from backup")
 					versionsSeen[rcvOTP.ID] = rcvOTP.Version
 					fromRX_OTP <- rcvOTP
 				}

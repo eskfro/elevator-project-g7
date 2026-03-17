@@ -38,7 +38,7 @@ func TxHeartBeat(
 		}
 		_, err = conn.WriteTo(data, dst)
 		if err != nil {
-			log.Println("Error sending message: ", err)
+			// log.Println("Error sending message: ", err)
 		}
 	}
 

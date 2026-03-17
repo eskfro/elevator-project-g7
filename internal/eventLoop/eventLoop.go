@@ -77,10 +77,8 @@ func Start(
 	go func(initElev elev.Elevator, fromIO_Obstruction <-chan bool, fromIO_Floor <-chan int,
 		fromHW_PhysicalInfo chan<- elev.ElevatorPhysicalInfo, toMV_FloorArrival chan<- int, updateHW_PhysicalInfo <-chan elev.ElevatorPhysicalInfo,
 	) {
-
-		// Local
+		// Local variable
 		physicalInfo := initElev.PhysicalInfo
-
 		for {
 			select {
 
