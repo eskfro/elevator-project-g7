@@ -181,7 +181,7 @@ func fsm_onDoorTimeout(
 
 	case elev.EM_DoorOpen:
 
-		if PhysicalInfo.Floor == 0 || PhysicalInfo.Floor == elev.N_FLOORS-1 { //Basert på symptom ikkje kunnskap
+		if PhysicalInfo.Floor != 0 && PhysicalInfo.Floor != elev.N_FLOORS-1 { //Basert på symptom ikkje kunnskap
 			doorTimer.Start()
 			fmt.Println("timer set 4")
 		}
