@@ -36,6 +36,10 @@ func Movement(
 	if physicalInfo.Movement == elev.EM_Moving {
 		betweenFloorTimer.Start()
 	}
+	if physicalInfo.Movement == elev.EM_DoorOpen && !doorTimer.IsRunning(){
+		doorTimer.Start()
+	}
+
 
 	for {
 		select {
