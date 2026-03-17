@@ -168,9 +168,11 @@ func fsm_onDoorTimeout(
 	}
 
 	// Chose direction
+	fmt.Println(PhysicalInfo.LocalOrderTable[PhysicalInfo.Floor][elevio.BT_HallUp])
 	pair := requests.ChooseDirection(PhysicalInfo.LocalOrderTable, PhysicalInfo.Floor, PhysicalInfo.MotorDir)
 	PhysicalInfo.Movement = pair.Movement
 	PhysicalInfo.MotorDir = pair.MotorDir
+
 	fromMV_MotorDir <- PhysicalInfo.MotorDir
 
 	if PhysicalInfo.Movement != prevMovement {
@@ -181,10 +183,8 @@ func fsm_onDoorTimeout(
 
 	case elev.EM_DoorOpen:
 
-		if PhysicalInfo.Floor != 0 && PhysicalInfo.Floor != elev.N_FLOORS-1 { //Basert på symptom ikkje kunnskap
-			doorTimer.Start()
-			fmt.Println("timer set 4")
-		}
+		doorTimer.Start()
+		fmt.Println("timer set 4")
 
 		// Clear current floor
 		updated_LOT, buttonsToClear := requests.ClearCurrentFloor(PhysicalInfo.LocalOrderTable, PhysicalInfo.Floor, PhysicalInfo.MotorDir)
