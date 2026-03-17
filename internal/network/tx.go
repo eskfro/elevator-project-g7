@@ -72,6 +72,7 @@ func TxOrderTable(
 	dst, _ := net.ResolveUDPAddr("udp4", address)
 
 	var latestPacket elev.OrderTablePacket
+	latestPacket.ID = elev.INVALID_ELEVATOR_ID
 	versionTracker := &VersionTracker{}
 
 	ticker := time.NewTicker(BCAST_INTERVAL_OT)
@@ -79,6 +80,7 @@ func TxOrderTable(
 	for {
 		select {
 
+		// Update info to transmitt
 		case newOTP := <-updateTX_OTP:
 			// Increment version before updating packet info
 			var nextVersion uint64
@@ -87,9 +89,14 @@ func TxOrderTable(
 			newOTP.Version = nextVersion
 			latestPacket = newOTP
 
+		// Ticker for tx interval
 		case <-ticker.C:
-			data, _ := json.Marshal(latestPacket)
-			conn.WriteTo(data, dst)
+
+			// Guard so we dont send init OTP
+			if latestPacket.ID != elev.INVALID_ELEVATOR_ID {
+				data, _ := json.Marshal(latestPacket)
+				conn.WriteTo(data, dst)
+			}
 
 		}
 	}

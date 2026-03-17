@@ -14,7 +14,7 @@ func Movement(
 	fromMV_LOT chan<- elev.LocalOrderTable,
 	fromMV_Movement chan<- elev.ElevatorMovement,
 	fromMV_MotorDir chan<- elevio.MotorDirection,
-	fromMV_ClearOrder chan<- elev.ClearOrders,
+	fromMV_ClearOrders chan<- elev.ClearOrders,
 	toMV_FloorArrival <-chan int) {
 
 	// Local to Movement
@@ -51,7 +51,7 @@ func Movement(
 			prevFloor := physicalInfo.Floor
 			physicalInfo = newPhysicalInfo
 
-			physicalInfo = fsm_onTableUpdate(physicalInfo, doorTimer, fromMV_LOT, fromMV_Movement, fromMV_MotorDir, fromMV_ClearOrder)
+			physicalInfo = fsm_onTableUpdate(physicalInfo, doorTimer, fromMV_LOT, fromMV_Movement, fromMV_MotorDir, fromMV_ClearOrders)
 
 			// Sync and update
 			syncBetweenFloorTimer(prevMovement, prevFloor, physicalInfo, betweenFloorTimer)
@@ -63,7 +63,7 @@ func Movement(
 			prevMovement := physicalInfo.Movement
 			prevFloor := physicalInfo.Floor
 
-			physicalInfo = fsm_onDoorTimeout(physicalInfo, doorTimer, fromMV_LOT, fromMV_Movement, fromMV_MotorDir, fromMV_ClearOrder)
+			physicalInfo = fsm_onDoorTimeout(physicalInfo, doorTimer, fromMV_LOT, fromMV_Movement, fromMV_MotorDir, fromMV_ClearOrders)
 
 			// Sync and update
 			syncBetweenFloorTimer(prevMovement, prevFloor, physicalInfo, betweenFloorTimer)
@@ -74,13 +74,12 @@ func Movement(
 			fmt.Printf("[Movement]: Arrived at Floor = %d\n", newFloor)
 			prevMovement := physicalInfo.Movement
 			prevFloor := physicalInfo.Floor
-
 			if newFloor == 0 || newFloor == (elev.N_FLOORS-1) {
 				elevio.SetMotorDirection(elevio.MD_Stop)
 			}
-
 			physicalInfo.Floor = newFloor
-			physicalInfo = fsm_onFloorArrival(physicalInfo, doorTimer, fromMV_LOT, fromMV_Movement, fromMV_ClearOrder)
+
+			physicalInfo = fsm_onFloorArrival(physicalInfo, doorTimer, fromMV_LOT, fromMV_Movement, fromMV_ClearOrders)
 
 			// Sync and update
 			syncBetweenFloorTimer(prevMovement, prevFloor, physicalInfo, betweenFloorTimer)

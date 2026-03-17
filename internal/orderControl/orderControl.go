@@ -86,19 +86,21 @@ func OrderControl(
 		case newAliveList := <-updateOC_AliveList:
 			log.Println("[OrderControl] AliveList Update")
 
+			wasAnyDead := false
 			// Remove old data from dead elevators
 			for elevID := 0; elevID < elev.N_MAX_ELEVS; elevID++ {
 				wasDead := aliveList[elevID].Role == elev.ER_Dead
 				isAlive := newAliveList[elevID].Role != elev.ER_Dead
 				if wasDead && isAlive {
 					allOrderTables[elevID] = elev.OrderTable{}
+					wasAnyDead = true
 				}
 			}
 
 			isAliveListChanged := newAliveList != aliveList
 			aliveList = newAliveList
 
-			if !isAliveListChanged {
+			if !isAliveListChanged && !wasAnyDead {
 				continue
 			}
 
@@ -114,13 +116,12 @@ func OrderControl(
 			}
 
 			// Update states and send
-			newOrderTable := updateOrderTable(orderTable, rcvOrderTable, physicalInfo.ID, allOrderTables, physicalInfo,
-				aliveList, updateTX_OTP, startOrderTimer, stopOrderTimer)
+			newOrderTable := updateOrderTable(orderTable, rcvOrderTable, physicalInfo.ID, allOrderTables, physicalInfo, aliveList, updateTX_OTP, startOrderTimer, stopOrderTimer)
 			isOrderTableChanged := orderTable != newOrderTable
 			orderTable = newOrderTable
 			allOrderTables[physicalInfo.ID] = orderTable
 
-			if isOrderTableChanged {
+			if isOrderTableChanged && !wasAnyDead {
 				fromOC_OrderTable <- orderTable
 			}
 
@@ -129,15 +130,18 @@ func OrderControl(
 			elevio.PrintButtonpress(btnPress)
 			rcvOrderTable := orderTable
 			currentStatus := orderTable[physicalInfo.ID][btnPress.Floor][btnPress.Button]
+
+			// Check if already order at (btn, floor)
 			isOrderAlreadyActive := currentStatus == elev.OS_REQUESTED || currentStatus == elev.OS_CONFIRMED
 			if isOrderAlreadyActive {
 				log.Println("[OrderControl] Order Already Active")
 				continue
 			}
+			// Set requested
 			rcvOrderTable[physicalInfo.ID][btnPress.Floor][btnPress.Button] = elev.OS_REQUESTED
+
 			// Update states and send
-			newOrderTable := updateOrderTable(orderTable, rcvOrderTable, physicalInfo.ID, allOrderTables, physicalInfo,
-				aliveList, updateTX_OTP, startOrderTimer, stopOrderTimer)
+			newOrderTable := updateOrderTable(orderTable, rcvOrderTable, physicalInfo.ID, allOrderTables, physicalInfo, aliveList, updateTX_OTP, startOrderTimer, stopOrderTimer)
 			isOrderTableDifferent := orderTable != newOrderTable
 			orderTable = newOrderTable
 			allOrderTables[physicalInfo.ID] = orderTable
@@ -159,9 +163,9 @@ func OrderControl(
 					rcvOrderTable[clearOrder.ElevID][clearOrder.Floor][clearOrder.ButtonType] = elev.OS_CLEAR
 				}
 			}
+
 			// Update states and send
-			newOrderTable := updateOrderTable(orderTable, rcvOrderTable, physicalInfo.ID, allOrderTables, physicalInfo,
-				aliveList, updateTX_OTP, startOrderTimer, stopOrderTimer)
+			newOrderTable := updateOrderTable(orderTable, rcvOrderTable, physicalInfo.ID, allOrderTables, physicalInfo, aliveList, updateTX_OTP, startOrderTimer, stopOrderTimer)
 			isOrderTableDifferent := orderTable != newOrderTable
 			orderTable = newOrderTable
 			allOrderTables[physicalInfo.ID] = orderTable
@@ -181,8 +185,7 @@ func OrderControl(
 			// AOT Update
 			allOrderTables[packet.ID] = packet.OrderTable
 			// Update states and send
-			newOrderTable := updateOrderTable(orderTable, packet.OrderTable, packet.ID, allOrderTables, physicalInfo,
-				aliveList, updateTX_OTP, startOrderTimer, stopOrderTimer)
+			newOrderTable := updateOrderTable(orderTable, packet.OrderTable, packet.ID, allOrderTables, physicalInfo, aliveList, updateTX_OTP, startOrderTimer, stopOrderTimer)
 			isOrderTableDifferent := orderTable != newOrderTable
 			orderTable = newOrderTable
 			allOrderTables[physicalInfo.ID] = orderTable
@@ -255,6 +258,7 @@ func updateOrderTable(
 
 			// OrderStatus transitions
 			primaryOT = handlePrimaryStatusTransitions(primaryOT, rcvOrderTable, aliveList)
+			allOrderTables[physicalInfo.ID] = primaryOT //Eskil 17.03
 
 			primaryOT = assignAndClearOrders(primaryOT, aliveList, allOrderTables, physicalInfo.ID, startOrderTimer, stopOrderTimer)
 			isOrderTableChanged := primaryOT != prevOrderTable

@@ -154,6 +154,7 @@ func handleAliveListUpdate(
 			fromRM_PrimaryID <- physicalInfo.PrimaryID
 			fromRM_Role <- physicalInfo.Role
 
+			return physicalInfo, aliveList
 		}
 
 		if wasDead {
@@ -300,6 +301,7 @@ func shouldUpdatePrimaryId(aliveList elev.AliveList, primaryID int, timeStart ti
 		return time.Since(timeStart) >= elev.PRIMARY_ELECTION_DELAY
 	} else {
 		return aliveList[primaryID].Role == elev.ER_Dead
+		// TODO return aliveList[primaryID].Role != ER_Primary
 	}
 }
 
