@@ -144,58 +144,8 @@ func ShouldStop(
 	}
 }
 
-
 func ClearCurrentFloor(
 	localOrderTable elev.LocalOrderTable,
-	currentFloor int,
-	dir elevio.MotorDirection,
-) (elev.LocalOrderTable, [elev.N_BUTTONS]bool) {
-
-	var buttonsToClear [elev.N_BUTTONS]bool
-
-	if localOrderTable[currentFloor][elevio.BT_Cab] {
-		localOrderTable[currentFloor][elevio.BT_Cab] = false
-		buttonsToClear[elevio.BT_Cab] = true
-	}
-
-	switch dir {
-	case elevio.MD_Up:
-		if localOrderTable[currentFloor][elevio.BT_HallUp] {
-			localOrderTable[currentFloor][elevio.BT_HallUp] = false
-			buttonsToClear[elevio.BT_HallUp] = true
-		}
-		if !RequestAbove(localOrderTable, currentFloor) && localOrderTable[currentFloor][elevio.BT_HallDown] {
-			localOrderTable[currentFloor][elevio.BT_HallDown] = false
-			buttonsToClear[elevio.BT_HallDown] = true
-		}
-
-	case elevio.MD_Down:
-		if localOrderTable[currentFloor][elevio.BT_HallDown] {
-			localOrderTable[currentFloor][elevio.BT_HallDown] = false
-			buttonsToClear[elevio.BT_HallDown] = true
-		}
-		if !RequestBelow(localOrderTable, currentFloor) && localOrderTable[currentFloor][elevio.BT_HallUp] {
-			localOrderTable[currentFloor][elevio.BT_HallUp] = false
-			buttonsToClear[elevio.BT_HallUp] = true
-		}
-
-	default:
-		if localOrderTable[currentFloor][elevio.BT_HallUp] {
-			localOrderTable[currentFloor][elevio.BT_HallUp] = false
-			buttonsToClear[elevio.BT_HallUp] = true
-		}
-		if localOrderTable[currentFloor][elevio.BT_HallDown] {
-			localOrderTable[currentFloor][elevio.BT_HallDown] = false
-			buttonsToClear[elevio.BT_HallDown] = true
-		}
-	}
-
-	return localOrderTable, buttonsToClear
-}
-
-
-
-func ClearCurrentFloor2(localOrderTable elev.LocalOrderTable,
 	currentFloor int,
 	dir elevio.MotorDirection,
 ) (elev.LocalOrderTable, [elev.N_BUTTONS]bool) {

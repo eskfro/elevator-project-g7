@@ -73,14 +73,24 @@ func Start(
 
 	publishSnapshotPP(elevator, processPairsTx)
 
-	// ==================================================================== PRINT ELEVATOR
 	go func(initElev elev.Elevator, fromIO_Obstruction <-chan bool, fromIO_Floor <-chan int,
 		fromHW_PhysicalInfo chan<- elev.ElevatorPhysicalInfo, toMV_FloorArrival chan<- int, updateHW_PhysicalInfo <-chan elev.ElevatorPhysicalInfo,
 	) {
+
+		obsTicker := time.NewTicker(3000 * time.Millisecond)
+
 		// Local variable
 		physicalInfo := initElev.PhysicalInfo
 		for {
 			select {
+			// I tilfelle programmet ikke ser obs endring
+			case <-obsTicker.C:
+				newObs := elevio.GetObstruction()
+				isChangedObs := newObs != physicalInfo.Obstructed
+				physicalInfo.Obstructed = newObs
+				if isChangedObs {
+					fromHW_PhysicalInfo <- physicalInfo
+				}
 
 			case physicalInfo = <-updateHW_PhysicalInfo:
 
