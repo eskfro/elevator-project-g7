@@ -47,6 +47,7 @@ func Start(
 	fromRM_PrimaryID := make(chan int, 20)
 	fromRM_AliveList := make(chan elev.AliveList, 20)
 	fromRM_ResetVersion := make(chan int, 10)
+	fromRM_ResetNewElevTimer := make(chan struct{}, 10)
 
 	// Network transmitter
 	updateTX_PhysicalInfo := make(chan elev.ElevatorPhysicalInfo, 20)
@@ -64,8 +65,8 @@ func Start(
 
 	// Start modules
 	go movement.Movement(elevator, updateMV_PhysicalInfo, fromMV_LOT, fromMV_Movement, fromMV_MotorDir, fromMV_ClearOrders, toMV_FloorArrival)
-	go ordercontrol.OrderControl(elevator, updateOC_PhysicalInfo, updateOC_AliveList, fromRX_OrderTableP, fromMV_ClearOrders, fromIO_BtnPress, fromOC_OrderTable, updateTX_OTP)
-	go rolemanager.RoleManager(elevator, fromRX_PhysicalInfo, updateRM_PhysicalInfo, fromRM_Role, fromRM_PrimaryID, fromRM_AliveList, fromRM_ResetVersion)
+	go ordercontrol.OrderControl(elevator, updateOC_PhysicalInfo, updateOC_AliveList, fromRX_OrderTableP, fromMV_ClearOrders, fromIO_BtnPress, fromOC_OrderTable, updateTX_OTP, fromRM_ResetNewElevTimer)
+	go rolemanager.RoleManager(elevator, fromRX_PhysicalInfo, updateRM_PhysicalInfo, fromRM_Role, fromRM_PrimaryID, fromRM_AliveList, fromRM_ResetVersion, fromRM_ResetNewElevTimer)
 	go network.TxHeartBeat(elevator, ports.HeartBeat, updateTX_PhysicalInfo)
 	go network.RxHeartBeat(ports.HeartBeat, fromRX_PhysicalInfo, elevator.PhysicalInfo.ID)
 	go network.TxOrderTable(elevator, ports.OrderTableP, updateTX_OTP)

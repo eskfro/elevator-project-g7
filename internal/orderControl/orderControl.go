@@ -4,6 +4,7 @@ import (
 	"elevator-project-g7/internal/elev"
 	"elevator-project-g7/internal/elevio"
 	"log"
+	"time"
 )
 
 func OrderControl(
@@ -15,11 +16,15 @@ func OrderControl(
 	fromIO_BtnPress <-chan elevio.ButtonEvent,
 	fromOC_OrderTable chan<- elev.OrderTable,
 	updateTX_OTP chan<- elev.OrderTablePacket,
+	fromRM_ResetNewElevTimer <-chan struct{},
 ) {
 
 	startOrderTimer := make(chan elev.Order, 10)
 	stopOrderTimer := make(chan elev.Order, 10)
 	orderToReassign := make(chan elev.Order, 10)
+
+	//Timer
+	newElevTime := time.Now()
 
 	// Local to OrderControl
 	orderTable := initElev.OrderTable
@@ -32,6 +37,9 @@ func OrderControl(
 	for {
 
 		select {
+
+		case <-fromRM_ResetNewElevTimer:
+			newElevTime = time.Now()
 
 		case newPhysicalInfo := <-updateOC_PhysicalInfo:
 			log.Println("[OrderControl] PhysicalInfo Update")
@@ -115,7 +123,7 @@ func OrderControl(
 			}
 
 			// Update states and send
-			newOrderTable := updateOrderTable(orderTable, rcvOrderTable, physicalInfo.ID, allOrderTables, physicalInfo, aliveList, updateTX_OTP, startOrderTimer, stopOrderTimer)
+			newOrderTable := updateOrderTable(orderTable, rcvOrderTable, physicalInfo.ID, allOrderTables, physicalInfo, aliveList, updateTX_OTP, startOrderTimer, stopOrderTimer, newElevTime)
 			isOrderTableDifferent := newOrderTable != orderTable
 			orderTable = newOrderTable
 			allOrderTables[physicalInfo.ID] = orderTable
@@ -140,7 +148,7 @@ func OrderControl(
 			rcvOrderTable[physicalInfo.ID][btnPress.Floor][btnPress.Button] = elev.OS_REQUESTED
 
 			// Update states and send
-			newOrderTable := updateOrderTable(orderTable, rcvOrderTable, physicalInfo.ID, allOrderTables, physicalInfo, aliveList, updateTX_OTP, startOrderTimer, stopOrderTimer)
+			newOrderTable := updateOrderTable(orderTable, rcvOrderTable, physicalInfo.ID, allOrderTables, physicalInfo, aliveList, updateTX_OTP, startOrderTimer, stopOrderTimer, newElevTime)
 			orderTable = newOrderTable
 			allOrderTables[physicalInfo.ID] = orderTable
 
@@ -161,7 +169,7 @@ func OrderControl(
 			}
 
 			// Update states and send
-			newOrderTable := updateOrderTable(orderTable, rcvOrderTable, physicalInfo.ID, allOrderTables, physicalInfo, aliveList, updateTX_OTP, startOrderTimer, stopOrderTimer)
+			newOrderTable := updateOrderTable(orderTable, rcvOrderTable, physicalInfo.ID, allOrderTables, physicalInfo, aliveList, updateTX_OTP, startOrderTimer, stopOrderTimer, newElevTime)
 			orderTable = newOrderTable
 			allOrderTables[physicalInfo.ID] = orderTable
 
@@ -175,10 +183,11 @@ func OrderControl(
 			if isMsgFromSelf || !isChanged {
 				continue
 			}
+
 			// AOT Update
 			allOrderTables[packet.ID] = packet.OrderTable
 			// Update states and send
-			newOrderTable := updateOrderTable(orderTable, packet.OrderTable, packet.ID, allOrderTables, physicalInfo, aliveList, updateTX_OTP, startOrderTimer, stopOrderTimer)
+			newOrderTable := updateOrderTable(orderTable, packet.OrderTable, packet.ID, allOrderTables, physicalInfo, aliveList, updateTX_OTP, startOrderTimer, stopOrderTimer, newElevTime)
 			isOrderTableDifferent := orderTable != newOrderTable
 			orderTable = newOrderTable
 			allOrderTables[physicalInfo.ID] = orderTable
@@ -201,6 +210,7 @@ func updateOrderTable(
 	updateTX_OTP chan<- elev.OrderTablePacket,
 	startOrderTimer chan<- elev.Order,
 	stopOrderTimer chan<- elev.Order,
+	newElevTime time.Time,
 ) elev.OrderTable {
 
 	prevOrderTable := OrderTable
@@ -211,9 +221,19 @@ func updateOrderTable(
 
 	case elev.ER_Backup:
 		// Backup stupid af 💀
+		if isMsgFromPrimary {
 
+			if time.Since(newElevTime) > elev.BACKUP_WAIT_OT_TIME {
+				updateTX_OTP <- elev.OrderTablePacket{ID: physicalInfo.ID, OrderTable: rcvOrderTable}
+				return rcvOrderTable
+			} else {
+				updateTX_OTP <- elev.OrderTablePacket{ID: physicalInfo.ID, OrderTable: OrderTable}
+				return OrderTable
+			}
+
+		}
 		// New Clear Order or BtnPress
-		if isMsgFromSelf || isMsgFromPrimary {
+		if isMsgFromSelf {
 			updateTX_OTP <- elev.OrderTablePacket{ID: physicalInfo.ID, OrderTable: rcvOrderTable}
 			return rcvOrderTable
 		}
@@ -230,7 +250,7 @@ func updateOrderTable(
 			primaryOT = reassignHallOrders(primaryOT, physicalInfo.ID, ordersToReassign) // Eskil 13.03
 
 			// OrderStatus transitions
-			primaryOT = handlePrimaryStatusTransitions(primaryOT, primaryOT, aliveList)
+			primaryOT = handlePrimaryStatusTransitions(primaryOT, primaryOT, aliveList, newElevTime)
 			allOrderTables[physicalInfo.ID] = primaryOT
 
 			primaryOT = assignAndClearOrders(primaryOT, aliveList, allOrderTables, physicalInfo.ID, startOrderTimer, stopOrderTimer)
@@ -251,8 +271,8 @@ func updateOrderTable(
 			primaryOT = reassignHallOrders(primaryOT, physicalInfo.ID, ordersToReassign) // Eskil 13.03
 
 			// OrderStatus transitions
-			primaryOT = handlePrimaryStatusTransitions(primaryOT, rcvOrderTable, aliveList)
-			allOrderTables[physicalInfo.ID] = primaryOT //Eskil 17.03
+			primaryOT = handlePrimaryStatusTransitions(primaryOT, rcvOrderTable, aliveList, newElevTime)
+			// allOrderTables[physicalInfo.ID] = primaryOT //Eskil 17.03
 
 			primaryOT = assignAndClearOrders(primaryOT, aliveList, allOrderTables, physicalInfo.ID, startOrderTimer, stopOrderTimer)
 			isOrderTableChanged := primaryOT != prevOrderTable
@@ -409,6 +429,7 @@ func handlePrimaryStatusTransitions(
 	primaryOT elev.OrderTable,
 	rcvOT elev.OrderTable,
 	AliveList elev.AliveList,
+	newElevTime time.Time,
 ) elev.OrderTable {
 
 	for elevIndex := 0; elevIndex < elev.N_MAX_ELEVS; elevIndex++ {
@@ -435,7 +456,7 @@ func handlePrimaryStatusTransitions(
 					//isHallCall
 				} else {
 					// State machine logikk for OrderStatus transitions
-					primaryOT[elevIndex][floor][btn] = orderStatusTransition(primaryStatus, rcvStatus)
+					primaryOT[elevIndex][floor][btn] = orderStatusTransition(primaryStatus, rcvStatus, newElevTime)
 				}
 			}
 		}
@@ -446,6 +467,7 @@ func handlePrimaryStatusTransitions(
 func orderStatusTransition(
 	primaryStatus elev.OrderStatus,
 	rcvStatus elev.OrderStatus,
+	newElevTime time.Time,
 ) elev.OrderStatus {
 
 	switch primaryStatus {
@@ -453,6 +475,10 @@ func orderStatusTransition(
 	case elev.OS_NO_ORDER:
 		if rcvStatus == elev.OS_REQUESTED {
 			return elev.OS_REQUESTED
+		}
+
+		if rcvStatus == elev.OS_CONFIRMED && time.Since(newElevTime) < elev.BACKUP_WAIT_OT_TIME {
+			return elev.OS_CONFIRMED
 		}
 
 	case elev.OS_REQUESTED:

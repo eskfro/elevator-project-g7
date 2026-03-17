@@ -16,6 +16,7 @@ func RoleManager(
 	fromRM_PrimaryID chan<- int,
 	fromRM_AliveList chan<- elev.AliveList,
 	fromRM_ResetVersion chan<- int,
+	fromRM_ResetNewElevTimer chan<- struct{},
 ) {
 	heartBeatID := make(chan int, 200)
 	timedOutID := make(chan int, 50)
@@ -35,7 +36,7 @@ func RoleManager(
 
 		case <-startupCheck.C:
 			aliveList[physicalInfo.ID] = physicalInfo
-			physicalInfo, aliveList = handleAliveListUpdate(physicalInfo, aliveList, timeStart, fromRM_AliveList, fromRM_PrimaryID, fromRM_Role, false, false)
+			physicalInfo, aliveList = handleAliveListUpdate(physicalInfo, aliveList, timeStart, fromRM_AliveList, fromRM_PrimaryID, fromRM_Role, false, false, fromRM_ResetNewElevTimer)
 			at_rolePrimaryID(physicalInfo.PrimaryID, physicalInfo.ID, physicalInfo.Role)
 
 		case newPhysicalInfo := <-updateRM_PhysicalInfo:
@@ -50,7 +51,7 @@ func RoleManager(
 			aliveList[timedOutID].Role = elev.ER_Dead
 			fromRM_AliveList <- aliveList
 			fromRM_ResetVersion <- timedOutID
-			physicalInfo, aliveList = handleAliveListUpdate(physicalInfo, aliveList, timeStart, fromRM_AliveList, fromRM_PrimaryID, fromRM_Role, true, false)
+			physicalInfo, aliveList = handleAliveListUpdate(physicalInfo, aliveList, timeStart, fromRM_AliveList, fromRM_PrimaryID, fromRM_Role, true, false, fromRM_ResetNewElevTimer)
 			at_rolePrimaryID(physicalInfo.PrimaryID, physicalInfo.ID, physicalInfo.Role)
 
 		case heartbeat := <-fromRX_PhysicalInfo:
@@ -71,11 +72,12 @@ func RoleManager(
 			}
 			if wasDead {
 				fromRM_ResetVersion <- heartbeat.ID
+				fromRM_ResetNewElevTimer <- struct{}{}
 			}
 			// log.Println("[RoleManager] New AliveList update to RoleManager")
 			aliveList[heartbeat.ID] = heartbeat
 			fromRM_AliveList <- aliveList
-			physicalInfo, aliveList = handleAliveListUpdate(physicalInfo, aliveList, timeStart, fromRM_AliveList, fromRM_PrimaryID, fromRM_Role, false, wasDead)
+			physicalInfo, aliveList = handleAliveListUpdate(physicalInfo, aliveList, timeStart, fromRM_AliveList, fromRM_PrimaryID, fromRM_Role, false, wasDead, fromRM_ResetNewElevTimer)
 			at_rolePrimaryID(physicalInfo.PrimaryID, physicalInfo.ID, physicalInfo.Role)
 
 		}
@@ -91,6 +93,7 @@ func handleAliveListUpdate(
 	fromRM_Role chan<- elev.ElevatorRole,
 	recentTimeout bool,
 	wasDead bool,
+	fromRM_ResetNewElevTimer chan<- struct{},
 
 ) (elev.ElevatorPhysicalInfo, elev.AliveList) {
 
@@ -135,6 +138,7 @@ func handleAliveListUpdate(
 			fromRM_AliveList <- aliveList
 			fromRM_PrimaryID <- physicalInfo.PrimaryID
 			fromRM_Role <- physicalInfo.Role //IDK ABOUT THIS
+			fromRM_ResetNewElevTimer <- struct{}{}
 		}
 
 		return physicalInfo, aliveList
@@ -161,6 +165,7 @@ func handleAliveListUpdate(
 			fromRM_AliveList <- aliveList
 			fromRM_PrimaryID <- physicalInfo.PrimaryID
 			fromRM_Role <- physicalInfo.Role //IDK ABOUT THIS
+			fromRM_ResetNewElevTimer <- struct{}{}
 		}
 
 		return physicalInfo, aliveList
