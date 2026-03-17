@@ -36,10 +36,9 @@ func Movement(
 	if physicalInfo.Movement == elev.EM_Moving {
 		betweenFloorTimer.Start()
 	}
-	if physicalInfo.Movement == elev.EM_DoorOpen && !doorTimer.IsRunning(){
+	if physicalInfo.Movement == elev.EM_DoorOpen && !doorTimer.IsRunning() {
 		doorTimer.Start()
 	}
-
 
 	for {
 		select {
@@ -63,7 +62,7 @@ func Movement(
 
 			// Sync and update
 			syncBetweenFloorTimer(prevMovement, prevFloor, physicalInfo, betweenFloorTimer)
-			syncStuckDoorTimer(prevMovement, physicalInfo, stuckDoorTimer)
+			syncStuckDoorTimer(physicalInfo, stuckDoorTimer)
 			syncIdleRestartTimer(physicalInfo, idleRestartTimer)
 
 		// FSM onDoorTimeout
@@ -76,7 +75,7 @@ func Movement(
 
 			// Sync and update
 			syncBetweenFloorTimer(prevMovement, prevFloor, physicalInfo, betweenFloorTimer)
-			syncStuckDoorTimer(prevMovement, physicalInfo, stuckDoorTimer)
+			syncStuckDoorTimer(physicalInfo, stuckDoorTimer)
 			syncIdleRestartTimer(physicalInfo, idleRestartTimer)
 
 		// FSM onFloorArrival
@@ -93,7 +92,7 @@ func Movement(
 
 			// Sync and update
 			syncBetweenFloorTimer(prevMovement, prevFloor, physicalInfo, betweenFloorTimer)
-			syncStuckDoorTimer(prevMovement, physicalInfo, stuckDoorTimer)
+			syncStuckDoorTimer(physicalInfo, stuckDoorTimer)
 			syncIdleRestartTimer(physicalInfo, idleRestartTimer)
 
 		}
@@ -122,23 +121,24 @@ func syncIdleRestartTimer(
 }
 
 func syncStuckDoorTimer(
-	prevMovement elev.ElevatorMovement,
 	physicalInfo elev.ElevatorPhysicalInfo,
 	stuckDoorTimer *timer.Timer,
 ) {
-	enteredDoorOpen := prevMovement != elev.EM_DoorOpen &&
-		physicalInfo.Movement == elev.EM_DoorOpen
+	if stuckDoorTimer == nil {
+		return
+	}
 
-	leftDoorOpen := prevMovement == elev.EM_DoorOpen &&
-		physicalInfo.Movement != elev.EM_DoorOpen
+	isDoorOpen := physicalInfo.Movement == elev.EM_DoorOpen
 
-	switch {
-	case leftDoorOpen:
+	if !isDoorOpen {
 		stuckDoorTimer.Stop()
+		return
+	}
 
-	case enteredDoorOpen:
+	if !stuckDoorTimer.IsRunning() {
 		stuckDoorTimer.Start()
 	}
+
 }
 
 func syncBetweenFloorTimer(
