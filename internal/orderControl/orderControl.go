@@ -161,7 +161,7 @@ func OrderControl(
 			}
 
 			// Update states and send
-			newOrderTable := updateOrderTable(rcvOrderTable, rcvOrderTable, physicalInfo.ID, allOrderTables, physicalInfo, aliveList, updateTX_OTP, startOrderTimer, stopOrderTimer)
+			newOrderTable := updateOrderTable(orderTable, rcvOrderTable, physicalInfo.ID, allOrderTables, physicalInfo, aliveList, updateTX_OTP, startOrderTimer, stopOrderTimer)
 			orderTable = newOrderTable
 			allOrderTables[physicalInfo.ID] = orderTable
 

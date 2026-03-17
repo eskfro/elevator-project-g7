@@ -25,7 +25,7 @@ func fsm_onTableUpdate(
 
 	case elev.EM_DoorOpen:
 
-		if requests.ShouldStop(PhysicalInfo.LocalOrderTable, PhysicalInfo.Floor, PhysicalInfo.MotorDir) {
+		if requests.RequestHere(PhysicalInfo.LocalOrderTable, PhysicalInfo.Floor) {
 			// Stay DoorOpen and reset door timer
 			PhysicalInfo.Movement = elev.EM_DoorOpen
 			doorTimer.Start()
