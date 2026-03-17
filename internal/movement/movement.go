@@ -40,10 +40,10 @@ func Movement(
 	for {
 		select {
 		case <-betweenFloorTimer.C:
-			log.Fatalln("[Movement] Elevator stuck between floors!")
+			log.Fatalf("[Movement] Elevator stuck between floors for %v!", elev.BETWEEN_FLOORS_TIMEOUT)
 
 		case <-stuckDoorTimer.C:
-			log.Fatalln("[Movement] The door is stuck open!")
+			log.Fatalf("[Movement] The door was stuck open for %v!", elev.STUCK_DOOR_TIMEOUT)
 
 		case <-idleRestartTimer.C:
 			log.Fatalf("[Movement] Idle for %v, restart just in case", elev.IDLE_RESTART_TIMEOUT)
