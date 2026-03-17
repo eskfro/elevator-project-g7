@@ -169,6 +169,8 @@ func fsm_onDoorTimeout(
 
 	// Chose direction
 	fmt.Println(PhysicalInfo.LocalOrderTable[PhysicalInfo.Floor][elevio.BT_HallUp])
+	fmt.Println(PhysicalInfo.LocalOrderTable[PhysicalInfo.Floor][elevio.BT_HallDown])
+	fmt.Println(PhysicalInfo.LocalOrderTable[PhysicalInfo.Floor][elevio.BT_Cab])
 	pair := requests.ChooseDirection(PhysicalInfo.LocalOrderTable, PhysicalInfo.Floor, PhysicalInfo.MotorDir)
 	PhysicalInfo.Movement = pair.Movement
 	PhysicalInfo.MotorDir = pair.MotorDir
