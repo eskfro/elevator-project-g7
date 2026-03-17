@@ -8,6 +8,9 @@ import (
 	ordercontrol "elevator-project-g7/internal/orderControl"
 	rolemanager "elevator-project-g7/internal/roleManager"
 	"log"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 )
 
@@ -56,6 +59,10 @@ func Start(
 	fromRX_OrderTableP := make(chan elev.OrderTablePacket, 100)
 	fromRX_PhysicalInfo := make(chan elev.ElevatorPhysicalInfo, 100)
 
+	// Hardware
+	fromHW_PhysicalInfo := make(chan elev.ElevatorPhysicalInfo, 100)
+	updateHW_PhysicalInfo := make(chan elev.ElevatorPhysicalInfo, 100)
+
 	// Start modules
 	go movement.Movement(elevator, updateMV_PhysicalInfo, fromMV_LOT, fromMV_Movement, fromMV_MotorDir, fromMV_ClearOrders, toMV_FloorArrival)
 	go ordercontrol.OrderControl(elevator, updateOC_PhysicalInfo, updateOC_AliveList, fromRX_OrderTableP, fromMV_ClearOrders, fromIO_BtnPress, fromOC_OrderTable, updateTX_OTP)
@@ -68,53 +75,66 @@ func Start(
 	publishSnapshotPP(elevator, processPairsTx)
 
 	// ==================================================================== PRINT ELEVATOR
-	go func() {
+	go func(initElev elev.Elevator, fromIO_Obstruction <-chan bool, fromIO_Floor <-chan int,
+		fromHW_PhysicalInfo chan<- elev.ElevatorPhysicalInfo, toMV_FloorArrival chan<- int, updateHW_PhysicalInfo <-chan elev.ElevatorPhysicalInfo,
+	) {
+
+		// Local
+		physicalInfo := initElev.PhysicalInfo
 
 		for {
 			select {
+
+			case physicalInfo = <-updateHW_PhysicalInfo:
+
+			case obst := <-fromIO_Obstruction:
+				log.Println("[MAIN] FromIO obs")
+				physicalInfo.Obstructed = obst
+				fromHW_PhysicalInfo <- physicalInfo
+
+			case floor := <-fromIO_Floor:
+				log.Println("[MAIN] FromIO floor")
+				physicalInfo.Floor = floor
+				toMV_FloorArrival <- floor
+				fromHW_PhysicalInfo <- physicalInfo
+
+			}
+		}
+	}(elevator, fromIO_Obstruction, fromIO_Floor, fromHW_PhysicalInfo, toMV_FloorArrival, updateHW_PhysicalInfo)
+
+	func() {
+
+		for {
+			select {
+
+			case newPhysicalInfo := <-fromHW_PhysicalInfo:
+				log.Println("[eventLoop] From HW PhysicalInfo ")
+				elevator.PhysicalInfo = newPhysicalInfo
+				sendPhysicalInfoUpdate(elevator.PhysicalInfo, updateRM_PhysicalInfo, updateOC_PhysicalInfo, updateTX_PhysicalInfo, updateMV_PhysicalInfo)
+				publishSnapshotPP(elevator, processPairsTx)
+
 			case <-ticker_printElevator.C:
 				uptime := time.Since(timeStart).Seconds()
 				elev.PrintElevatorInfo(elevator, uptime)
 				elev.PrintOrderTableSlice(elevator.OrderTable, elevator.PhysicalInfo.ID)
 
-			case obst := <-fromIO_Obstruction:
-				log.Println("[MAIN] FromIO obs")
-				elevator.PhysicalInfo.Obstructed = obst
-				sendPhysicalInfoUpdate(elevator.PhysicalInfo, updateRM_PhysicalInfo, updateOC_PhysicalInfo, updateTX_PhysicalInfo, updateMV_PhysicalInfo)
-				publishSnapshotPP(elevator, processPairsTx)
-
-			case floor := <-fromIO_Floor:
-				log.Println("[MAIN] FromIO floor")
-
-				elevator.PhysicalInfo.Floor = floor
-				toMV_FloorArrival <- floor
-				sendPhysicalInfoUpdate(elevator.PhysicalInfo, updateRM_PhysicalInfo, updateOC_PhysicalInfo, updateTX_PhysicalInfo)
-				publishSnapshotPP(elevator, processPairsTx)
-			}
-		}
-	}()
-
-	go func() {
-
-		for {
-			select {
 			// ================================================================== FROM MOVEMENT
 			case newLOT := <-fromMV_LOT:
 				log.Println("[MAIN] From MV: LocalOrderTable")
 				elevator.PhysicalInfo.LocalOrderTable = newLOT
-				sendPhysicalInfoUpdate(elevator.PhysicalInfo, updateRM_PhysicalInfo, updateOC_PhysicalInfo, updateTX_PhysicalInfo)
+				sendPhysicalInfoUpdate(elevator.PhysicalInfo, updateRM_PhysicalInfo, updateOC_PhysicalInfo, updateTX_PhysicalInfo, updateHW_PhysicalInfo)
 				publishSnapshotPP(elevator, processPairsTx)
 
 			case newMovement := <-fromMV_Movement:
 				log.Println("[MAIN] From MV: Movement")
 				elevator.PhysicalInfo.Movement = newMovement
-				sendPhysicalInfoUpdate(elevator.PhysicalInfo, updateRM_PhysicalInfo, updateOC_PhysicalInfo, updateTX_PhysicalInfo)
+				sendPhysicalInfoUpdate(elevator.PhysicalInfo, updateRM_PhysicalInfo, updateOC_PhysicalInfo, updateTX_PhysicalInfo, updateHW_PhysicalInfo)
 				publishSnapshotPP(elevator, processPairsTx)
 
 			case newMotorDir := <-fromMV_MotorDir:
 				log.Println("[MAIN] From MV: MotorDir")
 				elevator.PhysicalInfo.MotorDir = newMotorDir
-				sendPhysicalInfoUpdate(elevator.PhysicalInfo, updateRM_PhysicalInfo, updateOC_PhysicalInfo, updateTX_PhysicalInfo)
+				sendPhysicalInfoUpdate(elevator.PhysicalInfo, updateRM_PhysicalInfo, updateOC_PhysicalInfo, updateTX_PhysicalInfo, updateHW_PhysicalInfo)
 				publishSnapshotPP(elevator, processPairsTx)
 
 			// ================================================================== FROM ORDERCONTROL
@@ -128,7 +148,7 @@ func Start(
 				elevator.PhysicalInfo.LocalOrderTable = ordercontrol.OrderTableToLOT(elevator.OrderTable, elevator.PhysicalInfo.ID)
 
 				if isLOTChanged {
-					sendPhysicalInfoUpdate(elevator.PhysicalInfo, updateMV_PhysicalInfo)
+					sendPhysicalInfoUpdate(elevator.PhysicalInfo, updateMV_PhysicalInfo, updateHW_PhysicalInfo)
 					publishSnapshotPP(elevator, processPairsTx)
 				}
 				if isOTChanged {
@@ -146,7 +166,7 @@ func Start(
 				if isChanged {
 					updateTX_Role <- elevator.PhysicalInfo.Role
 					updateRX_Role <- elevator.PhysicalInfo.Role
-					sendPhysicalInfoUpdate(elevator.PhysicalInfo, updateMV_PhysicalInfo, updateOC_PhysicalInfo, updateTX_PhysicalInfo)
+					sendPhysicalInfoUpdate(elevator.PhysicalInfo, updateMV_PhysicalInfo, updateOC_PhysicalInfo, updateTX_PhysicalInfo, updateHW_PhysicalInfo)
 					publishSnapshotPP(elevator, processPairsTx)
 				}
 
@@ -156,7 +176,7 @@ func Start(
 				elevator.PhysicalInfo.PrimaryID = newPrimaryId
 
 				if isChanged {
-					sendPhysicalInfoUpdate(elevator.PhysicalInfo, updateMV_PhysicalInfo, updateOC_PhysicalInfo, updateTX_PhysicalInfo)
+					sendPhysicalInfoUpdate(elevator.PhysicalInfo, updateMV_PhysicalInfo, updateOC_PhysicalInfo, updateTX_PhysicalInfo, updateHW_PhysicalInfo)
 					updateRX_PrimaryID <- elevator.PhysicalInfo.PrimaryID
 					publishSnapshotPP(elevator, processPairsTx)
 				}
@@ -184,6 +204,8 @@ func Start(
 
 		}
 	}()
+
+	WaitForInterrupt()
 }
 
 func sendPhysicalInfoUpdate(info elev.ElevatorPhysicalInfo, channels ...chan<- elev.ElevatorPhysicalInfo) {
@@ -204,4 +226,10 @@ func publishSnapshotPP(e elev.Elevator, tx chan<- elev.Elevator) {
 	case tx <- e:
 	default:
 	}
+}
+
+func WaitForInterrupt() {
+	ch_sig := make(chan os.Signal, 1)
+	signal.Notify(ch_sig, os.Interrupt, syscall.SIGTERM)
+	<-ch_sig
 }
