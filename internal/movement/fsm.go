@@ -180,8 +180,11 @@ func fsm_onDoorTimeout(
 	switch PhysicalInfo.Movement {
 
 	case elev.EM_DoorOpen:
-		doorTimer.Start()
-		fmt.Println("timer set 4")
+
+		if PhysicalInfo.Floor == 0 || PhysicalInfo.Floor == elev.N_FLOORS-1 { //Basert på symptom ikkje kunnskap
+			doorTimer.Start()
+			fmt.Println("timer set 4")
+		}
 
 		// Clear current floor
 		updated_LOT, buttonsToClear := requests.ClearCurrentFloor(PhysicalInfo.LocalOrderTable, PhysicalInfo.Floor, PhysicalInfo.MotorDir)
