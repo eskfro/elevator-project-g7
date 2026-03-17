@@ -25,7 +25,7 @@ func RoleManager(
 	physicalInfo := initElev.PhysicalInfo
 	timeStart := time.Now()
 
-	startupCheck := time.NewTimer(elev.PRIMARY_ELECTION_DELAY)
+	startupCheck := time.NewTicker(500 * time.Millisecond)
 	defer startupCheck.Stop()
 
 	go monitorHeartBeats(heartBeatID, timedOutID)
