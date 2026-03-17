@@ -123,19 +123,6 @@ func startSlave(
 			mirrorElev.PhysicalInfo.PrimaryID = elev.INVALID_PRIMARY_ID
 			mirrorElev.PhysicalInfo.MotorDir = elevio.MD_Stop
 
-			for elevID := 0; elevID < elev.N_MAX_ELEVS; elevID++ {
-				if mirrorElev.AliveList[elevID].Role == elev.ER_Dead {
-					continue
-				}
-				for floor := 0; floor < elev.N_FLOORS; floor++ {
-					for btn := 0; btn < elev.N_BUTTONS; btn++ {
-						if mirrorElev.OrderTable[elevID][floor][btn] == elev.OS_CONFIRMED {
-							mirrorElev.OrderTable[elevID][floor][btn] = elev.OS_REQUESTED
-						}
-					}
-				}
-			}
-
 			if mirrorElev.PhysicalInfo.Movement == elev.EM_DoorOpen {
 				elevio.SetDoorOpenLamp(true)
 			}
