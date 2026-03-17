@@ -1,6 +1,7 @@
 package timer
 
 import (
+	"sync"
 	"time"
 )
 
@@ -9,6 +10,9 @@ type Timer struct {
 	duration time.Duration
 	C        chan struct{}
 	stop     chan struct{}
+
+	mu        sync.Mutex
+	isRunning bool
 }
 
 func New(duration time.Duration) *Timer {
@@ -39,22 +43,37 @@ func (t *Timer) loop() {
 }
 
 func (t *Timer) Start() {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
 	if !t.internal.Stop() {
 		select {
 		case <-t.internal.C:
 		default:
 		}
 	}
+
 	t.internal.Reset(t.duration)
+	t.isRunning = true
 }
 
 func (t *Timer) Stop() {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
 	if !t.internal.Stop() {
 		select {
 		case <-t.internal.C:
 		default:
 		}
 	}
+	t.isRunning = false
+}
+
+func (t *Timer) IsRunning() bool {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.isRunning
 }
 
 func (t *Timer) Close() {
