@@ -51,7 +51,6 @@ func Start(
 	// Network transmitter
 	updateTX_PhysicalInfo := make(chan elev.ElevatorPhysicalInfo, 20)
 	updateTX_OTP := make(chan elev.OrderTablePacket, 100)
-	updateTX_Role := make(chan elev.ElevatorRole, 5)
 
 	// Network reciever
 	updateRX_Role := make(chan elev.ElevatorRole, 5)
@@ -69,7 +68,7 @@ func Start(
 	go rolemanager.RoleManager(elevator, fromRX_PhysicalInfo, updateRM_PhysicalInfo, fromRM_Role, fromRM_PrimaryID, fromRM_AliveList, fromRM_ResetVersion)
 	go network.TxHeartBeat(elevator, ports.HeartBeat, updateTX_PhysicalInfo)
 	go network.RxHeartBeat(ports.HeartBeat, fromRX_PhysicalInfo, elevator.PhysicalInfo.ID)
-	go network.TxOrderTable(elevator, ports.OrderTableP, updateTX_OTP, updateTX_Role)
+	go network.TxOrderTable(elevator, ports.OrderTableP, updateTX_OTP)
 	go network.RxOrderTable(elevator, ports.OrderTableP, updateRX_Role, updateRX_PrimaryID, fromRM_ResetVersion, fromRX_OrderTableP)
 
 	publishSnapshotPP(elevator, processPairsTx)
@@ -164,7 +163,6 @@ func Start(
 				elevator.PhysicalInfo.Role = newRole
 
 				if isChanged {
-					updateTX_Role <- elevator.PhysicalInfo.Role
 					updateRX_Role <- elevator.PhysicalInfo.Role
 					sendPhysicalInfoUpdate(elevator.PhysicalInfo, updateMV_PhysicalInfo, updateOC_PhysicalInfo, updateTX_PhysicalInfo, updateHW_PhysicalInfo)
 					publishSnapshotPP(elevator, processPairsTx)

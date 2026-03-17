@@ -64,7 +64,6 @@ func TxOrderTable(
 	initElev elev.Elevator,
 	port_ot int,
 	updateTX_OTP <-chan elev.OrderTablePacket,
-	updateTX_Role <-chan elev.ElevatorRole,
 ) {
 
 	address := BCAST_RCV_IP + ":" + strconv.Itoa(port_ot)
