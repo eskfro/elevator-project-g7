@@ -75,6 +75,10 @@ func Movement(
 			prevMovement := physicalInfo.Movement
 			prevFloor := physicalInfo.Floor
 
+			if newFloor == 0 || newFloor == (elev.N_FLOORS-1) {
+				elevio.SetMotorDirection(elevio.MD_Stop)
+			}
+
 			physicalInfo.Floor = newFloor
 			physicalInfo = fsm_onFloorArrival(physicalInfo, doorTimer, fromMV_LOT, fromMV_Movement, fromMV_ClearOrder)
 
