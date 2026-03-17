@@ -50,12 +50,15 @@ func Movement(
 
 		// FSM onTableUpdate
 		case newPhysicalInfo := <-updateMV_PhysicalInfo:
+			isLotChanged := newPhysicalInfo.LocalOrderTable != physicalInfo.LocalOrderTable
 			log.Println("[Movement] PhysicalInfo Update")
 			prevMovement := physicalInfo.Movement
 			prevFloor := physicalInfo.Floor
 			physicalInfo = newPhysicalInfo
 
-			physicalInfo = fsm_onTableUpdate(physicalInfo, doorTimer, fromMV_LOT, fromMV_Movement, fromMV_MotorDir, fromMV_ClearOrders)
+			if isLotChanged {
+				physicalInfo = fsm_onTableUpdate(physicalInfo, doorTimer, fromMV_LOT, fromMV_Movement, fromMV_MotorDir, fromMV_ClearOrders)
+			}
 
 			// Sync and update
 			syncBetweenFloorTimer(prevMovement, prevFloor, physicalInfo, betweenFloorTimer)

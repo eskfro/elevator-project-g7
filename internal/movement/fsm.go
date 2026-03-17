@@ -163,6 +163,7 @@ func fsm_onDoorTimeout(
 
 	if isObstructed {
 		doorTimer.Start()
+		fmt.Printf("timer set 5")
 		return PhysicalInfo
 	}
 
