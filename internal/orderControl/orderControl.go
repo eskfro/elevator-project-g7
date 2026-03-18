@@ -137,6 +137,7 @@ func OrderControl(
 
 			// Check if already order at (btn, floor)
 			isOrderAlreadyActive := currentStatus == elev.OS_REQUESTED || currentStatus == elev.OS_CONFIRMED
+
 			if isOrderAlreadyActive {
 				log.Println("[OrderControl] Order Already Active")
 				continue
@@ -250,12 +251,9 @@ func updateOrderTable(
 			allOrderTables[physicalInfo.ID] = primaryOT
 
 			primaryOT = assignAndClearOrders(primaryOT, aliveList, allOrderTables, physicalInfo.ID, startOrderTimer, stopOrderTimer)
-			isOrderTableChanged := primaryOT != prevOrderTable
+			// isOrderTableChanged := primaryOT != prevOrderTable
 
-			if isOrderTableChanged {
-				// Send to network
-				updateTX_OTP <- elev.OrderTablePacket{ID: physicalInfo.ID, OrderTable: primaryOT}
-			}
+			updateTX_OTP <- elev.OrderTablePacket{ID: physicalInfo.ID, OrderTable: primaryOT}
 
 			return primaryOT
 
@@ -271,12 +269,9 @@ func updateOrderTable(
 			// allOrderTables[physicalInfo.ID] = primaryOT //Eskil 17.03
 
 			primaryOT = assignAndClearOrders(primaryOT, aliveList, allOrderTables, physicalInfo.ID, startOrderTimer, stopOrderTimer)
-			isOrderTableChanged := primaryOT != prevOrderTable
+			// isOrderTableChanged := primaryOT != prevOrderTable
 
-			if isOrderTableChanged {
-				// Send to network
-				updateTX_OTP <- elev.OrderTablePacket{ID: physicalInfo.ID, OrderTable: primaryOT}
-			}
+			updateTX_OTP <- elev.OrderTablePacket{ID: physicalInfo.ID, OrderTable: primaryOT}
 
 			return primaryOT
 		}
