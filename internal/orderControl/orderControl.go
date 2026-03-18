@@ -193,7 +193,7 @@ func OrderControl(
 			// if !isChanged && !wasDeadElev {
 			// 	continue
 			// }
-			if isMsgFromSelf {
+			if isMsgFromSelf { // TODO: kanskje noe her
 				continue
 			}
 
