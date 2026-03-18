@@ -50,7 +50,7 @@ func OrderControl(
 					updateTX_OTP <- elev.OrderTablePacket{ID: physicalInfo.ID, OrderTable: orderTable}
 
 				}
-				fromOC_OrderTable <- orderTable
+				// fromOC_OrderTable <- orderTable
 			}
 
 		case <-fromRM_ResetNewElevTimer:
