@@ -179,7 +179,7 @@ func OrderControl(
 		case packet := <-fromRX_OrderTableP:
 			isMsgFromSelf := packet.ID == physicalInfo.ID
 			isChanged := allOrderTables[packet.ID] != packet.OrderTable
-			wasDeadElev := time.Since(newElevTime) > elev.BACKUP_WAIT_OT_TIME
+			wasDeadElev := time.Since(newElevTime) < elev.BACKUP_WAIT_OT_TIME
 
 			if (isMsgFromSelf || !isChanged) && !wasDeadElev {
 				continue

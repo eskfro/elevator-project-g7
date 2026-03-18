@@ -54,7 +54,7 @@ func RxOrderTable(
 				if resetIndex >= 0 && resetIndex < elev.N_MAX_ELEVS {
 					log.Println("[RxOrderTableUDP] Version Reset")
 					versionsSeen[resetIndex] = 0
-					
+
 				} else {
 					log.Fatalf("[RxOrderTableUDP] Ignoring invalid reset index: %d\n", resetIndex)
 				}
@@ -128,10 +128,13 @@ func RxOrderTable(
 			// isThisBackup
 		} else {
 
-			if isMsgFromPrimary && isRcvVersionNewer {
-				log.Println("[RxOrderTableUDP] Got message from primary")
-				versionsSeen[rcvOTP.ID] = rcvOTP.Version
-				fromRX_OTP <- rcvOTP
+			if isMsgFromPrimary {
+
+				if isRcvVersionNewer { // TODO: sjekk om vi kan godta isRcvVersionInit
+					log.Println("[RxOrderTableUDP] Got message from primary")
+					versionsSeen[rcvOTP.ID] = rcvOTP.Version
+					fromRX_OTP <- rcvOTP
+				}
 			}
 		}
 	}
