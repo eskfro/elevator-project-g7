@@ -266,47 +266,7 @@ func updateOrderTable(
 				return OrderTable
 
 			} else {
-				backupOT := OrderTable
-
-				for elevID := 0; elevID < elev.N_MAX_ELEVS; elevID++ {
-					for floor := 0; floor < elev.N_FLOORS; floor++ {
-						for btn := 0; btn < elev.N_BUTTONS; btn++ {
-							primaryStatus := rcvOrderTable[elevID][floor][btn]
-							thisStatus := backupOT[elevID][floor][btn]
-
-							if elevio.ButtonType(btn) != elevio.BT_Cab {
-								backupOT[elevID][floor][btn] = primaryStatus
-								continue
-							}
-							// Primary cant overwrite thisID's cab orders
-							newStatus := thisStatus
-
-							switch thisStatus {
-
-							case elev.OS_NO_ORDER:
-								if primaryStatus == elev.OS_CONFIRMED || primaryStatus == elev.OS_REQUESTED {
-									newStatus = elev.OS_CONFIRMED
-								}
-
-							case elev.OS_REQUESTED:
-								if primaryStatus == elev.OS_CONFIRMED {
-									newStatus = elev.OS_CONFIRMED
-								}
-
-							case elev.OS_CONFIRMED:
-								if primaryStatus == elev.OS_CLEAR {
-									newStatus = elev.OS_NO_ORDER
-								}
-
-							case elev.OS_CLEAR:
-								newStatus = thisStatus
-
-							}
-							backupOT[elevID][floor][btn] = newStatus
-
-						}
-					}
-				}
+				backupOT := handleBackupTransitions(OrderTable, rcvOrderTable)
 				updateTX_OTP <- elev.OrderTablePacket{ID: physicalInfo.ID, OrderTable: backupOT}
 				return backupOT
 			}
@@ -460,6 +420,51 @@ func reassignHallOrders(
 	}
 
 	return primaryOT
+}
+func handleBackupTransitions(orderTable elev.OrderTable, rcvOrderTable elev.OrderTable) elev.OrderTable {
+
+	backupOT := orderTable
+
+	for elevID := 0; elevID < elev.N_MAX_ELEVS; elevID++ {
+		for floor := 0; floor < elev.N_FLOORS; floor++ {
+			for btn := 0; btn < elev.N_BUTTONS; btn++ {
+				primaryStatus := rcvOrderTable[elevID][floor][btn]
+				thisStatus := backupOT[elevID][floor][btn]
+
+				if elevio.ButtonType(btn) != elevio.BT_Cab {
+					backupOT[elevID][floor][btn] = primaryStatus
+					continue
+				}
+				// Primary cant overwrite thisID's cab orders
+				newStatus := thisStatus
+
+				switch thisStatus {
+
+				case elev.OS_NO_ORDER:
+					if primaryStatus == elev.OS_CONFIRMED || primaryStatus == elev.OS_REQUESTED {
+						newStatus = elev.OS_CONFIRMED
+					}
+
+				case elev.OS_REQUESTED:
+					if primaryStatus == elev.OS_CONFIRMED {
+						newStatus = elev.OS_CONFIRMED
+					}
+
+				case elev.OS_CONFIRMED:
+					if primaryStatus == elev.OS_CLEAR {
+						newStatus = elev.OS_NO_ORDER
+					}
+
+				case elev.OS_CLEAR:
+					newStatus = thisStatus
+
+				}
+				backupOT[elevID][floor][btn] = newStatus
+
+			}
+		}
+	}
+	return backupOT
 }
 
 func resolveDeadElevators(
