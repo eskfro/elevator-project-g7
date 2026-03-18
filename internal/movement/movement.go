@@ -60,7 +60,6 @@ func Movement(
 			physicalInfo = newPhysicalInfo
 
 			if isLotChanged {
-
 				physicalInfo = fsm_onTableUpdate(physicalInfo, doorTimer, fromMV_LOT, fromMV_Movement, fromMV_MotorDir, fromMV_ClearOrders)
 			}
 
