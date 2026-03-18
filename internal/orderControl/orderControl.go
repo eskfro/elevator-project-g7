@@ -179,20 +179,22 @@ func OrderControl(
 		case packet := <-fromRX_OrderTableP:
 			isMsgFromSelf := packet.ID == physicalInfo.ID
 			isChanged := allOrderTables[packet.ID] != packet.OrderTable
+			wasDeadElev := time.Since(newElevTime) > elev.BACKUP_WAIT_OT_TIME
 
-			if isMsgFromSelf || !isChanged {
+			if (isMsgFromSelf || !isChanged) && !wasDeadElev {
 				continue
 			}
 
 			// AOT Update
 			allOrderTables[packet.ID] = packet.OrderTable
+
 			// Update states and send
 			newOrderTable := updateOrderTable(orderTable, packet.OrderTable, packet.ID, allOrderTables, physicalInfo, aliveList, updateTX_OTP, startOrderTimer, stopOrderTimer, newElevTime)
 			isOrderTableDifferent := orderTable != newOrderTable
 			orderTable = newOrderTable
 			allOrderTables[physicalInfo.ID] = orderTable
 
-			if isOrderTableDifferent {
+			if isOrderTableDifferent || wasDeadElev {
 				fromOC_OrderTable <- orderTable
 			}
 
