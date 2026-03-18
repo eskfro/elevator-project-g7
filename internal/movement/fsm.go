@@ -28,8 +28,8 @@ func fsm_onTableUpdate(
 		if requests.RequestHere(PhysicalInfo.LocalOrderTable, PhysicalInfo.Floor) {
 			// Stay DoorOpen and reset door timer
 			PhysicalInfo.Movement = elev.EM_DoorOpen
-			// doorTimer.Start()
-			// fmt.Println("timer set 2")
+			doorTimer.Start()
+			fmt.Println("timer set 2")
 
 			updated_LOT, buttonsToClear := requests.ClearCurrentFloor(PhysicalInfo.LocalOrderTable, PhysicalInfo.Floor, PhysicalInfo.MotorDir)
 			PhysicalInfo.LocalOrderTable = updated_LOT
