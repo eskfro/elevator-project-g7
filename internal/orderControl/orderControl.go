@@ -42,9 +42,15 @@ func OrderControl(
 		case <-retriggerOT.C:
 			if physicalInfo.Role == elev.ER_Primary {
 
-				newOrderTable := updateOrderTable(orderTable, orderTable, physicalInfo.ID, allOrderTables, physicalInfo, aliveList, updateTX_OTP, startOrderTimer, stopOrderTimer, newElevTime)
-				orderTable = newOrderTable
-				allOrderTables[physicalInfo.ID] = orderTable
+				newOrderTable := assignAndClearOrders(orderTable, aliveList, allOrderTables, physicalInfo.ID, startOrderTimer, stopOrderTimer)
+
+				if newOrderTable != orderTable {
+					orderTable = newOrderTable
+					allOrderTables[physicalInfo.ID] = orderTable
+					fromOC_OrderTable <- orderTable
+					updateTX_OTP <- elev.OrderTablePacket{ID: physicalInfo.Floor, OrderTable: orderTable}
+
+				}
 
 				fromOC_OrderTable <- orderTable
 			}
@@ -187,13 +193,14 @@ func OrderControl(
 		// =========================================================================== PACKET FROM NETWORK
 		case packet := <-fromRX_OrderTableP:
 			isMsgFromSelf := packet.ID == physicalInfo.ID
-			// isChanged := allOrderTables[packet.ID] != packet.OrderTable
+			isChanged := allOrderTables[packet.ID] != packet.OrderTable
 			// wasDeadElev := time.Since(newElevTime) < elev.BACKUP_WAIT_OT_TIME
 
 			// if !isChanged && !wasDeadElev {
 			// 	continue
 			// }
-			if isMsgFromSelf { // TODO: kanskje noe her
+
+			if isMsgFromSelf || !isChanged { // TODO: kanskje noe her
 				continue
 			}
 
