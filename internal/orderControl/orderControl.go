@@ -124,13 +124,10 @@ func OrderControl(
 
 			// Update states and send
 			newOrderTable := updateOrderTable(orderTable, rcvOrderTable, physicalInfo.ID, allOrderTables, physicalInfo, aliveList, updateTX_OTP, startOrderTimer, stopOrderTimer, newElevTime)
-			isOrderTableDifferent := newOrderTable != orderTable
 			orderTable = newOrderTable
 			allOrderTables[physicalInfo.ID] = orderTable
 
-			if isOrderTableDifferent {
-				fromOC_OrderTable <- orderTable
-			}
+			fromOC_OrderTable <- orderTable
 
 		// ============================================================================== BTN PRESS FROM IO
 		case btnPress := <-fromIO_BtnPress:
@@ -190,13 +187,10 @@ func OrderControl(
 
 			// Update states and send
 			newOrderTable := updateOrderTable(orderTable, packet.OrderTable, packet.ID, allOrderTables, physicalInfo, aliveList, updateTX_OTP, startOrderTimer, stopOrderTimer, newElevTime)
-			isOrderTableDifferent := orderTable != newOrderTable
 			orderTable = newOrderTable
 			allOrderTables[physicalInfo.ID] = orderTable
 
-			if isOrderTableDifferent || wasDeadElev {
-				fromOC_OrderTable <- orderTable
-			}
+			fromOC_OrderTable <- orderTable
 
 		}
 	}

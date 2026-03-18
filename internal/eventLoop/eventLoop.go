@@ -149,20 +149,16 @@ func Start(
 
 			case newOrderTable := <-fromOC_OrderTable:
 				log.Println("[MAIN] From OC: OrderTable")
-				isLOTChanged := elevator.PhysicalInfo.LocalOrderTable != ordercontrol.OrderTableToLOT(newOrderTable, elevator.PhysicalInfo.ID)
-				isOTChanged := elevator.OrderTable != newOrderTable
+				// isLOTChanged := elevator.PhysicalInfo.LocalOrderTable != ordercontrol.OrderTableToLOT(newOrderTable, elevator.PhysicalInfo.ID)
+				// isOTChanged := elevator.OrderTable != newOrderTable
 
 				elevator.OrderTable = newOrderTable
 				elevator.PhysicalInfo.LocalOrderTable = ordercontrol.OrderTableToLOT(elevator.OrderTable, elevator.PhysicalInfo.ID)
 
-				if isLOTChanged {
-					sendPhysicalInfoUpdate(elevator.PhysicalInfo, updateMV_PhysicalInfo, updateHW_PhysicalInfo)
-					publishSnapshotPP(elevator, processPairsTx)
-				}
-				if isOTChanged {
-					elev.SetAllLights(elevator.PhysicalInfo.LocalOrderTable, elevator.OrderTable, elevator.AliveList)
-					publishSnapshotPP(elevator, processPairsTx)
-				}
+				sendPhysicalInfoUpdate(elevator.PhysicalInfo, updateMV_PhysicalInfo, updateHW_PhysicalInfo)
+				publishSnapshotPP(elevator, processPairsTx)
+
+				elev.SetAllLights(elevator.PhysicalInfo.LocalOrderTable, elevator.OrderTable, elevator.AliveList)
 
 			// =================================================================== FROM ROLEMANAGER
 
