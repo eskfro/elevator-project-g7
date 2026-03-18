@@ -29,39 +29,39 @@ func Start(
 
 	// =================================================================== CHANNELS
 	// Movement
-	updateMV_PhysicalInfo := make(chan elev.ElevatorPhysicalInfo, 20)
-	toMV_FloorArrival := make(chan int, 5)
-	fromMV_LOT := make(chan elev.LocalOrderTable, 20)
-	fromMV_MotorDir := make(chan elevio.MotorDirection, 20)
-	fromMV_Movement := make(chan elev.ElevatorMovement, 20)
-	fromMV_ClearOrders := make(chan elev.ClearOrders, 20)
+	updateMV_PhysicalInfo := make(chan elev.ElevatorPhysicalInfo, 32)
+	toMV_FloorArrival := make(chan int, 16)
+	fromMV_LOT := make(chan elev.LocalOrderTable, 32)
+	fromMV_MotorDir := make(chan elevio.MotorDirection, 32)
+	fromMV_Movement := make(chan elev.ElevatorMovement, 32)
+	fromMV_ClearOrders := make(chan elev.ClearOrders, 32)
 
 	// OrderControl
-	updateOC_PhysicalInfo := make(chan elev.ElevatorPhysicalInfo, 20)
-	updateOC_AliveList := make(chan elev.AliveList, 50)
-	fromOC_OrderTable := make(chan elev.OrderTable, 20)
+	updateOC_PhysicalInfo := make(chan elev.ElevatorPhysicalInfo, 32)
+	updateOC_AliveList := make(chan elev.AliveList, 64)
+	fromOC_OrderTable := make(chan elev.OrderTable, 256)
 
 	// RoleManager
-	updateRM_PhysicalInfo := make(chan elev.ElevatorPhysicalInfo, 20)
-	fromRM_Role := make(chan elev.ElevatorRole, 20)
-	fromRM_PrimaryID := make(chan int, 20)
-	fromRM_AliveList := make(chan elev.AliveList, 20)
-	fromRM_ResetVersion := make(chan int, 10)
-	fromRM_ResetNewElevTimer := make(chan struct{}, 10)
+	updateRM_PhysicalInfo := make(chan elev.ElevatorPhysicalInfo, 32)
+	fromRM_Role := make(chan elev.ElevatorRole, 32)
+	fromRM_PrimaryID := make(chan int, 32)
+	fromRM_AliveList := make(chan elev.AliveList, 32)
+	fromRM_ResetVersion := make(chan int, 32)
+	fromRM_ResetNewElevTimer := make(chan struct{}, 32)
 
 	// Network transmitter
-	updateTX_PhysicalInfo := make(chan elev.ElevatorPhysicalInfo, 20)
-	updateTX_OTP := make(chan elev.OrderTablePacket, 100)
+	updateTX_PhysicalInfo := make(chan elev.ElevatorPhysicalInfo, 32)
+	updateTX_OTP := make(chan elev.OrderTablePacket, 128)
 
 	// Network reciever
-	updateRX_Role := make(chan elev.ElevatorRole, 5)
-	updateRX_PrimaryID := make(chan int, 5)
-	fromRX_OrderTableP := make(chan elev.OrderTablePacket, 100)
-	fromRX_PhysicalInfo := make(chan elev.ElevatorPhysicalInfo, 100)
+	updateRX_Role := make(chan elev.ElevatorRole, 16)
+	updateRX_PrimaryID := make(chan int, 16)
+	fromRX_OrderTableP := make(chan elev.OrderTablePacket, 128)
+	fromRX_PhysicalInfo := make(chan elev.ElevatorPhysicalInfo, 128)
 
 	// Hardware
-	fromHW_PhysicalInfo := make(chan elev.ElevatorPhysicalInfo, 100)
-	updateHW_PhysicalInfo := make(chan elev.ElevatorPhysicalInfo, 100)
+	fromHW_PhysicalInfo := make(chan elev.ElevatorPhysicalInfo, 128)
+	updateHW_PhysicalInfo := make(chan elev.ElevatorPhysicalInfo, 32)
 
 	// Start modules
 	go movement.Movement(elevator, updateMV_PhysicalInfo, fromMV_LOT, fromMV_Movement, fromMV_MotorDir, fromMV_ClearOrders, toMV_FloorArrival)
@@ -83,9 +83,10 @@ func Start(
 
 		// Local variable
 		physicalInfo := initElev.PhysicalInfo
+
 		for {
 			select {
-			// I tilfelle programmet ikke ser obs endring
+
 			case <-obsTicker.C:
 				newObs := elevio.GetObstruction()
 				isChangedObs := newObs != physicalInfo.Obstructed
@@ -150,8 +151,6 @@ func Start(
 
 			case newOrderTable := <-fromOC_OrderTable:
 				log.Println("[MAIN] From OC: OrderTable")
-				// isLOTChanged := elevator.PhysicalInfo.LocalOrderTable != ordercontrol.OrderTableToLOT(newOrderTable, elevator.PhysicalInfo.ID)
-				// isOTChanged := elevator.OrderTable != newOrderTable
 
 				elevator.OrderTable = newOrderTable
 				elevator.PhysicalInfo.LocalOrderTable = ordercontrol.OrderTableToLOT(elevator.OrderTable, elevator.PhysicalInfo.ID)

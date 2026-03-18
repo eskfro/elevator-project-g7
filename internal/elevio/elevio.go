@@ -29,9 +29,9 @@ type ButtonEvent struct {
 // Input channels
 func Inputs() (<-chan ButtonEvent, <-chan int, <-chan bool) {
 
-	fromIO_BtnPress := make(chan ButtonEvent, 50)
-	fromIO_Floor := make(chan int, 20)
-	fromIO_Obstruction := make(chan bool, 20)
+	fromIO_BtnPress := make(chan ButtonEvent, 64)
+	fromIO_Floor := make(chan int, 32)
+	fromIO_Obstruction := make(chan bool, 32)
 
 	go pollButtons(fromIO_BtnPress)
 	go pollFloorSensor(fromIO_Floor)

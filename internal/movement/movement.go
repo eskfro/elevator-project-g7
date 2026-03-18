@@ -165,7 +165,7 @@ func syncBetweenFloorTimer(
 		betweenFloorTimer.Start()
 
 	case passedNewFloorWhileMoving:
-		betweenFloorTimer.Start() // Start() fungerer som reset
+		betweenFloorTimer.Start() 
 	}
 }
 

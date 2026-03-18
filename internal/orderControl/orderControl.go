@@ -19,9 +19,9 @@ func OrderControl(
 	fromRM_ResetNewElevTimer <-chan struct{},
 ) {
 
-	startOrderTimer := make(chan elev.Order, 10)
-	stopOrderTimer := make(chan elev.Order, 10)
-	orderToReassign := make(chan elev.Order, 10)
+	startOrderTimer := make(chan elev.Order, 16)
+	stopOrderTimer := make(chan elev.Order, 16)
+	orderToReassign := make(chan elev.Order, 16)
 
 	//Timer
 	newElevTime := time.Now()

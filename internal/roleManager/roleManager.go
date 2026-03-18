@@ -18,8 +18,8 @@ func RoleManager(
 	fromRM_ResetVersion chan<- int,
 	fromRM_ResetNewElevTimer chan<- struct{},
 ) {
-	heartBeatID := make(chan int, 200)
-	timedOutID := make(chan int, 50)
+	heartBeatID := make(chan int, 256)
+	timedOutID := make(chan int, 64)
 
 	// Local to RoleManager
 	aliveList := initElev.AliveList
