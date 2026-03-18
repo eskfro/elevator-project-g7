@@ -9,8 +9,8 @@ import (
 )
 
 // Network Config
-const BCAST_INTERVAL_HB = 30 * time.Millisecond //HeartBeats
-const BCAST_INTERVAL_OT = 30 * time.Millisecond //OrderTablePackets
+const BCAST_INTERVAL_HB = 35 * time.Millisecond //HeartBeats
+const BCAST_INTERVAL_OT = 35 * time.Millisecond //OrderTablePackets
 const BCAST_RCV_IP = "255.255.255.255"
 
 type Ports struct {
