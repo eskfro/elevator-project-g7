@@ -264,9 +264,23 @@ func updateOrderTable(
 			if isNewElevOnNetwork {
 				updateTX_OTP <- elev.OrderTablePacket{ID: physicalInfo.ID, OrderTable: OrderTable}
 				return OrderTable
+
 			} else {
-				updateTX_OTP <- elev.OrderTablePacket{ID: physicalInfo.ID, OrderTable: rcvOrderTable}
-				return rcvOrderTable
+				backupOT := OrderTable
+
+				for elevID := 0; elevID < elev.N_MAX_ELEVS; elevID++ {
+					for floor := 0; floor < elev.N_FLOORS; floor++ {
+						for btn := 0; btn < elev.N_BUTTONS; btn++ {
+							// Primary cantr overwrite thisID's cab orders
+							if elevio.ButtonType(btn) == elevio.BT_Cab && elevID == physicalInfo.ID {
+								continue
+							}
+							backupOT[elevID][floor][btn] = rcvOrderTable[elevID][floor][btn]
+						}
+					}
+				}
+				updateTX_OTP <- elev.OrderTablePacket{ID: physicalInfo.ID, OrderTable: backupOT}
+				return backupOT
 			}
 
 		}
