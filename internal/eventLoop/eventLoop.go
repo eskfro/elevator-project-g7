@@ -3,6 +3,7 @@ package eventloop
 import (
 	"elevator-project-g7/internal/elev"
 	"elevator-project-g7/internal/elevio"
+	"elevator-project-g7/internal/hardware"
 	"elevator-project-g7/internal/movement"
 	"elevator-project-g7/internal/network"
 	ordercontrol "elevator-project-g7/internal/orderControl"
@@ -22,7 +23,6 @@ func Start(
 	fromIO_Obstruction <-chan bool,
 	processPairsTx chan<- elev.Elevator,
 ) {
-	// Ticker for printing elevator
 	timeStart := time.Now()
 	ticker_printElevator := time.NewTicker(1000 * time.Millisecond)
 	defer ticker_printElevator.Stop()
@@ -71,49 +71,11 @@ func Start(
 	go network.RxHeartBeat(ports.HeartBeat, fromRX_PhysicalInfo, elevator.PhysicalInfo.ID)
 	go network.TxOrderTable(elevator, ports.OrderTableP, updateTX_OTP)
 	go network.RxOrderTable(elevator, ports.OrderTableP, updateRX_Role, updateRX_PrimaryID, fromRM_ResetVersion, fromRX_OrderTableP)
+	go hardware.Start(elevator, fromIO_Obstruction, fromIO_Floor, fromHW_PhysicalInfo, toMV_FloorArrival, updateHW_PhysicalInfo)
 
-	publishSnapshotPP(elevator, processPairsTx)
-
-	// Obstruction and floor sensor
-	go func(initElev elev.Elevator, fromIO_Obstruction <-chan bool, fromIO_Floor <-chan int,
-		fromHW_PhysicalInfo chan<- elev.ElevatorPhysicalInfo, toMV_FloorArrival chan<- int, updateHW_PhysicalInfo <-chan elev.ElevatorPhysicalInfo,
-	) {
-
-		obsTicker := time.NewTicker(3000 * time.Millisecond)
-
-		// Local variable
-		physicalInfo := initElev.PhysicalInfo
-
-		for {
-			select {
-
-			case <-obsTicker.C:
-				newObs := elevio.GetObstruction()
-				isChangedObs := newObs != physicalInfo.Obstructed
-				physicalInfo.Obstructed = newObs
-				if isChangedObs {
-					fromHW_PhysicalInfo <- physicalInfo
-				}
-
-			case physicalInfo = <-updateHW_PhysicalInfo:
-
-			case obst := <-fromIO_Obstruction:
-				log.Println("[MAIN] FromIO obs")
-				physicalInfo.Obstructed = obst
-				fromHW_PhysicalInfo <- physicalInfo
-
-			case floor := <-fromIO_Floor:
-				log.Println("[MAIN] FromIO floor")
-				physicalInfo.Floor = floor
-				toMV_FloorArrival <- floor
-				fromHW_PhysicalInfo <- physicalInfo
-
-			}
-		}
-	}(elevator, fromIO_Obstruction, fromIO_Floor, fromHW_PhysicalInfo, toMV_FloorArrival, updateHW_PhysicalInfo)
+	processPairSnapshot(elevator, processPairsTx)
 
 	func() {
-
 		for {
 			select {
 
@@ -122,30 +84,31 @@ func Start(
 				elev.PrintElevatorInfo(elevator, uptime)
 				elev.PrintOrderTableSlice(elevator.OrderTable, elevator.PhysicalInfo.ID)
 
+			// ================================================================== FROM HARDWARE
 			case newPhysicalInfo := <-fromHW_PhysicalInfo:
 				log.Println("[eventLoop] From HW PhysicalInfo ")
 				elevator.PhysicalInfo = newPhysicalInfo
 				sendPhysicalInfoUpdate(elevator.PhysicalInfo, updateRM_PhysicalInfo, updateOC_PhysicalInfo, updateTX_PhysicalInfo, updateMV_PhysicalInfo)
-				publishSnapshotPP(elevator, processPairsTx)
+				processPairSnapshot(elevator, processPairsTx)
 
 			// ================================================================== FROM MOVEMENT
 			case newLOT := <-fromMV_LOT:
 				log.Println("[MAIN] From MV: LocalOrderTable")
 				elevator.PhysicalInfo.LocalOrderTable = newLOT
 				sendPhysicalInfoUpdate(elevator.PhysicalInfo, updateRM_PhysicalInfo, updateOC_PhysicalInfo, updateTX_PhysicalInfo, updateHW_PhysicalInfo)
-				publishSnapshotPP(elevator, processPairsTx)
+				processPairSnapshot(elevator, processPairsTx)
 
 			case newMovement := <-fromMV_Movement:
 				log.Println("[MAIN] From MV: Movement")
 				elevator.PhysicalInfo.Movement = newMovement
 				sendPhysicalInfoUpdate(elevator.PhysicalInfo, updateRM_PhysicalInfo, updateOC_PhysicalInfo, updateTX_PhysicalInfo, updateHW_PhysicalInfo)
-				publishSnapshotPP(elevator, processPairsTx)
+				processPairSnapshot(elevator, processPairsTx)
 
 			case newMotorDir := <-fromMV_MotorDir:
 				log.Println("[MAIN] From MV: MotorDir")
 				elevator.PhysicalInfo.MotorDir = newMotorDir
 				sendPhysicalInfoUpdate(elevator.PhysicalInfo, updateRM_PhysicalInfo, updateOC_PhysicalInfo, updateTX_PhysicalInfo, updateHW_PhysicalInfo)
-				publishSnapshotPP(elevator, processPairsTx)
+				processPairSnapshot(elevator, processPairsTx)
 
 			// ================================================================== FROM ORDERCONTROL
 
@@ -156,7 +119,7 @@ func Start(
 				elevator.PhysicalInfo.LocalOrderTable = ordercontrol.OrderTableToLOT(elevator.OrderTable, elevator.PhysicalInfo.ID)
 
 				sendPhysicalInfoUpdate(elevator.PhysicalInfo, updateMV_PhysicalInfo, updateHW_PhysicalInfo)
-				publishSnapshotPP(elevator, processPairsTx)
+				processPairSnapshot(elevator, processPairsTx)
 
 				elev.SetAllLights(elevator.PhysicalInfo.LocalOrderTable, elevator.OrderTable, elevator.AliveList)
 
@@ -170,17 +133,16 @@ func Start(
 				if isChanged {
 					updateRX_Role <- elevator.PhysicalInfo.Role
 					sendPhysicalInfoUpdate(elevator.PhysicalInfo, updateMV_PhysicalInfo, updateOC_PhysicalInfo, updateTX_PhysicalInfo, updateHW_PhysicalInfo)
-					publishSnapshotPP(elevator, processPairsTx)
+					processPairSnapshot(elevator, processPairsTx)
 				}
 
 			case newPrimaryId := <-fromRM_PrimaryID:
 				log.Println("[MAIN] From RM: Primary ID")
 				elevator.PhysicalInfo.PrimaryID = newPrimaryId
 
-				// CLAUDE 18.03: fjerna isChanged guard
 				sendPhysicalInfoUpdate(elevator.PhysicalInfo, updateMV_PhysicalInfo, updateOC_PhysicalInfo, updateTX_PhysicalInfo, updateHW_PhysicalInfo)
 				updateRX_PrimaryID <- elevator.PhysicalInfo.PrimaryID
-				publishSnapshotPP(elevator, processPairsTx)
+				processPairSnapshot(elevator, processPairsTx)
 
 			case newAliveList := <-fromRM_AliveList:
 				log.Println("[MAIN] From RM: New AliveList")
@@ -191,7 +153,7 @@ func Start(
 				if isChanged {
 					updateOC_AliveList <- elevator.AliveList
 					elev.SetAllLights(elevator.PhysicalInfo.LocalOrderTable, elevator.OrderTable, elevator.AliveList)
-					publishSnapshotPP(elevator, processPairsTx)
+					processPairSnapshot(elevator, processPairsTx)
 				}
 			}
 
@@ -216,7 +178,8 @@ func sendPhysicalInfoUpdate(info elev.ElevatorPhysicalInfo, channels ...chan<- e
 		}
 	}
 }
-func publishSnapshotPP(e elev.Elevator, tx chan<- elev.Elevator) {
+
+func processPairSnapshot(e elev.Elevator, tx chan<- elev.Elevator) {
 	if tx == nil {
 		return
 	}

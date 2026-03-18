@@ -17,10 +17,8 @@ func Movement(
 	fromMV_ClearOrders chan<- elev.ClearOrders,
 	toMV_FloorArrival <-chan int) {
 
-	// Local to Movement
 	physicalInfo := initElev.PhysicalInfo
 
-	// Movement timers
 	doorTimer := timer.New(elev.DOOR_OPEN_TIME)
 	betweenFloorTimer := timer.New(elev.BETWEEN_FLOORS_TIMEOUT)
 	stuckDoorTimer := timer.New(elev.STUCK_DOOR_TIMEOUT)
@@ -29,7 +27,6 @@ func Movement(
 	defer betweenFloorTimer.Close()
 	defer stuckDoorTimer.Close()
 
-	// Initial sync for crash/restart cases
 	if physicalInfo.Movement == elev.EM_DoorOpen {
 		stuckDoorTimer.Start()
 	}
@@ -63,7 +60,6 @@ func Movement(
 				physicalInfo = fsm_onTableUpdate(physicalInfo, doorTimer, fromMV_LOT, fromMV_Movement, fromMV_MotorDir, fromMV_ClearOrders)
 			}
 
-			// Sync and update
 			syncBetweenFloorTimer(prevMovement, prevFloor, physicalInfo, betweenFloorTimer)
 			syncStuckDoorTimer(physicalInfo, stuckDoorTimer)
 			syncIdleRestartTimer(physicalInfo, idleRestartTimer)
@@ -76,7 +72,6 @@ func Movement(
 
 			physicalInfo = fsm_onDoorTimeout(physicalInfo, doorTimer, fromMV_LOT, fromMV_Movement, fromMV_MotorDir, fromMV_ClearOrders)
 
-			// Sync and update
 			syncBetweenFloorTimer(prevMovement, prevFloor, physicalInfo, betweenFloorTimer)
 			syncStuckDoorTimer(physicalInfo, stuckDoorTimer)
 			syncIdleRestartTimer(physicalInfo, idleRestartTimer)
@@ -93,7 +88,6 @@ func Movement(
 
 			physicalInfo = fsm_onFloorArrival(physicalInfo, doorTimer, fromMV_LOT, fromMV_Movement, fromMV_ClearOrders)
 
-			// Sync and update
 			syncBetweenFloorTimer(prevMovement, prevFloor, physicalInfo, betweenFloorTimer)
 			syncStuckDoorTimer(physicalInfo, stuckDoorTimer)
 			syncIdleRestartTimer(physicalInfo, idleRestartTimer)

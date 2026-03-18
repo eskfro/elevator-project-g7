@@ -60,7 +60,6 @@ func calculateCost(
 	numOrders := 0
 
 	floorDiff := int(math.Abs(float64(orderFloor - elevator.Floor)))
-	// Count num active orders for elevator
 	for floor := 0; floor < elev.N_FLOORS; floor++ {
 		for btn := 0; btn < elev.N_BUTTONS; btn++ {
 			if LocalOrderTable[floor][btn] {

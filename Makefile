@@ -23,9 +23,6 @@ clean:
 
 race:
 	go run -race main.go 0 16657 11311 10411 1
-	
-
-
 
 # =========================== STARTING ELEVS AT HOME
 sim0:

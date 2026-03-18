@@ -5,6 +5,11 @@ import (
 	"time"
 )
 
+/*
+	Made our own timer-module to make the timers more intuitive to use
+	without compromising safety
+*/
+
 type Timer struct {
 	internal *time.Timer
 	duration time.Duration

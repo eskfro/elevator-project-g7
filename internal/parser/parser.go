@@ -10,6 +10,9 @@ func ParseOsArgs(args []string, sim bool) (int, network.Ports, string) {
 	/*
 		Parser for OS-args when running program from cmd line
 		Returns Id, Ports, ProcessPairRole
+
+		ppRole = "1" -> Program starts as process-pair master
+		ppRole = "0" -> Programs starts as process-pair slave
 	*/
 
 	if sim {
@@ -30,8 +33,5 @@ func ParseOsArgs(args []string, sim bool) (int, network.Ports, string) {
 	}
 
 	return ID, network.Ports{Hardware: port_HW, OrderTableP: port_OT, HeartBeat: port_HB}, ppRole
-
-	// ppRole = "1" -> Programmet starter som en master
-	// ppRole = "0" -> Programmet starter som slave, denne er blitt kalt fra en master.
 
 }

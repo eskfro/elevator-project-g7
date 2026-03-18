@@ -57,7 +57,7 @@ func startMaster(
 	elevio.InitPhysicalElevator("localhost", ports.Hardware, elev.N_FLOORS)
 	elevator := elev.CreateElevator(ID, ports.Hardware, network.GetLocalIP())
 
-	fromIO_BtnPress, fromIO_Floor, fromIO_Obstruction := elevio.Inputs()
+	fromIO_BtnPress, fromIO_Floor, fromIO_Obstruction := elevio.CreateHardwareChannels()
 
 	go txHeartbeat(localHeartbeatPort(ID))
 	go txSnapshots(localSnapshotPort(ID), snapshotTx)
@@ -102,7 +102,7 @@ func startSlave(
 			}
 
 		case <-timeout.C:
-			log.Println("[PP] master timed out, taking over")
+			log.Println("[PP] Master timed out, taking over")
 
 			if !haveSnapshot {
 				mirrorElev = elev.CreateElevator(ID, ports.Hardware, network.GetLocalIP())
@@ -113,12 +113,11 @@ func startSlave(
 
 			elevio.InitPhysicalElevator("localhost", ports.Hardware, elev.N_FLOORS)
 
-			fromIO_BtnPress, fromIO_Floor, fromIO_Obstruction := elevio.Inputs()
+			fromIO_BtnPress, fromIO_Floor, fromIO_Obstruction := elevio.CreateHardwareChannels()
 
 			go txHeartbeat(localHeartbeatPort(ID))
 			go txSnapshots(localSnapshotPort(ID), snapshotTx)
 
-			// Check these if troubleshooting
 			mirrorElev.PhysicalInfo.Role = elev.ER_Backup
 			mirrorElev.PhysicalInfo.PrimaryID = elev.INVALID_PRIMARY_ID
 			mirrorElev.PhysicalInfo.MotorDir = elevio.MD_Stop
@@ -127,7 +126,6 @@ func startSlave(
 				elevio.SetDoorOpenLamp(true)
 			}
 
-			// 16.03
 			if elevio.GetObstruction() {
 				mirrorElev.PhysicalInfo.Obstructed = true
 			}

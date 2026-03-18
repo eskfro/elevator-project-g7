@@ -18,7 +18,6 @@ func TxHeartBeat(
 	message := initElev.PhysicalInfo
 	address := BCAST_RCV_IP + ":" + strconv.Itoa(port_hb)
 
-	// Establish udp "connection"
 	conn, err := lc.ListenPacket(context.Background(), "udp4", ":0")
 	if err != nil {
 		log.Printf("TxHeartBeat conn failed! port_hb = %d\n", port_hb)
@@ -38,7 +37,6 @@ func TxHeartBeat(
 		}
 		_, err = conn.WriteTo(data, dst)
 		if err != nil {
-			// log.Println("Error sending message: ", err)
 		}
 	}
 
@@ -82,14 +80,12 @@ func TxOrderTable(
 
 		// Update info to transmitt
 		case newOTP := <-updateTX_OTP:
-			// Increment version before updating packet info
 			var nextVersion uint64
 			nextVersion = versionTracker.increment()
 
 			newOTP.Version = nextVersion
 			latestPacket = newOTP
 
-		// Ticker for tx interval
 		case <-ticker.C:
 
 			// Guard so we dont send init OTP

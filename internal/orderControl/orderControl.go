@@ -23,12 +23,10 @@ func OrderControl(
 	stopOrderTimer := make(chan elev.Order, 16)
 	orderToReassign := make(chan elev.Order, 16)
 
-	//Timer
 	newElevTime := time.Now()
 	retriggerOT := time.NewTicker(500 * time.Millisecond)
 	defer retriggerOT.Stop()
 
-	// Local to OrderControl
 	orderTable := initElev.OrderTable
 	allOrderTables := initElev.AllOrderTables
 	physicalInfo := initElev.PhysicalInfo
@@ -50,14 +48,12 @@ func OrderControl(
 					updateTX_OTP <- elev.OrderTablePacket{ID: physicalInfo.ID, OrderTable: orderTable}
 
 				}
-				// fromOC_OrderTable <- orderTable
 			}
 
 		case <-fromRM_ResetNewElevTimer:
 			log.Println("[OrderControl] Reset New Elev Timer")
 			newElevTime = time.Now()
 
-			// CLAUDE 18.03
 			fromOC_OrderTable <- orderTable
 			updateTX_OTP <- elev.OrderTablePacket{ID: physicalInfo.ID, OrderTable: orderTable}
 
@@ -69,10 +65,8 @@ func OrderControl(
 		case order := <-orderToReassign:
 			var rcvOrderTable elev.OrderTable
 
-			// Only reassign if primary
 			if physicalInfo.Role == elev.ER_Primary {
 
-				// Check if the order is still active
 				isActiveOrder := false
 				for elevID := 0; elevID < elev.N_MAX_ELEVS; elevID++ {
 					if aliveList[elevID].Role == elev.ER_Dead {
@@ -96,11 +90,9 @@ func OrderControl(
 					}
 					timeoutID := order.ElevID
 
-					// Find best elevator to take new order
 					bestID := calculateBestElevator(order.Floor, rcvOrderTable, aliveList, timeoutID)
 					rcvOrderTable[bestID][order.Floor][order.ButtonType] = elev.OS_CONFIRMED
 
-					// Set values and send
 					orderTable = rcvOrderTable
 					allOrderTables[physicalInfo.ID] = orderTable
 					fromOC_OrderTable <- orderTable
@@ -143,7 +135,6 @@ func OrderControl(
 				rcvOrderTable = orderTable
 			}
 
-			// Update states and send
 			newOrderTable := updateOrderTable(orderTable, rcvOrderTable, physicalInfo.ID, allOrderTables, physicalInfo, aliveList, updateTX_OTP, startOrderTimer, stopOrderTimer, newElevTime)
 			orderTable = newOrderTable
 			allOrderTables[physicalInfo.ID] = orderTable
@@ -156,17 +147,14 @@ func OrderControl(
 			rcvOrderTable := orderTable
 			currentStatus := orderTable[physicalInfo.ID][btnPress.Floor][btnPress.Button]
 
-			// Check if already order at (btn, floor)
 			isOrderAlreadyActive := currentStatus == elev.OS_REQUESTED || currentStatus == elev.OS_CONFIRMED
 
 			if isOrderAlreadyActive {
 				log.Println("[OrderControl] Order Already Active")
 				continue
 			}
-			// Set requested
 			rcvOrderTable[physicalInfo.ID][btnPress.Floor][btnPress.Button] = elev.OS_REQUESTED
 
-			// Update states and send
 			newOrderTable := updateOrderTable(orderTable, rcvOrderTable, physicalInfo.ID, allOrderTables, physicalInfo, aliveList, updateTX_OTP, startOrderTimer, stopOrderTimer, newElevTime)
 			orderTable = newOrderTable
 			allOrderTables[physicalInfo.ID] = orderTable
@@ -178,7 +166,6 @@ func OrderControl(
 			log.Println("[OrderControl] Clear Order")
 			rcvOrderTable := orderTable
 
-			// Update OrderTable according to incoming clear order
 			for btn := 0; btn < elev.N_BUTTONS; btn++ {
 				isActiveClearOrder := clearOrders[btn].ElevID != elev.INVALID_ELEVATOR_ID
 				if isActiveClearOrder {
@@ -187,13 +174,11 @@ func OrderControl(
 				}
 			}
 
-			// Update states and send
 			newOrderTable := updateOrderTable(orderTable, rcvOrderTable, physicalInfo.ID, allOrderTables, physicalInfo, aliveList, updateTX_OTP, startOrderTimer, stopOrderTimer, newElevTime)
 			isChanged := newOrderTable != orderTable
 			orderTable = newOrderTable
 			allOrderTables[physicalInfo.ID] = orderTable
 
-			// ESKIL 18.03
 			if isChanged {
 				fromOC_OrderTable <- orderTable
 			}
@@ -203,29 +188,18 @@ func OrderControl(
 			isMsgFromSelf := packet.ID == physicalInfo.ID
 			isChanged := allOrderTables[packet.ID] != packet.OrderTable
 
-			// wasDeadElev := time.Since(newElevTime) < elev.BACKUP_WAIT_OT_TIME
-			// isRecentlyReconnected := time.Since(newElevTime) < elev.BACKUP_RCV_PRIMARYOT_TIMEOUT //CLAUDE 18.03
-			// if isMsgFromSelf || (!isChanged && !isRecentlyReconnected) { //CLAUDE 18.03
-			// 	continue
-			// }
-			// shouldIgnoreGuard := time.Since(newElevTime) > elev.BACKUP_RCV_PRIMARYOT_TIMEOUT &&
-			// 	time.Since(newElevTime) < elev.BACKUP_RCV_PRIMARYOT_TIMEOUT+500*time.Millisecond // ESKFRO 18.03
-
-			shouldIgnoreGuard := time.Since(newElevTime) < elev.BACKUP_RCV_PRIMARYOT_TIMEOUT+500*time.Millisecond // ESKFRO 18.03
-
 			if isMsgFromSelf {
 				continue
 			}
 
-			// Pass through guard if: (1s < newElevTime < 1.5s)
-			if !isChanged && !shouldIgnoreGuard { //ESKFRO 18.03
+			shouldIgnoreGuard := time.Since(newElevTime) < elev.RECONNECT_SYNC_WINDOW+500*time.Millisecond
+
+			if !isChanged && !shouldIgnoreGuard {
 				continue
 			}
 
-			// AOT Update
 			allOrderTables[packet.ID] = packet.OrderTable
 
-			// Update states and send
 			newOrderTable := updateOrderTable(orderTable, packet.OrderTable, packet.ID, allOrderTables, physicalInfo, aliveList, updateTX_OTP, startOrderTimer, stopOrderTimer, newElevTime)
 			orderTable = newOrderTable
 			allOrderTables[physicalInfo.ID] = orderTable
@@ -249,22 +223,18 @@ func updateOrderTable(
 	newElevTime time.Time,
 ) elev.OrderTable {
 
-	// prevOrderTable := OrderTable
 	isMsgFromSelf := rcvID == physicalInfo.ID
 	isMsgFromPrimary := rcvID == physicalInfo.PrimaryID
 
 	switch physicalInfo.Role {
 
 	case elev.ER_Backup:
-		// Backup stupid af 💀
+
 		if isMsgFromPrimary {
-
-			isNewElevOnNetwork := time.Since(newElevTime) < elev.BACKUP_RCV_PRIMARYOT_TIMEOUT
-
+			isNewElevOnNetwork := time.Since(newElevTime) < elev.RECONNECT_SYNC_WINDOW
 			if isNewElevOnNetwork {
 				updateTX_OTP <- elev.OrderTablePacket{ID: physicalInfo.ID, OrderTable: OrderTable}
 				return OrderTable
-
 			} else {
 				backupOT := handleBackupTransitions(OrderTable, rcvOrderTable)
 				updateTX_OTP <- elev.OrderTablePacket{ID: physicalInfo.ID, OrderTable: backupOT}
@@ -272,7 +242,7 @@ func updateOrderTable(
 			}
 
 		}
-		// New Clear Order or BtnPress
+		// Broadcast the new backup orderTable to get approval by primary elevator
 		if isMsgFromSelf {
 			updateTX_OTP <- elev.OrderTablePacket{ID: physicalInfo.ID, OrderTable: rcvOrderTable}
 			return rcvOrderTable
@@ -281,43 +251,33 @@ func updateOrderTable(
 	case elev.ER_Primary:
 		primaryOT := OrderTable
 
-		// ClearOrder or BtnPress from Self
+		// ClearOrder or BtnPress from self
 		if isMsgFromPrimary {
 			primaryOT = rcvOrderTable
 
-			// Resolve dead elevators
 			primaryOT, ordersToReassign := resolveDeadElevators(primaryOT, aliveList)
-			primaryOT = reassignHallOrders(primaryOT, physicalInfo.ID, ordersToReassign) // Eskil 13.03
+			primaryOT = reassignHallOrders(primaryOT, physicalInfo.ID, ordersToReassign)
 
-			// OrderStatus transitions
 			primaryOT = handlePrimaryStatusTransitions(primaryOT, primaryOT, aliveList, newElevTime)
 			allOrderTables[physicalInfo.ID] = primaryOT
 
 			primaryOT = assignAndClearOrders(primaryOT, aliveList, allOrderTables, physicalInfo.ID, startOrderTimer, stopOrderTimer)
-
 			updateTX_OTP <- elev.OrderTablePacket{ID: physicalInfo.ID, OrderTable: primaryOT}
-
 			return primaryOT
 
-			//isMsgFromBackup && isPrimary
-		} else {
-
-			// Resolve dead elevators
+		} else { // OrderTable from backup over network
 			primaryOT, ordersToReassign := resolveDeadElevators(primaryOT, aliveList)
-			primaryOT = reassignHallOrders(primaryOT, physicalInfo.ID, ordersToReassign) // Eskil 13.03
+			primaryOT = reassignHallOrders(primaryOT, physicalInfo.ID, ordersToReassign)
 
 			// OrderStatus transitions
 			primaryOT = handlePrimaryStatusTransitions(primaryOT, rcvOrderTable, aliveList, newElevTime)
 
 			primaryOT = assignAndClearOrders(primaryOT, aliveList, allOrderTables, physicalInfo.ID, startOrderTimer, stopOrderTimer)
-
 			updateTX_OTP <- elev.OrderTablePacket{ID: physicalInfo.ID, OrderTable: primaryOT}
-
 			return primaryOT
 		}
 	}
 
-	log.Println("[handleOrderTable] Bottom Return Case")
 	return OrderTable
 }
 
@@ -350,17 +310,14 @@ func assignAndClearOrders(
 				allOrderTables[thisID] = primaryOT
 				continue
 
-				//isHall
-			} else {
+			} else { //isHall
 				for orderElevID := 0; orderElevID < elev.N_MAX_ELEVS; orderElevID++ {
 					isDeadElev := aliveList[orderElevID].Role == elev.ER_Dead
 					if isDeadElev {
 						continue
 					}
 
-					// Eskil 17.03: Flytta clear foran lol
 					if isClearedByAny(allOrderTables, aliveList, floor, btn, orderElevID) {
-						// Set the Primary OrderTable
 						for elevID := 0; elevID < elev.N_MAX_ELEVS; elevID++ {
 							isDeadElev := aliveList[elevID].Role == elev.ER_Dead
 							if isDeadElev {
@@ -374,12 +331,9 @@ func assignAndClearOrders(
 					}
 
 					if isRequestedByAll(allOrderTables, aliveList, floor, btn, orderElevID) {
-
 						if isAlreadyConfirmed(aliveList, primaryOT, floor, btn) {
 							continue
 						}
-
-						// Important: remove stale REQUESTED / CONFIRMED rows for this hall call // Eskil 17.03
 						for elevID := 0; elevID < elev.N_MAX_ELEVS; elevID++ {
 							if aliveList[elevID].Role == elev.ER_Dead {
 								continue
@@ -410,7 +364,6 @@ func reassignHallOrders(
 	primaryID int,
 	ordersToReassign elev.LocalOrderTable,
 ) elev.OrderTable {
-
 	for floor := 0; floor < elev.N_FLOORS; floor++ {
 		for btn := 0; btn < elev.N_BUTTONS; btn++ {
 			if ordersToReassign[floor][btn] {
@@ -418,7 +371,6 @@ func reassignHallOrders(
 			}
 		}
 	}
-
 	return primaryOT
 }
 func handleBackupTransitions(orderTable elev.OrderTable, rcvOrderTable elev.OrderTable) elev.OrderTable {
@@ -431,11 +383,13 @@ func handleBackupTransitions(orderTable elev.OrderTable, rcvOrderTable elev.Orde
 				primaryStatus := rcvOrderTable[elevID][floor][btn]
 				thisStatus := backupOT[elevID][floor][btn]
 
+				// Hall orders are always overwritten by primary
 				if elevio.ButtonType(btn) != elevio.BT_Cab {
 					backupOT[elevID][floor][btn] = primaryStatus
 					continue
 				}
-				// Primary cant overwrite thisID's cab orders
+
+				// Handle cab orders
 				newStatus := thisStatus
 
 				switch thisStatus {
@@ -457,10 +411,8 @@ func handleBackupTransitions(orderTable elev.OrderTable, rcvOrderTable elev.Orde
 
 				case elev.OS_CLEAR:
 					newStatus = thisStatus
-
 				}
 				backupOT[elevID][floor][btn] = newStatus
-
 			}
 		}
 	}
@@ -515,7 +467,7 @@ func handlePrimaryStatusTransitions(
 		}
 		for floor := 0; floor < elev.N_FLOORS; floor++ {
 			for btn := 0; btn < elev.N_BUTTONS; btn++ {
-				// Define helpers
+
 				primaryStatus := primaryOT[elevIndex][floor][btn]
 				rcvStatus := rcvOT[elevIndex][floor][btn]
 				isCab := elevio.ButtonType(btn) == elevio.BT_Cab
@@ -529,9 +481,8 @@ func handlePrimaryStatusTransitions(
 						primaryOT[elevIndex][floor][btn] = elev.OS_NO_ORDER
 						continue
 					}
-					//isHallCall
-				} else {
-					// State machine logikk for OrderStatus transitions
+
+				} else { //isHallCall
 					primaryOT[elevIndex][floor][btn] = orderStatusTransition(primaryStatus, rcvStatus, newElevTime)
 				}
 			}
@@ -553,18 +504,18 @@ func orderStatusTransition(
 			return elev.OS_REQUESTED
 		}
 
-		if rcvStatus == elev.OS_CONFIRMED && time.Since(newElevTime) < elev.BACKUP_RCV_PRIMARYOT_TIMEOUT {
+		if rcvStatus == elev.OS_CONFIRMED && time.Since(newElevTime) < elev.RECONNECT_SYNC_WINDOW {
 			return elev.OS_CONFIRMED
 		}
 
 	case elev.OS_REQUESTED:
-		if rcvStatus == elev.OS_CLEAR { //La til denne, idk da
+		if rcvStatus == elev.OS_CLEAR {
 			return elev.OS_CLEAR
 		}
 		return elev.OS_REQUESTED
 
 	case elev.OS_CONFIRMED:
-		if rcvStatus == elev.OS_CLEAR { // Eskil 13.03 -> Alle kan cleare en confirmed -> Litt usikker men gir mening
+		if rcvStatus == elev.OS_CLEAR {
 			return elev.OS_CLEAR
 		}
 		return elev.OS_CONFIRMED
@@ -573,7 +524,6 @@ func orderStatusTransition(
 		return elev.OS_CLEAR
 	}
 
-	// log.Printf("[orderStatusTransition] Base Case Hit\n")
 	return primaryStatus
 }
 

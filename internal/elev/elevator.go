@@ -17,15 +17,14 @@ const ORDER_TIMEOUT = 20 * time.Second
 const STUCK_DOOR_TIMEOUT = 15 * time.Second
 const IDLE_RESTART_TIMEOUT = 1000 * time.Second
 const HEARTBEAT_TIMEOUT = 701 * time.Millisecond
-const BETWEEN_FLOORS_TIMEOUT = 7000 * time.Millisecond
+const BETWEEN_FLOORS_TIMEOUT = 7 * time.Second
 
-// Backup dont set orderTable from primary until primary gets orderTable from backup
-const BACKUP_RCV_PRIMARYOT_TIMEOUT = 1000 * time.Millisecond
+const RECONNECT_SYNC_WINDOW = 1000 * time.Millisecond
 
 const INVALID_PRIMARY_ID = N_MAX_ELEVS + 1
 const INVALID_ELEVATOR_ID = N_MAX_ELEVS + 1
 
-// ==================================== CUSTOM TYPES
+// ==================================== TYPES
 
 type OrderStatus uint8
 
@@ -85,11 +84,10 @@ type ElevatorPhysicalInfo struct {
 	LocalOrderTable LocalOrderTable
 }
 
-// ELEVATOR
 type Elevator struct {
 	PhysicalInfo   ElevatorPhysicalInfo
-	OrderTable     OrderTable
-	AllOrderTables AllOrderTables
+	OrderTable     OrderTable // Table of all the orders (floor, btn) for all elevators
+	AllOrderTables AllOrderTables // Primaries overview of everyones OrderTable
 	AliveList      AliveList
 	NumElevs       int
 }

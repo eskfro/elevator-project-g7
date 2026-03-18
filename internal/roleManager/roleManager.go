@@ -21,7 +21,6 @@ func RoleManager(
 	heartBeatID := make(chan int, 256)
 	timedOutID := make(chan int, 64)
 
-	// Local to RoleManager
 	aliveList := initElev.AliveList
 	physicalInfo := initElev.PhysicalInfo
 	timeStart := time.Now()
@@ -47,7 +46,6 @@ func RoleManager(
 			if timedOutID == physicalInfo.ID {
 				continue
 			}
-
 			aliveList[timedOutID].Role = elev.ER_Dead
 			fromRM_AliveList <- aliveList
 			fromRM_ResetVersion <- timedOutID
@@ -58,9 +56,8 @@ func RoleManager(
 			select {
 			case heartBeatID <- heartbeat.ID:
 			default:
-				log.Fatalln("[RoleManager] Sending Heartbeat Default Case")
+				log.Fatalln("[RoleManager] Sending Heartbeat Blocked!")
 			}
-
 			isHeartbeatChanged := aliveList[heartbeat.ID] != heartbeat
 			isValidPrimaryID := heartbeat.PrimaryID != elev.INVALID_PRIMARY_ID
 			wasDead := aliveList[heartbeat.ID].Role == elev.ER_Dead
@@ -74,7 +71,6 @@ func RoleManager(
 				fromRM_ResetVersion <- heartbeat.ID
 				fromRM_ResetNewElevTimer <- struct{}{}
 			}
-			// log.Println("[RoleManager] New AliveList update to RoleManager")
 			aliveList[heartbeat.ID] = heartbeat
 			fromRM_AliveList <- aliveList
 			physicalInfo, aliveList = handleAliveListUpdate(physicalInfo, aliveList, timeStart, fromRM_AliveList, fromRM_PrimaryID, fromRM_Role, false, wasDead, fromRM_ResetNewElevTimer)
@@ -100,8 +96,7 @@ func handleAliveListUpdate(
 	switch physicalInfo.Role {
 
 	case elev.ER_Dead:
-		fmt.Println("[RoleManager] DEAD")
-		return physicalInfo, aliveList
+		log.Fatalln("[RoleManager] 💀")
 
 	case elev.ER_Backup:
 
@@ -123,7 +118,8 @@ func handleAliveListUpdate(
 		// Update PrimaryId when we know this elevator will be a backup
 		if shouldUpdatePrimaryId(aliveList, physicalInfo.PrimaryID, timeStart) {
 			log.Println("[RoleManager] Should Update PrimaryID")
-			newPrimaryId := getPrimaryId(aliveList, recentTimeout)
+			// Set change
+			newPrimaryId := getPrimaryID(aliveList, recentTimeout)
 			physicalInfo.PrimaryID = newPrimaryId
 			aliveList[physicalInfo.ID] = physicalInfo
 
@@ -149,7 +145,7 @@ func handleAliveListUpdate(
 			log.Println("[RoleManager] Should Become Backup")
 			// Set change
 			physicalInfo.Role = elev.ER_Backup
-			newPrimaryID := getPrimaryId(aliveList, recentTimeout)
+			newPrimaryID := getPrimaryID(aliveList, recentTimeout)
 			physicalInfo.PrimaryID = newPrimaryID
 			aliveList[physicalInfo.ID] = physicalInfo
 
@@ -164,7 +160,7 @@ func handleAliveListUpdate(
 		if wasDead {
 			fromRM_AliveList <- aliveList
 			fromRM_PrimaryID <- physicalInfo.PrimaryID
-			fromRM_Role <- physicalInfo.Role //IDK ABOUT THIS
+			fromRM_Role <- physicalInfo.Role
 			fromRM_ResetNewElevTimer <- struct{}{}
 		}
 
@@ -178,7 +174,6 @@ func monitorHeartBeats(
 	heartBeatID <-chan int,
 	timedOutID chan<- int,
 ) {
-	// Array of timers accessed by id
 	var elevTimers [elev.N_MAX_ELEVS]*timer.Timer
 
 	for id := range heartBeatID {
@@ -190,11 +185,9 @@ func monitorHeartBeats(
 
 		t := elevTimers[id]
 
-		// Init timer goroutine
 		if t == nil {
 			fmt.Printf("[monitorHeartBeats] New elevator: ID %d. Initializing timer.\n", id)
 
-			// Create the timer and store it in the array
 			t = timer.New(elev.HEARTBEAT_TIMEOUT)
 			elevTimers[id] = t
 
@@ -211,9 +204,8 @@ func monitorHeartBeats(
 	}
 }
 
-func getPrimaryId(aliveList elev.AliveList, recentTimeout bool) int {
+func getPrimaryID(aliveList elev.AliveList, recentTimeout bool) int {
 	numPrimaries := countPrimaries(aliveList)
-	// This is backup and should not become primary -> the lowest backupId is the new primary
 	if recentTimeout && numPrimaries == 0 {
 		for elevID := 0; elevID < elev.N_MAX_ELEVS; elevID++ {
 			if aliveList[elevID].Role == elev.ER_Backup {
@@ -223,7 +215,6 @@ func getPrimaryId(aliveList elev.AliveList, recentTimeout bool) int {
 		log.Fatalln("[GetPrimaryId] AliveList Empty!")
 	}
 
-	// Else return the primary with lowest Id
 	primaryID := elev.N_MAX_ELEVS
 	for elevId := 0; elevId < elev.N_MAX_ELEVS; elevId++ {
 		if aliveList[elevId].Role == elev.ER_Primary {
@@ -305,7 +296,6 @@ func shouldUpdatePrimaryId(aliveList elev.AliveList, primaryID int, timeStart ti
 		return time.Since(timeStart) >= elev.PRIMARY_ELECTION_DELAY
 	} else {
 		return aliveList[primaryID].Role != elev.ER_Primary
-		// old code -> return aliveList[primaryID].Role != elev.ER_Dead
 	}
 }
 

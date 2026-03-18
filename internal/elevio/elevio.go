@@ -26,8 +26,7 @@ type ButtonEvent struct {
 	Button ButtonType
 }
 
-// Input channels
-func Inputs() (<-chan ButtonEvent, <-chan int, <-chan bool) {
+func CreateHardwareChannels() (<-chan ButtonEvent, <-chan int, <-chan bool) {
 
 	fromIO_BtnPress := make(chan ButtonEvent, 64)
 	fromIO_Floor := make(chan int, 32)
@@ -40,7 +39,6 @@ func Inputs() (<-chan ButtonEvent, <-chan int, <-chan bool) {
 	return fromIO_BtnPress, fromIO_Floor, fromIO_Obstruction
 }
 
-// Moves elevator to a floor
 func InitPhysicalElevator(ip string, port int, numFloors int) {
 
 	Init(fmt.Sprintf("localhost:%d", port), numFloors)
@@ -52,17 +50,6 @@ func InitPhysicalElevator(ip string, port int, numFloors int) {
 
 	SetDoorOpenLamp(false)
 	SetFloorIndicator(GetFloor())
-}
-
-func PrintStopButton(chanStopButton <-chan bool) {
-	counter := 0
-	for press := range chanStopButton {
-
-		str := fmt.Sprintf("Someone pressed the Stop Button [%d] - (%t)", counter, press)
-		fmt.Println(str)
-
-		counter++
-	}
 }
 
 func PrintButtonpress(buttonEvent ButtonEvent) {

@@ -3,7 +3,6 @@ package requests
 import (
 	"elevator-project-g7/internal/elev"
 	"elevator-project-g7/internal/elevio"
-	"fmt"
 )
 
 type DirnMovementPair struct {
@@ -139,7 +138,6 @@ func ShouldStop(
 			!RequestAbove(localOrderTable, currentFloor)
 
 	default:
-		fmt.Println("ShouldStop case default")
 		return true
 	}
 }
