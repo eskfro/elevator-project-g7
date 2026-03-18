@@ -186,13 +186,13 @@ func OrderControl(
 
 		// =========================================================================== PACKET FROM NETWORK
 		case packet := <-fromRX_OrderTableP:
-			isMsgFromSelf := packet.ID == physicalInfo.ID
-			isChanged := allOrderTables[packet.ID] != packet.OrderTable
-			wasDeadElev := time.Since(newElevTime) < elev.BACKUP_WAIT_OT_TIME
+			// isMsgFromSelf := packet.ID == physicalInfo.ID
+			// isChanged := allOrderTables[packet.ID] != packet.OrderTable
+			// wasDeadElev := time.Since(newElevTime) < elev.BACKUP_WAIT_OT_TIME
 
-			if (isMsgFromSelf || !isChanged) && !wasDeadElev {
-				continue
-			}
+			// if !isChanged && !wasDeadElev {
+			// 	continue
+			// }
 
 			// AOT Update
 			allOrderTables[packet.ID] = packet.OrderTable
