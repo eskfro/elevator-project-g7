@@ -25,6 +25,8 @@ func OrderControl(
 
 	//Timer
 	newElevTime := time.Now()
+	retriggerOT := time.NewTicker(500 * time.Millisecond)
+	defer retriggerOT.Stop()
 
 	// Local to OrderControl
 	orderTable := initElev.OrderTable
@@ -37,6 +39,15 @@ func OrderControl(
 	for {
 
 		select {
+		case <-retriggerOT.C:
+			if physicalInfo.Role == elev.ER_Primary {
+
+				newOrderTable := updateOrderTable(orderTable, orderTable, physicalInfo.ID, allOrderTables, physicalInfo, aliveList, updateTX_OTP, startOrderTimer, stopOrderTimer, newElevTime)
+				orderTable = newOrderTable
+				allOrderTables[physicalInfo.ID] = orderTable
+
+				fromOC_OrderTable <- orderTable
+			}
 
 		case <-fromRM_ResetNewElevTimer:
 			newElevTime = time.Now()
