@@ -284,18 +284,20 @@ func updateOrderTable(
 							switch thisStatus {
 
 							case elev.OS_NO_ORDER:
-								newStatus = thisStatus
+								if primaryStatus == elev.OS_CONFIRMED || primaryStatus == elev.OS_REQUESTED {
+									newStatus = elev.OS_CONFIRMED
+								}
 
 							case elev.OS_REQUESTED:
 								if primaryStatus == elev.OS_CONFIRMED {
 									newStatus = elev.OS_CONFIRMED
-								} 
-								
+								}
+
 							case elev.OS_CONFIRMED:
 								if primaryStatus == elev.OS_CLEAR {
 									newStatus = elev.OS_NO_ORDER
 								}
-								
+
 							case elev.OS_CLEAR:
 								newStatus = thisStatus
 
