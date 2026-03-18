@@ -46,6 +46,23 @@ func fsm_onTableUpdate(
 			if PhysicalInfo.Movement != prevMovement {
 				fromMV_Movement <- PhysicalInfo.Movement
 			}
+		} else if !doorTimer.IsRunning() {
+
+			// The order may have gotten reasigned
+			elevio.SetDoorOpenLamp(false)
+			pair := requests.ChooseDirection(PhysicalInfo.LocalOrderTable, PhysicalInfo.Floor, PhysicalInfo.MotorDir)
+			PhysicalInfo.MotorDir = pair.MotorDir
+			PhysicalInfo.Movement = pair.Movement
+
+			if PhysicalInfo.MotorDir != prevMotorDir {
+				fromMV_MotorDir <- PhysicalInfo.MotorDir
+			}
+			if PhysicalInfo.Movement != prevMovement {
+				fromMV_Movement <- PhysicalInfo.Movement
+			}
+			if PhysicalInfo.Movement == elev.EM_Moving {
+				elevio.SetMotorDirection(PhysicalInfo.MotorDir)
+			}
 		}
 
 	case elev.EM_Moving:
