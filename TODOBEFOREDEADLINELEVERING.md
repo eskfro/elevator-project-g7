@@ -19,3 +19,8 @@ TING FØR FREDAG:
 ACCEPTANCE TEST TO MAKE:
 - Du er backup men primaryID sier du er primary
 - Du er primary men primaryID sier annnna tall
+
+
+TODO 18.03
+- sjekk ekstra godt om version number logikk funker
+- sjekk om vi kan ha en timer som gjør at vi uansett godtar pakker hvert 500ms

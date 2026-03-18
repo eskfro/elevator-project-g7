@@ -108,21 +108,14 @@ func RxOrderTable(
 
 		if isThisPrimary {
 
-			if !isMsgFromSelf {
+			if isMsgFromSelf {
+				continue
+			}
 
-				if isRcvVersionInit || isRcvVersionNewer {
-					// log.Println("[RxOrderTableUDP] Got message from backup")
-					versionsSeen[rcvOTP.ID] = rcvOTP.Version
-					fromRX_OTP <- rcvOTP
-				}
-				//isMsgFromSelf -> Sjekker om vi kan ha samme case uansett om det er fra deg selv eller ikke
-			} else {
-				if isRcvVersionInit || isRcvVersionNewer {
-					// log.Println("[RxOrderTableUDP] Got message from backup")
-					versionsSeen[rcvOTP.ID] = rcvOTP.Version
-					fromRX_OTP <- rcvOTP
-				}
-
+			if isRcvVersionInit || isRcvVersionNewer {
+				// log.Println("[RxOrderTableUDP] Got message from backup")
+				versionsSeen[rcvOTP.ID] = rcvOTP.Version
+				fromRX_OTP <- rcvOTP
 			}
 
 			// isThisBackup
@@ -130,7 +123,7 @@ func RxOrderTable(
 
 			if isMsgFromPrimary {
 
-				if isRcvVersionNewer { // TODO: sjekk om vi kan godta isRcvVersionInit
+				if isRcvVersionNewer || isRcvVersionInit { //Eskil 18.03 la til isRcvVersion init
 					log.Println("[RxOrderTableUDP] Got message from primary")
 					versionsSeen[rcvOTP.ID] = rcvOTP.Version
 					fromRX_OTP <- rcvOTP

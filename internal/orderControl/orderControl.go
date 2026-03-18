@@ -41,22 +41,23 @@ func OrderControl(
 		select {
 		case <-retriggerOT.C:
 			if physicalInfo.Role == elev.ER_Primary {
-
 				newOrderTable := assignAndClearOrders(orderTable, aliveList, allOrderTables, physicalInfo.ID, startOrderTimer, stopOrderTimer)
-
 				if newOrderTable != orderTable {
 					orderTable = newOrderTable
 					allOrderTables[physicalInfo.ID] = orderTable
 					fromOC_OrderTable <- orderTable
-					updateTX_OTP <- elev.OrderTablePacket{ID: physicalInfo.Floor, OrderTable: orderTable}
+					updateTX_OTP <- elev.OrderTablePacket{ID: physicalInfo.ID, OrderTable: orderTable}
 
 				}
-
 				fromOC_OrderTable <- orderTable
 			}
 
 		case <-fromRM_ResetNewElevTimer:
 			newElevTime = time.Now()
+
+			// CLAUDE 18.03
+			fromOC_OrderTable <- orderTable
+			updateTX_OTP <- elev.OrderTablePacket{ID: physicalInfo.ID, OrderTable: orderTable}
 
 		case newPhysicalInfo := <-updateOC_PhysicalInfo:
 			log.Println("[OrderControl] PhysicalInfo Update")
@@ -195,12 +196,9 @@ func OrderControl(
 			isMsgFromSelf := packet.ID == physicalInfo.ID
 			isChanged := allOrderTables[packet.ID] != packet.OrderTable
 			// wasDeadElev := time.Since(newElevTime) < elev.BACKUP_WAIT_OT_TIME
+			isRecentlyReconnected := time.Since(newElevTime) < elev.BACKUP_WAIT_OT_TIME //CLAUDE 18.03
 
-			// if !isChanged && !wasDeadElev {
-			// 	continue
-			// }
-
-			if isMsgFromSelf || !isChanged { // TODO: kanskje noe her
+			if isMsgFromSelf || (!isChanged && !isRecentlyReconnected) { //CLAUDE 18.03
 				continue
 			}
 

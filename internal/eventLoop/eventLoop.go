@@ -175,14 +175,12 @@ func Start(
 
 			case newPrimaryId := <-fromRM_PrimaryID:
 				log.Println("[MAIN] From RM: Primary ID")
-				isChanged := elevator.PhysicalInfo.PrimaryID != newPrimaryId
 				elevator.PhysicalInfo.PrimaryID = newPrimaryId
 
-				if isChanged {
-					sendPhysicalInfoUpdate(elevator.PhysicalInfo, updateMV_PhysicalInfo, updateOC_PhysicalInfo, updateTX_PhysicalInfo, updateHW_PhysicalInfo)
-					updateRX_PrimaryID <- elevator.PhysicalInfo.PrimaryID
-					publishSnapshotPP(elevator, processPairsTx)
-				}
+				// CLAUDE 18.03: fjerna isChanged guard
+				sendPhysicalInfoUpdate(elevator.PhysicalInfo, updateMV_PhysicalInfo, updateOC_PhysicalInfo, updateTX_PhysicalInfo, updateHW_PhysicalInfo)
+				updateRX_PrimaryID <- elevator.PhysicalInfo.PrimaryID
+				publishSnapshotPP(elevator, processPairsTx)
 
 			case newAliveList := <-fromRM_AliveList:
 				log.Println("[MAIN] From RM: New AliveList")
