@@ -210,7 +210,7 @@ func updateOrderTable(
 	newElevTime time.Time,
 ) elev.OrderTable {
 
-	prevOrderTable := OrderTable
+	// prevOrderTable := OrderTable
 	isMsgFromSelf := rcvID == physicalInfo.ID
 	isMsgFromPrimary := rcvID == physicalInfo.PrimaryID
 
