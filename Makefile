@@ -58,3 +58,20 @@ lab1:
 lab2:
 	chmod +x scripts/lab.sh
 	./scripts/lab.sh 2
+
+
+# ========================= PACKETLOSS
+rmploss:
+	sudo iptables -F
+
+ploss25:
+	chmod +x packet_loss/packetloss.sh
+	sudo ./packet_loss/packetloss.sh 25 -i 11311 10411
+
+ploss50:
+	chmod +x packet_loss/packetloss.sh
+	sudo ./packet_loss/packetloss.sh 50 -i 11311 10411
+
+ploss100:
+	chmod +x packet_loss/packetloss.sh
+	sudo ./packet_loss/packetloss.sh 100 -i 11311 10411

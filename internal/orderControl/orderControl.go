@@ -186,10 +186,14 @@ func OrderControl(
 
 			// Update states and send
 			newOrderTable := updateOrderTable(orderTable, rcvOrderTable, physicalInfo.ID, allOrderTables, physicalInfo, aliveList, updateTX_OTP, startOrderTimer, stopOrderTimer, newElevTime)
+			isChanged := newOrderTable != orderTable
 			orderTable = newOrderTable
 			allOrderTables[physicalInfo.ID] = orderTable
 
-			fromOC_OrderTable <- orderTable
+			// ESKIL 18.03
+			if isChanged {
+				fromOC_OrderTable <- orderTable
+			}
 
 		// =========================================================================== PACKET FROM NETWORK
 		case packet := <-fromRX_OrderTableP:
