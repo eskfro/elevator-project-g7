@@ -271,11 +271,17 @@ func updateOrderTable(
 				for elevID := 0; elevID < elev.N_MAX_ELEVS; elevID++ {
 					for floor := 0; floor < elev.N_FLOORS; floor++ {
 						for btn := 0; btn < elev.N_BUTTONS; btn++ {
-							// Primary cantr overwrite thisID's cab orders
-							if elevio.ButtonType(btn) == elevio.BT_Cab && elevID == physicalInfo.ID {
-								continue
+							primaryStatus := rcvOrderTable[elevID][floor][btn]
+							thisStatus := backupOT[elevID][floor][btn]
+
+							if elevio.ButtonType(btn) != elevio.BT_Cab {
+								backupOT[elevID][floor][btn] = primaryStatus
 							}
-							backupOT[elevID][floor][btn] = rcvOrderTable[elevID][floor][btn]
+							// Primary cant overwrite thisID's cab orders
+							if (thisStatus == elev.OS_CONFIRMED || thisStatus == elev.OS_REQUESTED) && primaryStatus == elev.OS_NO_ORDER {
+								backupOT[elevID][floor][btn] = thisStatus
+							}
+
 						}
 					}
 				}
