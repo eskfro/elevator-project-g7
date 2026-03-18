@@ -276,11 +276,31 @@ func updateOrderTable(
 
 							if elevio.ButtonType(btn) != elevio.BT_Cab {
 								backupOT[elevID][floor][btn] = primaryStatus
+								continue
 							}
 							// Primary cant overwrite thisID's cab orders
-							if (thisStatus == elev.OS_CONFIRMED || thisStatus == elev.OS_REQUESTED) && primaryStatus == elev.OS_NO_ORDER {
-								backupOT[elevID][floor][btn] = thisStatus
+							newStatus := thisStatus
+
+							switch thisStatus {
+
+							case elev.OS_NO_ORDER:
+								newStatus = thisStatus
+
+							case elev.OS_REQUESTED:
+								if primaryStatus == elev.OS_CONFIRMED {
+									newStatus = elev.OS_CONFIRMED
+								} 
+								
+							case elev.OS_CONFIRMED:
+								if primaryStatus == elev.OS_CLEAR {
+									newStatus = elev.OS_NO_ORDER
+								}
+								
+							case elev.OS_CLEAR:
+								newStatus = thisStatus
+
 							}
+							backupOT[elevID][floor][btn] = newStatus
 
 						}
 					}
