@@ -37,11 +37,11 @@ func RoleManager(
 		case <-startupCheck.C:
 			aliveList[physicalInfo.ID] = physicalInfo
 			physicalInfo, aliveList = handleAliveListUpdate(physicalInfo, aliveList, timeStart, fromRM_AliveList, fromRM_PrimaryID, fromRM_Role, false, false, fromRM_ResetNewElevTimer)
-			at_rolePrimaryID(physicalInfo.PrimaryID, physicalInfo.ID, physicalInfo.Role)
+			assertRolePrimaryConsistency(physicalInfo.PrimaryID, physicalInfo.ID, physicalInfo.Role)
 
 		case newPhysicalInfo := <-updateRM_PhysicalInfo:
 			physicalInfo = newPhysicalInfo
-			at_rolePrimaryID(physicalInfo.PrimaryID, physicalInfo.ID, physicalInfo.Role)
+			assertRolePrimaryConsistency(physicalInfo.PrimaryID, physicalInfo.ID, physicalInfo.Role)
 
 		case timedOutID := <-timedOutID:
 			if timedOutID == physicalInfo.ID {
@@ -52,13 +52,13 @@ func RoleManager(
 			fromRM_AliveList <- aliveList
 			fromRM_ResetVersion <- timedOutID
 			physicalInfo, aliveList = handleAliveListUpdate(physicalInfo, aliveList, timeStart, fromRM_AliveList, fromRM_PrimaryID, fromRM_Role, true, false, fromRM_ResetNewElevTimer)
-			at_rolePrimaryID(physicalInfo.PrimaryID, physicalInfo.ID, physicalInfo.Role)
+			assertRolePrimaryConsistency(physicalInfo.PrimaryID, physicalInfo.ID, physicalInfo.Role)
 
 		case heartbeat := <-fromRX_PhysicalInfo:
 			select {
 			case heartBeatID <- heartbeat.ID:
 			default:
-				log.Println("[RoleManager] Sending Heartbeat Default Case")
+				log.Fatalln("[RoleManager] Sending Heartbeat Default Case")
 			}
 
 			isHeartbeatChanged := aliveList[heartbeat.ID] != heartbeat
@@ -67,7 +67,7 @@ func RoleManager(
 
 			// I starten settes PrimaryId til INVALID
 			if !isHeartbeatChanged && isValidPrimaryID && !wasDead {
-				at_rolePrimaryID(physicalInfo.PrimaryID, physicalInfo.ID, physicalInfo.Role)
+				assertRolePrimaryConsistency(physicalInfo.PrimaryID, physicalInfo.ID, physicalInfo.Role)
 				continue
 			}
 			if wasDead {
@@ -78,7 +78,7 @@ func RoleManager(
 			aliveList[heartbeat.ID] = heartbeat
 			fromRM_AliveList <- aliveList
 			physicalInfo, aliveList = handleAliveListUpdate(physicalInfo, aliveList, timeStart, fromRM_AliveList, fromRM_PrimaryID, fromRM_Role, false, wasDead, fromRM_ResetNewElevTimer)
-			at_rolePrimaryID(physicalInfo.PrimaryID, physicalInfo.ID, physicalInfo.Role)
+			assertRolePrimaryConsistency(physicalInfo.PrimaryID, physicalInfo.ID, physicalInfo.Role)
 
 		}
 	}
@@ -133,11 +133,11 @@ func handleAliveListUpdate(
 
 		}
 
-		// If an elevator was dead we want to start events so it updates nicely on the network or something
+		// If an elevator was dead we want to start events so it updates nicely on the network
 		if wasDead {
 			fromRM_AliveList <- aliveList
 			fromRM_PrimaryID <- physicalInfo.PrimaryID
-			fromRM_Role <- physicalInfo.Role //IDK ABOUT THIS
+			fromRM_Role <- physicalInfo.Role
 			fromRM_ResetNewElevTimer <- struct{}{}
 		}
 
@@ -186,12 +186,11 @@ func monitorHeartBeats(
 
 		if isIndexInvalid {
 			log.Fatalf("[monitorHeartBeats] Error: ID %d out of bounds\n", id)
-			continue
 		}
 
 		t := elevTimers[id]
 
-		// INIT TIMER GOROUTINE
+		// Init timer goroutine
 		if t == nil {
 			fmt.Printf("[monitorHeartBeats] New elevator: ID %d. Initializing timer.\n", id)
 
@@ -261,7 +260,7 @@ func CountNumElevs(aliveList elev.AliveList) int {
 	return numElevs
 }
 
-// Primary election -> the backup with smallest ID becomes primary
+// Primary election: the backup with smallest ID becomes primary
 func shouldBecomePrimary(thisID int, aliveList elev.AliveList, timeStart time.Time) bool {
 	// Make sure the alivelist is updated before we start primary election
 	if time.Since(timeStart) < elev.PRIMARY_ELECTION_DELAY ||
@@ -305,12 +304,12 @@ func shouldUpdatePrimaryId(aliveList elev.AliveList, primaryID int, timeStart ti
 	if primaryID == elev.INVALID_PRIMARY_ID {
 		return time.Since(timeStart) >= elev.PRIMARY_ELECTION_DELAY
 	} else {
-		return aliveList[primaryID].Role == elev.ER_Dead
-		// TODO return aliveList[primaryID].Role != ER_Primary
+		return aliveList[primaryID].Role != elev.ER_Primary
+		// old code -> return aliveList[primaryID].Role != elev.ER_Dead
 	}
 }
 
-func at_rolePrimaryID(PrimaryID int, thisID int, thisRole elev.ElevatorRole) {
+func assertRolePrimaryConsistency(PrimaryID int, thisID int, thisRole elev.ElevatorRole) {
 
 	if thisRole == elev.ER_Primary && thisID != PrimaryID {
 		log.Fatalln("[at_rolePrimaryID] err1")

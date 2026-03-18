@@ -39,6 +39,7 @@ func OrderControl(
 	for {
 
 		select {
+
 		case <-retriggerOT.C:
 			if physicalInfo.Role == elev.ER_Primary {
 				newOrderTable := assignAndClearOrders(orderTable, aliveList, allOrderTables, physicalInfo.ID, startOrderTimer, stopOrderTimer)
@@ -53,6 +54,7 @@ func OrderControl(
 			}
 
 		case <-fromRM_ResetNewElevTimer:
+			log.Println("[OrderControl] Reset New Elev Timer")
 			newElevTime = time.Now()
 
 			// CLAUDE 18.03
@@ -116,6 +118,7 @@ func OrderControl(
 				wasDead := aliveList[elevID].Role == elev.ER_Dead
 				isAlive := newAliveList[elevID].Role != elev.ER_Dead
 				if wasDead && isAlive {
+					// Reset allOrderTables to default when newElev
 					allOrderTables[elevID] = elev.OrderTable{}
 					wasAnyDead = true
 				}
@@ -199,10 +202,23 @@ func OrderControl(
 		case packet := <-fromRX_OrderTableP:
 			isMsgFromSelf := packet.ID == physicalInfo.ID
 			isChanged := allOrderTables[packet.ID] != packet.OrderTable
-			// wasDeadElev := time.Since(newElevTime) < elev.BACKUP_WAIT_OT_TIME
-			isRecentlyReconnected := time.Since(newElevTime) < elev.BACKUP_WAIT_OT_TIME //CLAUDE 18.03
 
-			if isMsgFromSelf || (!isChanged && !isRecentlyReconnected) { //CLAUDE 18.03
+			// wasDeadElev := time.Since(newElevTime) < elev.BACKUP_WAIT_OT_TIME
+			// isRecentlyReconnected := time.Since(newElevTime) < elev.BACKUP_RCV_PRIMARYOT_TIMEOUT //CLAUDE 18.03
+			// if isMsgFromSelf || (!isChanged && !isRecentlyReconnected) { //CLAUDE 18.03
+			// 	continue
+			// }
+			// shouldIgnoreGuard := time.Since(newElevTime) > elev.BACKUP_RCV_PRIMARYOT_TIMEOUT &&
+			// 	time.Since(newElevTime) < elev.BACKUP_RCV_PRIMARYOT_TIMEOUT+500*time.Millisecond // ESKFRO 18.03
+
+			shouldIgnoreGuard := time.Since(newElevTime) < elev.BACKUP_RCV_PRIMARYOT_TIMEOUT+500*time.Millisecond // ESKFRO 18.03
+
+			if isMsgFromSelf {
+				continue
+			}
+
+			// Pass through guard if: (1s < newElevTime < 1.5s)
+			if !isChanged && !shouldIgnoreGuard { //ESKFRO 18.03
 				continue
 			}
 
@@ -243,12 +259,14 @@ func updateOrderTable(
 		// Backup stupid af 💀
 		if isMsgFromPrimary {
 
-			if time.Since(newElevTime) > elev.BACKUP_WAIT_OT_TIME {
-				updateTX_OTP <- elev.OrderTablePacket{ID: physicalInfo.ID, OrderTable: rcvOrderTable}
-				return rcvOrderTable
-			} else {
+			isNewElevOnNetwork := time.Since(newElevTime) < elev.BACKUP_RCV_PRIMARYOT_TIMEOUT
+
+			if isNewElevOnNetwork {
 				updateTX_OTP <- elev.OrderTablePacket{ID: physicalInfo.ID, OrderTable: OrderTable}
 				return OrderTable
+			} else {
+				updateTX_OTP <- elev.OrderTablePacket{ID: physicalInfo.ID, OrderTable: rcvOrderTable}
+				return rcvOrderTable
 			}
 
 		}
@@ -274,7 +292,6 @@ func updateOrderTable(
 			allOrderTables[physicalInfo.ID] = primaryOT
 
 			primaryOT = assignAndClearOrders(primaryOT, aliveList, allOrderTables, physicalInfo.ID, startOrderTimer, stopOrderTimer)
-			// isOrderTableChanged := primaryOT != prevOrderTable
 
 			updateTX_OTP <- elev.OrderTablePacket{ID: physicalInfo.ID, OrderTable: primaryOT}
 
@@ -289,10 +306,8 @@ func updateOrderTable(
 
 			// OrderStatus transitions
 			primaryOT = handlePrimaryStatusTransitions(primaryOT, rcvOrderTable, aliveList, newElevTime)
-			// allOrderTables[physicalInfo.ID] = primaryOT //Eskil 17.03
 
 			primaryOT = assignAndClearOrders(primaryOT, aliveList, allOrderTables, physicalInfo.ID, startOrderTimer, stopOrderTimer)
-			// isOrderTableChanged := primaryOT != prevOrderTable
 
 			updateTX_OTP <- elev.OrderTablePacket{ID: physicalInfo.ID, OrderTable: primaryOT}
 
@@ -491,7 +506,7 @@ func orderStatusTransition(
 			return elev.OS_REQUESTED
 		}
 
-		if rcvStatus == elev.OS_CONFIRMED && time.Since(newElevTime) < elev.BACKUP_WAIT_OT_TIME {
+		if rcvStatus == elev.OS_CONFIRMED && time.Since(newElevTime) < elev.BACKUP_RCV_PRIMARYOT_TIMEOUT {
 			return elev.OS_CONFIRMED
 		}
 

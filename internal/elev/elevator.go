@@ -15,10 +15,12 @@ const PRIMARY_ELECTION_DELAY = 401 * time.Millisecond
 
 const ORDER_TIMEOUT = 20 * time.Second
 const STUCK_DOOR_TIMEOUT = 15 * time.Second
-const IDLE_RESTART_TIMEOUT = 100 * time.Second
+const IDLE_RESTART_TIMEOUT = 1000 * time.Second
 const HEARTBEAT_TIMEOUT = 501 * time.Millisecond
 const BETWEEN_FLOORS_TIMEOUT = 7000 * time.Millisecond
-const BACKUP_WAIT_OT_TIME = 1000 * time.Millisecond
+
+// Backup dont set orderTable from primary until primary gets orderTable from backup
+const BACKUP_RCV_PRIMARYOT_TIMEOUT = 1000 * time.Millisecond
 
 const INVALID_PRIMARY_ID = N_MAX_ELEVS + 1
 const INVALID_ELEVATOR_ID = N_MAX_ELEVS + 1

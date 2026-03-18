@@ -22,7 +22,7 @@ func Start(
 	fromIO_Obstruction <-chan bool,
 	processPairsTx chan<- elev.Elevator,
 ) {
-	// Ticker for debugging
+	// Ticker for printing elevator
 	timeStart := time.Now()
 	ticker_printElevator := time.NewTicker(1000 * time.Millisecond)
 	defer ticker_printElevator.Stop()
@@ -74,6 +74,7 @@ func Start(
 
 	publishSnapshotPP(elevator, processPairsTx)
 
+	// Obstruction and floor sensor
 	go func(initElev elev.Elevator, fromIO_Obstruction <-chan bool, fromIO_Floor <-chan int,
 		fromHW_PhysicalInfo chan<- elev.ElevatorPhysicalInfo, toMV_FloorArrival chan<- int, updateHW_PhysicalInfo <-chan elev.ElevatorPhysicalInfo,
 	) {
@@ -195,9 +196,7 @@ func Start(
 				}
 			}
 
-			//===================== ACCEPTANCE TESTS ===============================
-
-			// TODO: Denne må flyttes herifra, eventloopen skal bare inneholde events mellom moduler
+			//====================================================================== ACCEPTANCE TESTS
 
 			if elevator.PhysicalInfo.Floor < 0 || elevator.PhysicalInfo.Floor >= elev.N_FLOORS {
 				log.Fatalln("AT: Invalid floor index: ")

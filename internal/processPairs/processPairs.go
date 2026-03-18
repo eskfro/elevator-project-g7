@@ -62,7 +62,7 @@ func startMaster(
 	go txHeartbeat(localHeartbeatPort(ID))
 	go txSnapshots(localSnapshotPort(ID), snapshotTx)
 
-	spawnSlave(ID, ports)
+	//spawnSlave(ID, ports)
 
 	snapshotTx <- elevator
 
