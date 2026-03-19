@@ -37,7 +37,6 @@ func RoleManager(
 			aliveList[physicalInfo.ID] = physicalInfo
 			physicalInfo, aliveList = handleAliveListUpdate(physicalInfo, aliveList, timeStart, fromRM_AliveList, fromRM_PrimaryID, fromRM_Role, false, false, fromRM_ResetNewElevTimer)
 			assertRolePrimaryConsistency(physicalInfo.PrimaryID, physicalInfo.ID, physicalInfo.Role)
-			fromRM_AliveList <- aliveList
 
 		case newPhysicalInfo := <-updateRM_PhysicalInfo:
 			physicalInfo = newPhysicalInfo
@@ -224,7 +223,7 @@ func getPrimaryID(aliveList elev.AliveList, recentTimeout bool) int {
 		}
 	}
 	if primaryID == elev.N_MAX_ELEVS {
-		log.Fatalln("[GetPrimaryId] No Primary found in AliveList")
+		log.Println("[GetPrimaryId] No Primary found in AliveList")
 	}
 	return primaryID
 
