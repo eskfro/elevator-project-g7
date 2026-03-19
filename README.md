@@ -25,7 +25,7 @@ or <br>
 - Start program: ./out id hardWarePort orderTablePort, heartbeatPort
 - Start server: elevatorserver <br>
 or <br>
-- Start program: make lab1 / make lab2 / make lab3
+- Start program: make lab0 / make lab1 / make lab2
 - Start server: elevatorserver 
 
 
