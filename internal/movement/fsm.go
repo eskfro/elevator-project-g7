@@ -81,7 +81,9 @@ func fsm_onTableUpdate(
 		switch PhysicalInfo.Movement {
 
 		case elev.EM_DoorOpen:
-			elevio.SetDoorOpenLamp(true)
+			if elevio.GetFloor() != -1 {
+				elevio.SetDoorOpenLamp(true)
+			}
 			doorTimer.Start()
 			fmt.Println("timer set 1")
 
@@ -132,7 +134,11 @@ func fsm_onFloorArrival(
 	}
 
 	elevio.SetMotorDirection(elevio.MD_Stop)
-	elevio.SetDoorOpenLamp(true)
+
+	if elevio.GetFloor() != -1 {
+		elevio.SetDoorOpenLamp(true)
+	}
+
 	PhysicalInfo.Movement = elev.EM_DoorOpen
 	doorTimer.Start()
 	fmt.Println("timer set 3")

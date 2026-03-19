@@ -18,7 +18,7 @@ const STUCK_DOOR_TIMEOUT = 15 * time.Second
 const IDLE_RESTART_TIMEOUT = 1000 * time.Second
 const HEARTBEAT_TIMEOUT = 701 * time.Millisecond
 const BETWEEN_FLOORS_TIMEOUT = 7 * time.Second
-
+																		
 const RECONNECT_SYNC_WINDOW = 1000 * time.Millisecond
 
 const INVALID_PRIMARY_ID = N_MAX_ELEVS + 1
