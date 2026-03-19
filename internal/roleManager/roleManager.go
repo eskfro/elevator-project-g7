@@ -223,7 +223,7 @@ func getPrimaryID(aliveList elev.AliveList, recentTimeout bool) int {
 		}
 	}
 	if primaryID == elev.N_MAX_ELEVS {
-		log.Println("[GetPrimaryId] No Primary found in AliveList")
+		log.Fatalln("[GetPrimaryId] No Primary found in AliveList")
 	}
 	return primaryID
 
