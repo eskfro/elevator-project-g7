@@ -10,7 +10,7 @@ Elevator project where the goal is to make fault tolerant code for a distributed
 ### Dependencies 
 - Golang 1.20
 
-### Build
+### Building the binaries
 - Elevator Program: make build
 - Elevator Server: dmd -w -g src/sim_server.d src/timer_event.d -ofSimElevatorServer
 
