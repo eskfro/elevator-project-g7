@@ -18,8 +18,8 @@ Elevator project where the goal is to make fault tolerant code for a distributed
 - Start program: ./out id hardwarePort ordertablePort heartbeatPort
 - Start server: ./SimElevatorServer --port hardwarePort <br>
 or <br>
-- make sim0 / make sim1 / make sim2
-- make simall
+- Start program: make sim0 / make sim1 / make sim2
+- Start server: make simall
 
 ### Run simulator at the lab
 - Start program: ./out id hardWarePort orderTablePort, heartbeatPort
